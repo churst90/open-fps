@@ -13,6 +13,7 @@ using OpenFPS.Common.Networking;
 using OpenFPS.Geometry;
 using OpenFPS.Materials;
 using OpenFPS.Physics;
+using OpenFPS.Environment;
 
 namespace OpenFPS.AudioLab.Spikes;
 
@@ -222,10 +223,10 @@ public static class RunningWaterSpike
         string set = args.FirstOrDefault(a => a.StartsWith("set=", StringComparison.Ordinal))?[4..] ?? "all";
         double sec = Arg(args, "sec=", 30f);
         Directory.CreateDirectory(outDir);
-        Environment.SetEnvironmentVariable("OPENFPS_DITHER", "0");
-        Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", Path.Combine(outDir, "capture.wav"));
-        Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(outDir, "capture.post.wav"));
-        Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
+        System.Environment.SetEnvironmentVariable("OPENFPS_DITHER", "0");
+        System.Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", Path.Combine(outDir, "capture.wav"));
+        System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(outDir, "capture.post.wav"));
+        System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
         Console.WriteLine($"Extended sources {(LabOptions.WideSources.Enabled ? "spread" : "one point")}; ear model {(LabHearing.EarModelOn ? "on" : "off")}");
         // noise=1: every place of every running water source plays its own white noise instead of its
         // water, through the same voices, places, ground and HRTF: what the game's path does on its own.

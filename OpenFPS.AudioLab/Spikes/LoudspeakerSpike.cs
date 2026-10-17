@@ -130,7 +130,7 @@ public static class LoudspeakerSpike
     {
         AcousticRegistry.Initialize();
         string wav = Path.Combine(outDir, "capture.wav");
-        Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", wav);
+        System.Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", wav);
         var provider = new FmodAudioProvider { Hearing = LabHearing };
         var facade = new AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();

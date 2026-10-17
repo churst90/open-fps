@@ -195,7 +195,7 @@ public static class JoltTrialSpike
         long rss0 = RssKb();
         if (!Foundation.Init(false)) { Console.WriteLine("FAIL: Jolt's Foundation.Init returned false"); return 1; }
         long rssInit = RssKb();
-        Console.WriteLine($"  Jolt up: native libjoltc from JoltPhysics.Native, {Environment.OSVersion}, {System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}; "
+        Console.WriteLine($"  Jolt up: native libjoltc from JoltPhysics.Native, {System.Environment.OSVersion}, {System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}; "
                           + $"{threads} worker thread(s); RSS {Mb(rss0)} -> {Mb(rssInit)}");
 
         // ── The city: one tile's static triangles, and the whole city, as mesh shapes ────────────────

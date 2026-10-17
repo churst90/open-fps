@@ -1,5 +1,5 @@
 using System.Numerics;
-using OpenFPS.Common;
+using OpenFPS.Environment;
 using OpenFPS.Acoustics;
 
 namespace OpenFPS.Sound.Core;
@@ -262,7 +262,7 @@ public static class Thunder
             for (int i = 0; i < fine.Count; i++) if (member[i] == g) mine.Add(i);
             // A few cores, a buffer each, near and far pieces interleaved: a strike 100 m away is heard
             // a third of a second after the flash.
-            int threads = options.Threads > 0 ? options.Threads : Math.Clamp(Environment.ProcessorCount / 2, 1, 4);
+            int threads = options.Threads > 0 ? options.Threads : Math.Clamp(System.Environment.ProcessorCount / 2, 1, 4);
             var buffers = new float[threads][];
             System.Threading.Tasks.Parallel.For(0, threads, t =>
             {

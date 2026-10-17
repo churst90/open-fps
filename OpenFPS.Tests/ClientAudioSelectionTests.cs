@@ -10,6 +10,7 @@ using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
 using OpenFPS.Sound;
 using OpenFPS.Physics;
+using OpenFPS.Environment;
 
 namespace OpenFPS.Tests;
 

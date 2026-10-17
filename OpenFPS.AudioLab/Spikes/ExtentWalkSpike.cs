@@ -19,6 +19,7 @@ using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
 using OpenFPS.Materials;
 using OpenFPS.Physics;
+using OpenFPS.Environment;
 
 namespace OpenFPS.AudioLab.Spikes;
 
@@ -586,9 +587,9 @@ public static class ExtentWalkSpike
     private static void Render(Walk walk, List<EntityDefinition> sources, float[]? ground, float speed, string outDir)
     {
         string capture = Path.Combine(outDir, walk.Name + ".wav");
-        Environment.SetEnvironmentVariable("OPENFPS_DITHER", "0");
-        Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", capture);
-        Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
+        System.Environment.SetEnvironmentVariable("OPENFPS_DITHER", "0");
+        System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", capture);
+        System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
         var provider = new FmodAudioProvider { Options = LabOptions };
         var clock = Stopwatch.StartNew();
         var rig = MakeRig(provider, () => clock.Elapsed.TotalSeconds, prewarm: false, sounds: LabPaths.Sounds());

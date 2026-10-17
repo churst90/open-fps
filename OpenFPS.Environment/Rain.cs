@@ -1,4 +1,4 @@
-namespace OpenFPS.Common;
+namespace OpenFPS.Environment;
 
 /// <summary>How hard it is raining, by the usual classes of rain rate.</summary>
 public enum RainCategory { None, Light, Moderate, Heavy, Violent }

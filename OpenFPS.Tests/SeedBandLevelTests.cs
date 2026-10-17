@@ -5,6 +5,7 @@ using OpenFPS.Audio.Fmod;
 using OpenFPS.Common;
 using Xunit.Abstractions;
 using OpenFPS.Physics;
+using OpenFPS.Environment;
 
 namespace OpenFPS.Tests;
 
@@ -145,7 +146,7 @@ public class SeedBandLevelTests
     [Fact]
     public void A_shore_is_as_loud_in_every_band_whatever_its_seed()
     {
-        if (Environment.GetEnvironmentVariable("OPENFPS_SEED_BANDS_SHORE") != "1")
+        if (System.Environment.GetEnvironmentVariable("OPENFPS_SEED_BANDS_SHORE") != "1")
         {
             _o.WriteLine("OPENFPS_SEED_BANDS_SHORE is not 1: the shore was not rendered.");
             return;

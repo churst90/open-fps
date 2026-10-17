@@ -122,7 +122,7 @@ public class LibraryBoundaryTests
         foreach (var (key, may) in allowed)
             if (!counts.ContainsKey(key)) under.Add($"{key.File}: {key.Name} 0 (allowed {may})");
 
-        string? write = Environment.GetEnvironmentVariable("OPENFPS_BOUNDARY_WRITE");
+        string? write = System.Environment.GetEnvironmentVariable("OPENFPS_BOUNDARY_WRITE");
         if (write == "1" && under.Count > 0)
         {
             // Lower only: a count over its allowance stays a failure below.
@@ -286,7 +286,7 @@ public class LibraryBoundaryTests
         new object[] { typeof(OpenFPS.Acoustics.AcousticConstants).Assembly.GetName().Name!,
                        new[] { "OpenFPS.Geometry", "OpenFPS.Materials" } },
         // The weather, the water and fire (docs/ENGINE_PACKAGES.md, stage 3): on the physics, below the sound.
-        new object[] { typeof(OpenFPS.Common.WorldWeather).Assembly.GetName().Name!,
+        new object[] { typeof(OpenFPS.Environment.WorldWeather).Assembly.GetName().Name!,
                        new[] { "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Schema", "OpenFPS.Physics" } },
         // The sound models and the synthesis. MemoryPack: TransientSound is on the wire.
         new object[] { typeof(OpenFPS.Sound.Loudness).Assembly.GetName().Name!,

@@ -46,8 +46,8 @@ public class AsyncAcousticWorker : IDisposable
     // Every Phonon object lives on this worker's thread only: made in WorkerLoop, freed in Dispose after
     // the thread joins, never touched from another thread or the mixer. OPENFPS_STEAMAUDIO_SIM=0 forces the
     // hand-rolled tracer.
-    private static readonly bool _saDisabled = Environment.GetEnvironmentVariable("OPENFPS_STEAMAUDIO_SIM") == "0";
-    private static readonly bool _saDebug = Environment.GetEnvironmentVariable("OPENFPS_AUDIO_DEBUG") == "1";
+    private static readonly bool _saDisabled = System.Environment.GetEnvironmentVariable("OPENFPS_STEAMAUDIO_SIM") == "0";
+    private static readonly bool _saDebug = System.Environment.GetEnvironmentVariable("OPENFPS_AUDIO_DEBUG") == "1";
     private int _lastSceneBoxes;
 
     // OPENFPS_AUDIO_DEBUG=1: one line a second per source, and one summary. A line per source per tick
@@ -1020,7 +1020,7 @@ public class AsyncAcousticWorker : IDisposable
             // arriving or a door swinging rebuilds none of the rest. First, since the simulators are made
             // for the context's scene type. OPENFPS_EMBREE=0 keeps the default tracer and whole rebuilds;
             // OPENFPS_TILE_SCENES=0 keeps Embree with whole scenes.
-            _embree = Environment.GetEnvironmentVariable("OPENFPS_EMBREE") != "0"
+            _embree = System.Environment.GetEnvironmentVariable("OPENFPS_EMBREE") != "0"
                       && OpenFPS.Audio.SteamAudio.SteamAudioScene.UseEmbree(_saContext);
             Console.WriteLine(_embree
                 ? "[AcousticWorker] Steam Audio scenes use Embree: a sub-scene per tile and per door leaf."
@@ -1340,7 +1340,7 @@ public class AsyncAcousticWorker : IDisposable
             // heard inside Selby House). TileSceneSet's remarks say why; they now answer as the whole-scene
             // build does through any number of swings and tile changes (AudioLab --path-probe door=
             // swings=, --stream-walk stops=).
-            _tileScenes = Environment.GetEnvironmentVariable("OPENFPS_TILE_SCENES") == "0" ? null : new TileSceneSet(_saContext, world.TileMetres) { Lab = _lab };
+            _tileScenes = System.Environment.GetEnvironmentVariable("OPENFPS_TILE_SCENES") == "0" ? null : new TileSceneSet(_saContext, world.TileMetres) { Lab = _lab };
             _acousticStore = _tileScenes == null ? new AcousticGeometry(world.TileMetres) : null;
             var (assembledFull, assembledListener) = ScenesFor(_saContext, _tileScenes, boxes, mapLeaves, terrains);
             _saScene.Dispose();

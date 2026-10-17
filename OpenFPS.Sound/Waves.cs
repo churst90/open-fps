@@ -4,7 +4,7 @@ using System.Numerics;
 using System.Text.Json.Serialization;
 using OpenFPS.Schema;
 using OpenFPS.Acoustics;
-using OpenFPS.Common;
+using OpenFPS.Environment;
 using OpenFPS.Materials;
 
 namespace OpenFPS.Sound;

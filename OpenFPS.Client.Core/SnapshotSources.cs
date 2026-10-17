@@ -3,6 +3,7 @@ using OpenFPS.Audio.Data;
 using OpenFPS.Common;
 using OpenFPS.Common.Networking;
 using OpenFPS.Sound;
+using OpenFPS.Environment;
 
 namespace OpenFPS.Client.Core;
 

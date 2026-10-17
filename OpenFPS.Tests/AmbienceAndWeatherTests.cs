@@ -5,6 +5,7 @@ using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
 using Arch.Core;
+using OpenFPS.Environment;
 
 namespace OpenFPS.Tests;
 
@@ -94,10 +95,10 @@ public class AmbienceAndWeatherTests
     {
         // Precipitation and temperature swap the material under the player's feet, so weather changing
         // on its own mid-session reads as a bug in whatever was actually being listened to.
-        var previous = Environment.GetEnvironmentVariable("OPENFPS_WEATHER");
+        var previous = System.Environment.GetEnvironmentVariable("OPENFPS_WEATHER");
         try
         {
-            Environment.SetEnvironmentVariable("OPENFPS_WEATHER", "Clear");
+            System.Environment.SetEnvironmentVariable("OPENFPS_WEATHER", "Clear");
             var system = new WorldEnvironmentSystem(new Random(1));
 
             Assert.Equal(WeatherType.Clear, system.CurrentScenario);
@@ -107,33 +108,33 @@ public class AmbienceAndWeatherTests
             for (int i = 0; i < 30 * 60 * 60; i++) system.Update(1f / 30f);
             Assert.Equal(WeatherType.Clear, system.CurrentScenario);
         }
-        finally { Environment.SetEnvironmentVariable("OPENFPS_WEATHER", previous); }
+        finally { System.Environment.SetEnvironmentVariable("OPENFPS_WEATHER", previous); }
     }
 
     [Fact]
     public void AnUnrecognisedWeatherNameIsReportedRatherThanObeyed()
     {
-        var previous = Environment.GetEnvironmentVariable("OPENFPS_WEATHER");
+        var previous = System.Environment.GetEnvironmentVariable("OPENFPS_WEATHER");
         try
         {
-            Environment.SetEnvironmentVariable("OPENFPS_WEATHER", "drizzle-ish");
+            System.Environment.SetEnvironmentVariable("OPENFPS_WEATHER", "drizzle-ish");
             var system = new WorldEnvironmentSystem(new Random(1));
             // Left rolling normally rather than silently pinned to whatever Clear happens to be.
             Assert.True(system.FrontProbabilityPerTick > 0);
         }
-        finally { Environment.SetEnvironmentVariable("OPENFPS_WEATHER", previous); }
+        finally { System.Environment.SetEnvironmentVariable("OPENFPS_WEATHER", previous); }
     }
 
     [Fact]
     public void WithoutThePinTheWeatherStillRolls()
     {
-        var previous = Environment.GetEnvironmentVariable("OPENFPS_WEATHER");
+        var previous = System.Environment.GetEnvironmentVariable("OPENFPS_WEATHER");
         try
         {
-            Environment.SetEnvironmentVariable("OPENFPS_WEATHER", null);
+            System.Environment.SetEnvironmentVariable("OPENFPS_WEATHER", null);
             var system = new WorldEnvironmentSystem(new Random(1));
             Assert.True(system.FrontProbabilityPerTick > 0);
         }
-        finally { Environment.SetEnvironmentVariable("OPENFPS_WEATHER", previous); }
+        finally { System.Environment.SetEnvironmentVariable("OPENFPS_WEATHER", previous); }
     }
 }

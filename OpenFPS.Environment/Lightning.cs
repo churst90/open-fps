@@ -1,10 +1,9 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Numerics;
-using OpenFPS.Common.Components;
 using OpenFPS.Materials;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Environment;
 
 /// <summary>Which kind of flash: one that reaches the ground, or one that stays in the cloud.</summary>
 public enum FlashKind

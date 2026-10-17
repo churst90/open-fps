@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 using FMOD;
-using OpenFPS.Common;
+using OpenFPS.Environment;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Nature;
 

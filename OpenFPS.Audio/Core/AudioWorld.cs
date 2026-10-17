@@ -9,6 +9,7 @@ using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
 using OpenFPS.Materials;
 using OpenFPS.Physics;
+using OpenFPS.Environment;
 
 namespace OpenFPS.Audio.Core;
 
@@ -740,7 +741,7 @@ public partial class AudioWorld
         // gutter is not given a voice. Snow stays where it falls.
         {
             var p = _sources.Precipitation;
-            float wet = p.Falling ? (p.Kind == OpenFPS.Common.PrecipitationKind.Snow ? 0f : p.RateMmPerHour) : _sources.RainRateMmPerHour;
+            float wet = p.Falling ? (p.Kind == OpenFPS.Environment.PrecipitationKind.Snow ? 0f : p.RateMmPerHour) : _sources.RainRateMmPerHour;
             _audio.Weather.Runoff.Update(wet, _audio.Clock.Now);
         }
         ChooseLiveMachines(visualEyePos);
@@ -887,7 +888,7 @@ public partial class AudioWorld
         if (!OpenFPS.Common.ModelKindTable.Is(id, OpenFPS.Common.ModelSynth.Fire)) return id;
         var k = (id, shape, size);
         if (_voiceKeys.TryGetValue(k, out var key)) return key;
-        key = OpenFPS.Common.FireSpec.KeyForPlaced(id, shape.IsRound(), size, ModelLibrary.Presets.Fire);
+        key = OpenFPS.Environment.FireSpec.KeyForPlaced(id, shape.IsRound(), size, ModelLibrary.Presets.Fire);
         if (_voiceKeys.Count > 4096) _voiceKeys.Clear();
         _voiceKeys[k] = key;
         return key;

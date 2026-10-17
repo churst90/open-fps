@@ -54,14 +54,14 @@ public class SpokenLinesReplayTests
         var replay = SpokenReplay.Run(SpokenReplay.Scenarios[scenario]);
         var lines = replay.Lines;
         _o.WriteLine($"{scenario}: {lines.Count(l => l.Contains(" say"))} lines said, {lines.Count(l => l.Contains(" cue ") || l.Contains(" ui"))} cues, {replay.Tick} ticks");
-        if (Environment.GetEnvironmentVariable("OPENFPS_REPLAY_DUMP") is { Length: > 0 } dump)
+        if (System.Environment.GetEnvironmentVariable("OPENFPS_REPLAY_DUMP") is { Length: > 0 } dump)
         {
             Directory.CreateDirectory(dump);
             File.WriteAllText(Path.Combine(dump, scenario + ".spoken.txt"), string.Join("\n", replay.LinesWithNotes) + "\n");
             File.WriteAllText(Path.Combine(dump, scenario + ".mixer.txt"), string.Join("\n", replay.MixerLines) + "\n");
         }
         string path = StoredPath(scenario);
-        if (Environment.GetEnvironmentVariable("OPENFPS_REPLAY_WRITE") == "1")
+        if (System.Environment.GetEnvironmentVariable("OPENFPS_REPLAY_WRITE") == "1")
         {
             Directory.CreateDirectory(StoredFolder);
             File.WriteAllText(path, string.Join("\n", lines) + "\n");
@@ -82,7 +82,7 @@ public class SpokenLinesReplayTests
     [Fact]
     public void EveryScenarioIsStoredAndNothingElse()
     {
-        if (Environment.GetEnvironmentVariable("OPENFPS_REPLAY_WRITE") == "1") return;
+        if (System.Environment.GetEnvironmentVariable("OPENFPS_REPLAY_WRITE") == "1") return;
         var stored = Directory.Exists(StoredFolder)
             ? Directory.GetFiles(StoredFolder, "*.txt").Select(f => Path.GetFileNameWithoutExtension(f)).OrderBy(n => n, StringComparer.Ordinal).ToList()
             : new List<string>();

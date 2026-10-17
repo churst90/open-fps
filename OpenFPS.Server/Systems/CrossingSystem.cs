@@ -257,7 +257,7 @@ public sealed class CrossingSystem
 
             // Once a second, for a crossing named by a substring: OPENFPS_TRACE_CROSSING=Southgate.
             // Tells a crossing that never closes from a bell that never reaches the client.
-            if (Environment.GetEnvironmentVariable("OPENFPS_TRACE_CROSSING") is { } tr
+            if (System.Environment.GetEnvironmentVariable("OPENFPS_TRACE_CROSSING") is { } tr
                 && c.Name.Contains(tr, StringComparison.OrdinalIgnoreCase))
             {
                 c.TraceAt += dt;

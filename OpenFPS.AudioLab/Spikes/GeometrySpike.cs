@@ -599,7 +599,7 @@ public static class GeometrySpike
         long par = 0; sw.Restart();
         Parallel.For(0, pts.Length * 20, ii => { int i = ii % pts.Length; int c = 0; for (int k = 0; k < 192; k++) if (bvh.Closest(pts[i], Enclosure.SphereDirection(k, 192), 60f, out _, out _)) c++; System.Threading.Interlocked.Add(ref par, 192); });
         double tPar = sw.Elapsed.TotalMilliseconds;
-        Console.WriteLine($"  the same spheres on all {Environment.ProcessorCount} threads: {par / tPar * 1000 / 1e6:F1} M rays/s");
+        Console.WriteLine($"  the same spheres on all {System.Environment.ProcessorCount} threads: {par / tPar * 1000 / 1e6:F1} M rays/s");
 
         // 3. today's Enclosure.Look against the same survey through the BVH: 192 rays, a bounce for each
         // hit, and (when the listener is not already outside) 14 openness rays halfway along each hit

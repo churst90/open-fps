@@ -15,18 +15,18 @@ internal static class TestConfigIsolation
     [ModuleInitializer]
     internal static void Isolate()
     {
-        string scratch = Path.Combine(Path.GetTempPath(), "openfps-test-config-" + Environment.ProcessId);
+        string scratch = Path.Combine(Path.GetTempPath(), "openfps-test-config-" + System.Environment.ProcessId);
         Directory.CreateDirectory(scratch);
-        Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", scratch);
+        System.Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", scratch);
         // A folder of its own, not $XDG_CONFIG_HOME/openfps: on Linux that is the platform's folder in a test,
         // and a test that unsets the variable must see the folder change.
-        Environment.SetEnvironmentVariable(SettingsFolder.Variable, Path.Combine(scratch, "settings"));
+        System.Environment.SetEnvironmentVariable(SettingsFolder.Variable, Path.Combine(scratch, "settings"));
         // And the player's data: the door render cache (ClientAudioPaths) prunes other builds' folders beside its own.
         string data = Path.Combine(scratch, "data");
         Directory.CreateDirectory(data);
-        Environment.SetEnvironmentVariable("XDG_DATA_HOME", data);
-        Environment.SetEnvironmentVariable("OPENFPS_RENDER_CACHE", Path.Combine(data, "renders"));
-        Environment.SetEnvironmentVariable("OPENFPS_MESH_CACHE", Path.Combine(data, "meshes"));
+        System.Environment.SetEnvironmentVariable("XDG_DATA_HOME", data);
+        System.Environment.SetEnvironmentVariable("OPENFPS_RENDER_CACHE", Path.Combine(data, "renders"));
+        System.Environment.SetEnvironmentVariable("OPENFPS_MESH_CACHE", Path.Combine(data, "meshes"));
         AppDomain.CurrentDomain.ProcessExit += (_, _) =>
         {
             try { Directory.Delete(scratch, recursive: true); }
@@ -44,7 +44,7 @@ public class TestConfigIsolationTests
     [Fact]
     public void TestsNeverSeeThePlayersSettingsFolder()
     {
-        string own = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "openfps");
+        string own = Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData), "openfps");
         // The checks below mean something only if the temporary folder is not inside the player's own.
         Assert.False(Path.GetTempPath().StartsWith(own, StringComparison.OrdinalIgnoreCase));
         Assert.StartsWith(Path.GetTempPath(), SettingsFolder.Path);

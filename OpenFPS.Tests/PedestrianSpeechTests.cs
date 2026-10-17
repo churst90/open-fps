@@ -5,6 +5,7 @@ using OpenFPS.Common.Components;
 using OpenFPS.Server.Systems;
 using OpenFPS.Geometry;
 using OpenFPS.Sound;
+using OpenFPS.Environment;
 
 namespace OpenFPS.Tests;
 

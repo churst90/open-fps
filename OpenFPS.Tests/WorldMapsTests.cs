@@ -268,7 +268,7 @@ public class WorldMapsTests : IDisposable
     [Fact]
     public void Arriving_at_bobcat_lane_from_the_real_survey()
     {
-        if (Environment.GetEnvironmentVariable("OPENFPS_WORLD_NET") != "1") return;
+        if (System.Environment.GetEnvironmentVariable("OPENFPS_WORLD_NET") != "1") return;
         string mapDir = Path.Combine(_dir, "maps");
         Directory.CreateDirectory(mapDir);
         File.Copy(Path.Combine(AppContext.BaseDirectory, "maps", "speedway.json"), Path.Combine(mapDir, "speedway.json"));

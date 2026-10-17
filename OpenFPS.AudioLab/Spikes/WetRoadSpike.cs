@@ -12,6 +12,7 @@ using OpenFPS.Geometry;
 using OpenFPS.Sound;
 using OpenFPS.Materials;
 using OpenFPS.Physics;
+using OpenFPS.Environment;
 
 namespace OpenFPS.AudioLab.Spikes;
 
@@ -203,10 +204,10 @@ public static class WetRoadSpike
         string outDir = Arg(args, "out=") ?? "/tmp/openfps-wet-game";
         string set = Arg(args, "set=") ?? "all";
         Directory.CreateDirectory(outDir);
-        Environment.SetEnvironmentVariable("OPENFPS_DITHER", "0");
-        Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", Path.Combine(outDir, "capture.wav"));
-        Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(outDir, "capture.post.wav"));
-        Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
+        System.Environment.SetEnvironmentVariable("OPENFPS_DITHER", "0");
+        System.Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", Path.Combine(outDir, "capture.wav"));
+        System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(outDir, "capture.post.wav"));
+        System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
         Console.WriteLine($"Ear model {(LabHearing.EarModelOn ? "on" : "off")}; /levels {LabHearing.Compression:F2}");
         var provider = new FmodAudioProvider { Hearing = LabHearing };
         var facade = new AudioEngineFacade(provider);

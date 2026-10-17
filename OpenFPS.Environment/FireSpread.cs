@@ -3,7 +3,7 @@ using System.Numerics;
 using OpenFPS.Materials;
 using OpenFPS.Physics;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Environment;
 
 /// <summary>Why something caught.</summary>
 public enum IgnitionCause { Lit, Lightning, Radiation, FlameContact, Ember, SurfaceFireBeneath }

@@ -1,10 +1,9 @@
 using System.Collections.Generic;
 using System.Globalization;
-using OpenFPS.Common.Components;
 using OpenFPS.Schema;
 using OpenFPS.Physics;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Environment;
 
 /// <summary>What is burning, which decides what besides the flames and the crackle is heard
 /// (docs/FIRE.md section 6).</summary>

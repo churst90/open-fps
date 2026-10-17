@@ -2,6 +2,7 @@ using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Nature;
+using OpenFPS.Environment;
 
 namespace OpenFPS.Audio.Fmod;
 

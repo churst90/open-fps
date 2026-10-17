@@ -8,6 +8,7 @@ using OpenFPS.Acoustics;
 using OpenFPS.Sound;
 using OpenFPS.Materials;
 using OpenFPS.Physics;
+using OpenFPS.Environment;
 
 namespace OpenFPS.Client.Core;
 
@@ -1058,7 +1059,7 @@ public class ClientWorldState
     }
 
     /// <summary>Threads a client floods its rooms on, off the game thread: a few, so the frame keeps its cores.</summary>
-    public static int RoomFloodThreads => Math.Clamp(Environment.ProcessorCount / 4, 1, 4);
+    public static int RoomFloodThreads => Math.Clamp(System.Environment.ProcessorCount / 4, 1, 4);
 
     /// <summary>Each group of rooms' flood, kept from one refresh to the next; one flood at a time uses it.</summary>
     private readonly OpenFPS.Geometry.RoomFlood.Cache _roomFloods = new();

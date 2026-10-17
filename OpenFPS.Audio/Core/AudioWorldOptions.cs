@@ -40,7 +40,7 @@ public sealed class AudioWorldOptions
 
     /// <summary>The shipped world, unless OPENFPS_WIDE_SOURCES, OPENFPS_EXTENT_RULE or OPENFPS_CABIN_PATHS says
     /// otherwise.</summary>
-    public static AudioWorldOptions FromEnvironment() => From(Environment.GetEnvironmentVariable);
+    public static AudioWorldOptions FromEnvironment() => From(System.Environment.GetEnvironmentVariable);
 
     /// <summary>The same, from <paramref name="variable"/> instead of the process's environment.</summary>
     public static AudioWorldOptions From(Func<string, string?> variable) => new()

@@ -1,8 +1,7 @@
 using System.Numerics;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
-using OpenFPS.Common;
-using OpenFPS.Common.Components;
+using OpenFPS.Environment;
 using OpenFPS.Server.Systems;
 using OpenFPS.Materials;
 

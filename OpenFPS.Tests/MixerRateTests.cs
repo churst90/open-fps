@@ -8,6 +8,7 @@ using OpenFPS.Sound.Core.Signals;
 using OpenFPS.Client.Core;
 using OpenFPS.Common;
 using Xunit.Abstractions;
+using OpenFPS.Environment;
 
 namespace OpenFPS.Tests;
 
@@ -25,7 +26,7 @@ public class MixerRateTests
     public void TheMixerAsksForFortyEightKilohertz()
     {
         Assert.Equal(48000, MixerQuality.DefaultRate);
-        if (Environment.GetEnvironmentVariable("OPENFPS_MIXER_RATE") == null) Assert.Equal(48000, MixerQuality.RequestedRate);
+        if (System.Environment.GetEnvironmentVariable("OPENFPS_MIXER_RATE") == null) Assert.Equal(48000, MixerQuality.RequestedRate);
         // Rendered one-shots are made at the mixer's rate, so a stationary one plays with no resampler.
         Assert.Equal(MixerQuality.DefaultRate, TransientSynth.SampleRate);
         // The interface's and the scope's sounds are made at the rate of the mixer they play in: without an FMOD

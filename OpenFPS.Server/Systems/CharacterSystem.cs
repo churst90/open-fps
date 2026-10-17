@@ -6,6 +6,7 @@ using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using Serilog;
 using OpenFPS.Geometry;
+using OpenFPS.Environment;
 
 namespace OpenFPS.Server.Systems;
 
@@ -96,7 +97,7 @@ public sealed class CharacterSystem
     public double Pace { get; set; } = ReadPace();
 
     private static double ReadPace()
-        => double.TryParse(Environment.GetEnvironmentVariable("OPENFPS_CHARACTER_PACE"), System.Globalization.NumberStyles.Float,
+        => double.TryParse(System.Environment.GetEnvironmentVariable("OPENFPS_CHARACTER_PACE"), System.Globalization.NumberStyles.Float,
                            System.Globalization.CultureInfo.InvariantCulture, out double p) && p > 0 ? p : 1.0;
 
     public CharacterSystem(int seed = 20261006) { _seed = seed; }

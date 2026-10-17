@@ -279,7 +279,7 @@ public sealed class MasterLimiter : IDisposable
     private int _faultReported;
 
     /// <summary>OPENFPS_LIMITER=fmod: FMOD's limiter (no look-ahead, sample peak, -2 dBFS) instead.</summary>
-    public static bool UseFmodLimiter => string.Equals(Environment.GetEnvironmentVariable("OPENFPS_LIMITER")?.Trim(), "fmod", StringComparison.OrdinalIgnoreCase);
+    public static bool UseFmodLimiter => string.Equals(System.Environment.GetEnvironmentVariable("OPENFPS_LIMITER")?.Trim(), "fmod", StringComparison.OrdinalIgnoreCase);
 
     private MasterLimiter(int rate, float makeupDb) { Core = new TruePeakLimiter(rate, TruePeakLimiter.DefaultCeilingDb, makeupDb); }
 

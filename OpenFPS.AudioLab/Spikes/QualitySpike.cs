@@ -7,6 +7,7 @@ using OpenFPS.Common;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
 using OpenFPS.Materials;
+using OpenFPS.Environment;
 
 namespace OpenFPS.AudioLab.Spikes;
 
@@ -114,8 +115,8 @@ public static class QualitySpike
         {
             // Digital silence on the real output (no voice, no dither), to read the stream's format off
             // the sound server while it is open (pactl list sink-inputs).
-            Environment.SetEnvironmentVariable("OPENFPS_DITHER", "0");
-            Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", null);
+            System.Environment.SetEnvironmentVariable("OPENFPS_DITHER", "0");
+            System.Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", null);
             var p = new FmodAudioProvider { Hearing = LabHearing };
             if (!p.Initialize()) return 1;
             for (int i = 0; i < 400; i++) { p.Update(); Thread.Sleep(10); }
@@ -141,10 +142,10 @@ public static class QualitySpike
         public Session(string dir, string name, bool pre)
         {
             _out = Path.Combine(dir, name + ".fmodout.wav");
-            Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", _out);
-            Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(dir, name + ".post.wav"));
-            Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
-            Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_PRE", pre ? Path.Combine(dir, name + ".pre.wav") : null);
+            System.Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", _out);
+            System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(dir, name + ".post.wav"));
+            System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
+            System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_PRE", pre ? Path.Combine(dir, name + ".pre.wav") : null);
             P = new FmodAudioProvider { Hearing = LabHearing };
             if (!P.Initialize()) throw new InvalidOperationException("provider init failed");
             P.UpdateListener(Vector3.Zero, Quaternion.Identity, Vector3.Zero, -1);
@@ -172,9 +173,9 @@ public static class QualitySpike
         {
             P.Dispose();
             // The WAV writer's file is the sound card's copy of the post capture; the resampler run reports its format.
-            Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", null);
-            Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", null);
-            Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_PRE", null);
+            System.Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", null);
+            System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", null);
+            System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_PRE", null);
         }
 
         public void DropSoundCardCopy() { try { File.Delete(_out); } catch { } }
@@ -233,7 +234,7 @@ public static class QualitySpike
         };
         foreach (string m in methods)
         {
-            Environment.SetEnvironmentVariable("OPENFPS_RESAMPLER", m);
+            System.Environment.SetEnvironmentVariable("OPENFPS_RESAMPLER", m);
             using var s = new Session(dir, "resampler-" + m, pre: false);
             var sched = new List<string> { "case,rate,pitch,start_s,seconds,freqs" };
             int id = -400;
@@ -266,7 +267,7 @@ public static class QualitySpike
             s.Dispose();
             s.DropSoundCardCopy();
         }
-        Environment.SetEnvironmentVariable("OPENFPS_RESAMPLER", null);
+        System.Environment.SetEnvironmentVariable("OPENFPS_RESAMPLER", null);
         Console.WriteLine($"  captures in {dir}; measure with tools/audio_quality.py resampler {dir}");
         return 0;
     }
@@ -638,7 +639,7 @@ public static class QualitySpike
     /// </summary>
     private static int LimiterTones(string dir, string tag)
     {
-        Environment.SetEnvironmentVariable("OPENFPS_MASTER_DB", "0");
+        System.Environment.SetEnvironmentVariable("OPENFPS_MASTER_DB", "0");
         string name = $"limiter-{tag}";
         using var s = new Session(dir, name, pre: true);
         int sr = s.P.MixerRate;
@@ -718,7 +719,7 @@ public static class QualitySpike
         float cpu = s.Cpu.Count > 0 ? s.Cpu.Average() : float.NaN;
         s.Dispose();
         s.DropSoundCardCopy();
-        Environment.SetEnvironmentVariable("OPENFPS_MASTER_DB", null);
+        System.Environment.SetEnvironmentVariable("OPENFPS_MASTER_DB", null);
         Console.WriteLine($"  {name}: limiter {(MasterLimiter.UseFmodLimiter ? "FMOD's" : "true peak")}, mixer {sr} Hz, makeup {FmodAudioProvider.MasterMakeupDb:F1} dB, dsp {cpu:F1} %; {dir}/{name}.pre.wav, .post.wav, .csv");
         return 0;
     }

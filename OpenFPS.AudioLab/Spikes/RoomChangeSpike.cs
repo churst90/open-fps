@@ -40,8 +40,8 @@ public static class RoomChangeSpike
         foreach (var e in snapshot.Entities.Values) world.RegisterDefinition(e.Definition, deferAcoustics: true);
         world.SetAcousticMap(snapshot.AcousticMap!);
 
-        Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(outDir, "capture.post.wav"));
-        Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
+        System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(outDir, "capture.post.wav"));
+        System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
         var provider = new FmodAudioProvider();
         var facade = new AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();

@@ -77,8 +77,8 @@ public sealed class MixSettings
     {
         var m = new MixSettings
         {
-            TracedEchoesOn = !string.Equals(Environment.GetEnvironmentVariable("OPENFPS_ECHOES"), "off", StringComparison.OrdinalIgnoreCase),
-            ReducedFarEngines = Environment.GetEnvironmentVariable("OPENFPS_ENGINE_DETAIL") != "0",
+            TracedEchoesOn = !string.Equals(System.Environment.GetEnvironmentVariable("OPENFPS_ECHOES"), "off", StringComparison.OrdinalIgnoreCase),
+            ReducedFarEngines = System.Environment.GetEnvironmentVariable("OPENFPS_ENGINE_DETAIL") != "0",
         };
         if (EnvDb("OPENFPS_TAIL_DB") is float tail) m.TailDb = tail;
         if (EnvDb("OPENFPS_COPIES_DB") is float copies) m.CopiesDb = copies;
@@ -86,6 +86,6 @@ public sealed class MixSettings
     }
 
     private static float? EnvDb(string name) =>
-        float.TryParse(Environment.GetEnvironmentVariable(name), NumberStyles.Float, CultureInfo.InvariantCulture, out float db)
+        float.TryParse(System.Environment.GetEnvironmentVariable(name), NumberStyles.Float, CultureInfo.InvariantCulture, out float db)
             ? Math.Clamp(db, -80f, 6f) : null;
 }

@@ -19,6 +19,7 @@ using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
 using OpenFPS.Materials;
 using OpenFPS.Physics;
+using OpenFPS.Environment;
 
 namespace OpenFPS.Tests;
 
@@ -60,7 +61,7 @@ public class EmitterStreamReplayTests
 
         string maths = RenderFingerprintTests.MathsProbe();
         string path = StreamPath(scenario);
-        if (Environment.GetEnvironmentVariable("OPENFPS_REPLAY_WRITE") == "1")
+        if (System.Environment.GetEnvironmentVariable("OPENFPS_REPLAY_WRITE") == "1")
         {
             Write(path, maths, first);
             _o.WriteLine($"{scenario}: written");
@@ -219,7 +220,7 @@ public class EmitterStreamReplayTests
 
     private static void Dump(string scenario, List<string> lines)
     {
-        string? dir = Environment.GetEnvironmentVariable("OPENFPS_REPLAY_DUMP");
+        string? dir = System.Environment.GetEnvironmentVariable("OPENFPS_REPLAY_DUMP");
         if (string.IsNullOrEmpty(dir)) return;
         Directory.CreateDirectory(dir);
         File.WriteAllLines(Path.Combine(dir, scenario + ".txt"), lines);
@@ -237,8 +238,8 @@ public class EmitterStreamReplayTests
     [MemberData(nameof(Scenarios))]
     public void UnderTheIdMapTheStreamIsTheOneBefore(string scenario)
     {
-        string? before = Environment.GetEnvironmentVariable("OPENFPS_REPLAY_BEFORE");
-        if (string.IsNullOrEmpty(before) && string.IsNullOrEmpty(Environment.GetEnvironmentVariable("OPENFPS_REPLAY_DUMP")))
+        string? before = System.Environment.GetEnvironmentVariable("OPENFPS_REPLAY_BEFORE");
+        if (string.IsNullOrEmpty(before) && string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("OPENFPS_REPLAY_DUMP")))
         {
             _o.WriteLine("Neither OPENFPS_REPLAY_BEFORE nor OPENFPS_REPLAY_DUMP is set: nothing to compare with or to write.");
             return;
@@ -273,7 +274,7 @@ public class EmitterStreamReplayTests
     [Fact]
     public void EveryScenarioIsStoredAndNothingElse()
     {
-        if (Environment.GetEnvironmentVariable("OPENFPS_REPLAY_WRITE") == "1") return;
+        if (System.Environment.GetEnvironmentVariable("OPENFPS_REPLAY_WRITE") == "1") return;
         string dir = Path.GetDirectoryName(StreamPath("x"))!;
         var stored = Directory.Exists(dir)
             ? Directory.GetFiles(dir, "*.txt.gz").Select(f => Path.GetFileName(f)[..^".txt.gz".Length]).OrderBy(n => n, StringComparer.Ordinal)

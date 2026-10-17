@@ -678,15 +678,15 @@ public class BeaconPreferenceFileTests
     /// (null or empty: not moved at all), and puts it back.</summary>
     private static void In(string? folder, Action act)
     {
-        string? was = Environment.GetEnvironmentVariable(SettingsFolder.Variable);
+        string? was = System.Environment.GetEnvironmentVariable(SettingsFolder.Variable);
         try
         {
-            Environment.SetEnvironmentVariable(SettingsFolder.Variable, folder);
+            System.Environment.SetEnvironmentVariable(SettingsFolder.Variable, folder);
             act();
         }
         finally
         {
-            Environment.SetEnvironmentVariable(SettingsFolder.Variable, was);
+            System.Environment.SetEnvironmentVariable(SettingsFolder.Variable, was);
         }
     }
 
@@ -741,7 +741,7 @@ public class BeaconPreferenceFileTests
     [InlineData("")]
     public void MovedNowhereTheFolderIsThePlatformsOwn(string? unset)
     {
-        string own = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "openfps");
+        string own = Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData), "openfps");
         In(unset, () =>
         {
             Assert.Equal(own, SettingsFolder.Path);

@@ -18,13 +18,13 @@ namespace OpenFPS.Audio.Fmod;
 public static class MixerQuality
 {
     /// <summary>Read when a mixer is made, so the lab can make one of each in a single run.</summary>
-    public static DSP_RESAMPLER Resampler => Parse(Environment.GetEnvironmentVariable("OPENFPS_RESAMPLER"));
+    public static DSP_RESAMPLER Resampler => Parse(System.Environment.GetEnvironmentVariable("OPENFPS_RESAMPLER"));
 
     /// <summary>Captures (OPENFPS_AUDIO_CAPTURE, _PRE) in 32-bit float, unless OPENFPS_AUDIO_CAPTURE_FLOAT=0
     /// asks for 16-bit PCM. Float by default since 2026-10-07: the 16-bit capture truncated every sample
     /// with no dither, so a quiet render (an airliner at 60 m, -47 dBFS) was sent for listening with
     /// truncation distortion and sixteen-bit steps the game itself never makes.</summary>
-    public static bool CaptureFloat => Environment.GetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT") != "0";
+    public static bool CaptureFloat => System.Environment.GetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT") != "0";
 
     public const DSP_RESAMPLER Default = DSP_RESAMPLER.SPLINE;
 
@@ -45,7 +45,7 @@ public static class MixerQuality
 
     /// <summary>What FmodAudioProvider asks FMOD for (setSoftwareFormat). See <see cref="DefaultRate"/>.</summary>
     public static int RequestedRate
-        => int.TryParse(Environment.GetEnvironmentVariable("OPENFPS_MIXER_RATE"), out int r) && r >= 22050 && r <= 192000 ? r : DefaultRate;
+        => int.TryParse(System.Environment.GetEnvironmentVariable("OPENFPS_MIXER_RATE"), out int r) && r >= 22050 && r <= 192000 ? r : DefaultRate;
 
     /// <summary>
     /// Brings a buffer to <paramref name="to"/> with a Kaiser-windowed sinc (64 taps a side, about 90 dB
@@ -61,7 +61,7 @@ public static class MixerQuality
     /// </summary>
     public static void ApplyOutput(FMOD.System system)
     {
-        OUTPUTTYPE? type = Environment.GetEnvironmentVariable("OPENFPS_FMOD_OUTPUT")?.Trim().ToLowerInvariant() switch
+        OUTPUTTYPE? type = System.Environment.GetEnvironmentVariable("OPENFPS_FMOD_OUTPUT")?.Trim().ToLowerInvariant() switch
         {
             "pulse" or "pulseaudio" => OUTPUTTYPE.PULSEAUDIO,
             "alsa" => OUTPUTTYPE.ALSA,

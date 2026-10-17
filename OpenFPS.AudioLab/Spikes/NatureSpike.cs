@@ -5,6 +5,7 @@ using OpenFPS.Sound.Core.Nature;
 using OpenFPS.Common;
 using OpenFPS.Materials;
 using OpenFPS.Physics;
+using OpenFPS.Environment;
 
 namespace OpenFPS.AudioLab.Spikes;
 
@@ -126,7 +127,7 @@ public static class NatureSpike
         foreach (var key in keys)
         {
             string cap = Path.Combine(dir, key.Replace(':', '_') + ".wav");
-            Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", cap);
+            System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", cap);
             var provider = new OpenFPS.Audio.Fmod.FmodAudioProvider { Hearing = LabHearing };
             provider.Weather.Wind = Air.Wind;
             if (!provider.Initialize()) { Console.WriteLine("provider init failed"); return 1; }

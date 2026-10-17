@@ -5,6 +5,7 @@ using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
 using OpenFPS.Sound;
 using OpenFPS.Physics;
+using OpenFPS.Environment;
 
 namespace OpenFPS.Common;
 
@@ -90,7 +91,7 @@ public class WorldSnapshot : IAcousticWorld
     /// <summary>How hard it is raining, mm/h; zero when dry or when what falls is snow (Rainfall).</summary>
     public float RainRateMmPerHour = 0.0f;
     /// <summary>What is falling and how big (Precipitation): the rate above is its water equivalent.</summary>
-    public Precipitation Precipitation = OpenFPS.Common.Precipitation.None;
+    public Precipitation Precipitation = OpenFPS.Environment.Precipitation.None;
     /// <summary>The water in a wheel path of an asphalt road, mm (RoadWater): for a vehicle whose wheels
     /// the server does not send. Wheels that are sent carry their own (WheelState.Water).</summary>
     public float RoadWaterMm = 0.0f;

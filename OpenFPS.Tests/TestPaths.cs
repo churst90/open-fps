@@ -8,7 +8,7 @@ internal static class TestPaths
 {
     public static string Sounds([CallerFilePath] string here = "")
     {
-        string? set = Environment.GetEnvironmentVariable("OPENFPS_SOUNDS");
+        string? set = System.Environment.GetEnvironmentVariable("OPENFPS_SOUNDS");
         if (!string.IsNullOrEmpty(set) && Directory.Exists(set)) return set;
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "OpenFPS.Client", "ASSETS", "SOUNDS"))) dir = dir.Parent;

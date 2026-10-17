@@ -548,7 +548,7 @@ public static class GlassFracture
     /// landing is 10 dB quieter.
     /// </summary>
     private static readonly double RingShare =
-        double.TryParse(Environment.GetEnvironmentVariable("OPENFPS_GLASS_RING_SHARE"), NumberStyles.Float, CultureInfo.InvariantCulture, out double share)
+        double.TryParse(System.Environment.GetEnvironmentVariable("OPENFPS_GLASS_RING_SHARE"), NumberStyles.Float, CultureInfo.InvariantCulture, out double share)
             ? share : 0.3;
 
     /// <summary>
@@ -1066,7 +1066,7 @@ public static class GlassFracture
         // The loose dice, counted: each from its own height and release, with drag; a share to each core,
         // each with its own buffer, because there are tens of thousands and a pane is always a first hearing.
         double dieVol = Sq(sim.DieSize) * h, dieMass = Density * dieVol, vtDie = Terminal(dieMass, Sq(sim.DieSize), true);
-        int workers = sim.Out == null ? 1 : Math.Clamp(Environment.ProcessorCount / 2, 1, 6);
+        int workers = sim.Out == null ? 1 : Math.Clamp(System.Environment.ProcessorCount / 2, 1, 6);
         var buffers = new double[workers][];
         System.Threading.Tasks.Parallel.For(0, workers, new System.Threading.Tasks.ParallelOptions { MaxDegreeOfParallelism = workers }, w =>
         {
@@ -1243,7 +1243,7 @@ public static class GlassFracture
     }
 
     /// <summary>Lab only: render just one component ("pane", "clicks", "modes"), from OPENFPS_GLASS_ONLY.</summary>
-    private static readonly string? Only = Environment.GetEnvironmentVariable("OPENFPS_GLASS_ONLY");
+    private static readonly string? Only = System.Environment.GetEnvironmentVariable("OPENFPS_GLASS_ONLY");
     private static bool Want(string part) => Only == null || Only == part;
 
     private static double[] RenderBreak(Sim sim, int rate)
@@ -1346,7 +1346,7 @@ public static class GlassFracture
         // Each piece's events in order first (the sort is not thread-safe on a shared list).
         foreach (var f in frags)
             f.Events.Sort((p, q) => p.T != q.T ? p.T.CompareTo(q.T) : (p.State >= 0 ? 0 : 1).CompareTo(q.State >= 0 ? 0 : 1));
-        int workers = Math.Clamp(Environment.ProcessorCount / 2, 1, 6);
+        int workers = Math.Clamp(System.Environment.ProcessorCount / 2, 1, 6);
         if (workers == 1 || frags.Count < 8) { foreach (var f in frags) Modes(f, y, rate, t0, landing); return; }
         var partial = new double[workers][];
         System.Threading.Tasks.Parallel.For(0, workers, new System.Threading.Tasks.ParallelOptions { MaxDegreeOfParallelism = workers }, w =>
@@ -1449,7 +1449,7 @@ public static class GlassFracture
     }
 
     /// <summary>Lab only: render clicks of one tag alone (OPENFPS_GLASS_TAG = 0 contact, 1 kick, 2 slap, 3 strike, 4 tap).</summary>
-    private static readonly int OnlyTag = int.TryParse(Environment.GetEnvironmentVariable("OPENFPS_GLASS_TAG"), out int tagOnly) ? tagOnly : -1;
+    private static readonly int OnlyTag = int.TryParse(System.Environment.GetEnvironmentVariable("OPENFPS_GLASS_TAG"), out int tagOnly) ? tagOnly : -1;
 
     private static void RenderClick(Click c, double[] y, int rate, double t0)
     {

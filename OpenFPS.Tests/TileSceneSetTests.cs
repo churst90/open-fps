@@ -22,7 +22,7 @@ internal static class SteamAudioForTests
 {
     private static readonly Lazy<IntPtr> Context = new(() =>
     {
-        string? asked = Environment.GetEnvironmentVariable("OPENFPS_STEAMAUDIO_TESTS");
+        string? asked = System.Environment.GetEnvironmentVariable("OPENFPS_STEAMAUDIO_TESTS");
         if (string.IsNullOrEmpty(asked) || asked == "0") return IntPtr.Zero;
         string? file = Find(asked);
         if (file == null) return IntPtr.Zero;

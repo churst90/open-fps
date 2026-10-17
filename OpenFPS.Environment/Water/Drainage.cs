@@ -1,6 +1,5 @@
-using OpenFPS.Common;
 
-namespace OpenFPS.Server.Water;
+namespace OpenFPS.Environment.Water;
 
 /// <summary>
 /// One tile's drainage, worked out once from its ground and kept with the tile (WorldTile.Drainage): which

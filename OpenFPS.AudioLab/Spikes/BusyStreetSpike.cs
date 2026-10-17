@@ -130,7 +130,7 @@ public static class BusyStreetSpike
         int self = body.Id;
 
         // The client, silent: FMOD's real-time file writer in place of the sound card.
-        Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", Path.Combine(outDir, "mix.wav"));
+        System.Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", Path.Combine(outDir, "mix.wav"));
         // rule=old: the pool first come, first served, as before 2026-10-17.
         var provider = new FmodAudioProvider { Hearing = LabHearing, Lab = new LabLevers { FirstComeStages = Arg(args, "rule") == "old" } };
         string sounds = LabPaths.Sounds();
@@ -363,10 +363,10 @@ public static class BusyStreetSpike
         Directory.CreateDirectory(outDir);
         if (!args.Contains("debug")) Serilog.Log.Logger = new Serilog.LoggerConfiguration().MinimumLevel.Warning().CreateLogger();
         string wav = Path.Combine(outDir, "capture-float.wav");
-        Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", Path.Combine(outDir, "mix.wav"));
-        Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", wav);
-        Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
-        Environment.SetEnvironmentVariable("OPENFPS_DITHER", "0");
+        System.Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", Path.Combine(outDir, "mix.wav"));
+        System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", wav);
+        System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
+        System.Environment.SetEnvironmentVariable("OPENFPS_DITHER", "0");
         AcousticRegistry.Initialize();
         // Its comparison is a voice stopped outright, which StopSound no longer does (LabLevers.HardStops).
         var provider = new FmodAudioProvider { Hearing = LabHearing, Lab = new LabLevers { HardStops = true } };

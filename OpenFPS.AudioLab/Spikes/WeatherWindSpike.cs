@@ -2,7 +2,7 @@ using System.Numerics;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Nature;
 using OpenFPS.Common;
-using OpenFPS.Common.Components;
+using OpenFPS.Environment;
 using OpenFPS.Server.Systems;
 using OpenFPS.Physics;
 
@@ -416,7 +416,7 @@ public static class WeatherWindSpike
     private static int Live(float sec)
     {
         string cap = Path.Combine(Path.GetTempPath(), "openfps-earwind-live.wav");
-        Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", cap);
+        System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", cap);
         var weather = WindWeather.Steady(WindAir.FromCompass(10f, 90f, 0f));
         var provider = new OpenFPS.Audio.Fmod.FmodAudioProvider { Hearing = LabHearing };
         provider.Weather.Wind = weather;

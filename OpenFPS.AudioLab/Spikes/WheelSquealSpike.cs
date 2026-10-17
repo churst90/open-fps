@@ -37,7 +37,7 @@ public static class WheelSquealSpike
     public static int Run(string? outDir)
     {
         AcousticRegistry.Initialize();
-        outDir ??= Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".cache", "openfps-wheel-squeal");
+        outDir ??= Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile), ".cache", "openfps-wheel-squeal");
         Directory.CreateDirectory(outDir);
 
         Console.WriteLine("\n  ONE TYRE'S SQUEAL, measured (i4_midsize's tyre, at its slip velocity reference, static load)\n");

@@ -713,8 +713,8 @@ public sealed class WorldMaps
     /// <summary>A tile's ground and drainage as its frame's drainage network takes them: its cells' heights in the
     /// frame's metres, and the drainage it was made with (or, for a tile made before generator 4, worked out from
     /// its own ground alone).</summary>
-    private static Water.DrainageNetwork.TileInput DrainageInput(Frame frame, TileKey local, float tileMetres, WorldTile.TerrainData t,
-                                                                 Water.TileDrainage? drainage)
+    private static Environment.Water.DrainageNetwork.TileInput DrainageInput(Frame frame, TileKey local, float tileMetres, WorldTile.TerrainData t,
+                                                                 Environment.Water.TileDrainage? drainage)
     {
         var posts = new float[t.Posts * t.Posts];
         for (int k = 0; k < posts.Length; k++) posts[k] = t.BaseY - frame.BaseY + t.HeightsCm[k] * 0.01f;
@@ -724,10 +724,10 @@ public sealed class WorldMaps
             var surfaces = new byte[cells * cells];
             for (int k = 0; k < surfaces.Length; k++)
                 surfaces[k] = Water.SurfaceRaster.OfGround(k < t.Cells.Length && t.Cells[k] < t.Materials.Length ? t.Materials[t.Cells[k]] : null);
-            drainage = Water.Drainage.OfWindow(posts, t.Posts, t.Posts, 0, 0, cells, t.Spacing, surfaces, 0);
+            drainage = Environment.Water.Drainage.OfWindow(posts, t.Posts, t.Posts, 0, 0, cells, t.Spacing, surfaces, 0);
         }
-        return new Water.DrainageNetwork.TileInput(local.X, local.Z, local.X * tileMetres, local.Z * tileMetres,
-                                                   Water.Drainage.CellHeights(posts, t.Posts, t.Posts), drainage);
+        return new Environment.Water.DrainageNetwork.TileInput(local.X, local.Z, local.X * tileMetres, local.Z * tileMetres,
+                                                   Environment.Water.Drainage.CellHeights(posts, t.Posts, t.Posts), drainage);
     }
 
     /// <summary>
@@ -739,7 +739,7 @@ public sealed class WorldMaps
     {
         if (_maps.GroundWater.TakeRebuilt(frame.Id) is not { } net) return;
         if (!_maps.TryGetMap(frame.Id, out var world, out _, out _, out _) || !_maps.TryGetTiles(frame.Id, out var tiles)) return;
-        var wanted = new Dictionary<TileKey, Dictionary<string, Water.DrainageNetwork.Voice>>();
+        var wanted = new Dictionary<TileKey, Dictionary<string, Environment.Water.DrainageNetwork.Voice>>();
         foreach (var v in net.Voices)
         {
             var owner = TileKey.Of(v.Position, tiles.TileMetres);

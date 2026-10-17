@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 using System.Globalization;
-using OpenFPS.Common;
+using OpenFPS.Environment;
 
 namespace OpenFPS.Sound;
 
@@ -8,7 +8,7 @@ namespace OpenFPS.Sound;
 /// The running water of a drainage line of the ground (docs/RUNNING_WATER.md section 13): the creek, the
 /// ditch, the rivulet that the ground's shape and the rain make, heard through the running-water model
 /// (RunningWaterSynth) with its flow from the map's state (GroundWater). The server places one wherever the
-/// line could carry enough to be heard (OpenFPS.Server.Water.DrainageNetwork); everything about it is in its
+/// line could carry enough to be heard (OpenFPS.Environment.Water.DrainageNetwork); everything about it is in its
 /// sound id, "flow:ground/KIND/WIDTH_CM/SLOPE_PERMILLE/LENGTH_M/REFERENCE_ML_PER_S/CATCHMENT", so a client
 /// makes the same spec.
 /// </summary>

@@ -17,6 +17,7 @@ using OpenFPS.Acoustics;
 using OpenFPS.Native.SteamAudio;
 using OpenFPS.Materials;
 using OpenFPS.Physics;
+using OpenFPS.Environment;
 
 namespace OpenFPS.AudioLab.Spikes;
 
@@ -217,10 +218,10 @@ public static class CabinSpike
         string set = Arg(args, "set=") ?? "all";
         float sec = float.Parse(Arg(args, "sec=") ?? "10", CultureInfo.InvariantCulture);
         Directory.CreateDirectory(outDir);
-        Environment.SetEnvironmentVariable("OPENFPS_DITHER", "0");
-        Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", Path.Combine(outDir, "capture.wav"));
-        Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(outDir, "capture.post.wav"));
-        Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
+        System.Environment.SetEnvironmentVariable("OPENFPS_DITHER", "0");
+        System.Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", Path.Combine(outDir, "capture.wav"));
+        System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(outDir, "capture.post.wav"));
+        System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
         Console.WriteLine($"Cabin paths {(LabOptions.CabinPathsOn ? "on" : "off (one point)")}; ear model {(LabHearing.EarModelOn ? "on" : "off")}; /levels {LabHearing.Compression:F2}");
 
         // Outside, open asphalt; riding, the room is the cabin traced from the vehicle's shell.

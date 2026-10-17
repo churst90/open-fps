@@ -100,7 +100,7 @@ public class WorldLandCoverTests : IDisposable
     [Fact]
     public async Task Record_the_fixture_from_the_network()
     {
-        if (Environment.GetEnvironmentVariable("OPENFPS_WORLD_NET") != "1") return;
+        if (System.Environment.GetEnvironmentVariable("OPENFPS_WORLD_NET") != "1") return;
         var rec = new Recording(new HttpRanges());
         var cover = new EsaWorldCover(Path.Combine(_dir, "live"), rec);
         var classes = await cover.ClassesAsync(Bobcat, WorldTileService.Posts - 1, WorldTileService.Spacing, CancellationToken.None);

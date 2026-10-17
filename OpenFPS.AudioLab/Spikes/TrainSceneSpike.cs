@@ -61,9 +61,9 @@ public static class TrainSceneSpike
             spot = new Vector3(float.Parse(p[0], CultureInfo.InvariantCulture), 0.09f, float.Parse(p[1], CultureInfo.InvariantCulture));
         }
         Directory.CreateDirectory(outDir);
-        Environment.SetEnvironmentVariable("OPENFPS_DITHER", "0");
-        Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(outDir, "capture.post.wav"));
-        Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
+        System.Environment.SetEnvironmentVariable("OPENFPS_DITHER", "0");
+        System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(outDir, "capture.post.wav"));
+        System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
 
         // The server's half: the city, its rail loop, its crossings.
         var prefabs = new PrefabRepository(Path.Combine(AppContext.BaseDirectory, "prefabs"));

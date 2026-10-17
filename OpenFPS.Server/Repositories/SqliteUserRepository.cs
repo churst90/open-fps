@@ -118,7 +118,7 @@ public class SqliteUserRepository : IUserRepository
     /// </summary>
     private void EnsureAdminSeed()
     {
-        string? chosen = Environment.GetEnvironmentVariable("OPENFPS_ADMIN_PASSWORD");
+        string? chosen = System.Environment.GetEnvironmentVariable("OPENFPS_ADMIN_PASSWORD");
         using var ctx = CreateContext();
         if (!ctx.Users.Any())
         {

@@ -1,6 +1,6 @@
 using System.Numerics;
 using OpenFPS.Acoustics;
-using OpenFPS.Common;
+using OpenFPS.Environment;
 using OpenFPS.Physics;
 
 namespace OpenFPS.Sound.Core;

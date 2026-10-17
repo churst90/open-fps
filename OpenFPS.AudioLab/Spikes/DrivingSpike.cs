@@ -18,6 +18,7 @@ using OpenFPS.Sound;
 using OpenFPS.Native.SteamAudio;
 using OpenFPS.Materials;
 using OpenFPS.Physics;
+using OpenFPS.Environment;
 
 namespace OpenFPS.AudioLab.Spikes;
 
@@ -69,9 +70,9 @@ public static class DrivingSpike
         string set = Arg(args, "set=") ?? "all";
         bool Want(string s) => set == "all" || set.Split(',').Contains(s);
         Directory.CreateDirectory(outDir);
-        Environment.SetEnvironmentVariable("OPENFPS_DITHER", "0");
-        Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(outDir, "capture.post.wav"));
-        Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
+        System.Environment.SetEnvironmentVariable("OPENFPS_DITHER", "0");
+        System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(outDir, "capture.post.wav"));
+        System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
 
         // The city's roads and crossings, as the server sends them, and its carriageways near Main
         // Street and Central Street for the lane sensors.

@@ -29,7 +29,7 @@ public static class EarshotSpike
         var at = Vec(Str(args, "at")) ?? new Vector3(0f, 1.6f, -40f);
 
         string? mapPath = OpenFPS.AudioLab.LabPaths.Existing(OpenFPS.AudioLab.LabPaths.Server("maps", mapId + ".json"));
-        if (mapPath == null) { Console.WriteLine($"  FAIL: no maps/{mapId}.json above {Environment.CurrentDirectory}"); return 1; }
+        if (mapPath == null) { Console.WriteLine($"  FAIL: no maps/{mapId}.json above {System.Environment.CurrentDirectory}"); return 1; }
         var data = System.Text.Json.JsonSerializer.Deserialize<MapFile>(System.IO.File.ReadAllText(mapPath),
             new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         if (data?.Vehicles == null) { Console.WriteLine("  FAIL: the map declares no vehicles."); return 1; }

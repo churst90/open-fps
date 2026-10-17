@@ -1,5 +1,5 @@
 using OpenFPS.Common;
-using OpenFPS.Common.Components;
+using OpenFPS.Environment;
 
 namespace OpenFPS.Server.Systems;
 

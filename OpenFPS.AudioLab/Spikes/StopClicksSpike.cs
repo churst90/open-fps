@@ -37,10 +37,10 @@ public static class StopClicksSpike
         Directory.CreateDirectory(outDir);
         if (!args.Contains("debug")) Serilog.Log.Logger = new Serilog.LoggerConfiguration().MinimumLevel.Warning().CreateLogger();
         string wav = System.IO.Path.Combine(outDir, "capture-float.wav");
-        Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", System.IO.Path.Combine(outDir, "mix.wav"));
-        Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", wav);
-        Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
-        Environment.SetEnvironmentVariable("OPENFPS_DITHER", "0");
+        System.Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", System.IO.Path.Combine(outDir, "mix.wav"));
+        System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", wav);
+        System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
+        System.Environment.SetEnvironmentVariable("OPENFPS_DITHER", "0");
         AcousticRegistry.Initialize();
         var provider = new FmodAudioProvider { Hearing = LabHearing, Lab = new LabLevers { HardStops = old } };
         string sounds = LabPaths.Sounds();

@@ -19,12 +19,12 @@ public static class TracedReverbSpike
 {
     /// <summary>Which block the impulse goes in: a fresh effect crossfades in from an empty response
     /// over its first block, so an impulse in block 0 measures the crossfade. SA_IMPULSE_BLOCK overrides.</summary>
-    private static readonly int ImpulseBlock = int.TryParse(Environment.GetEnvironmentVariable("SA_IMPULSE_BLOCK"), out int ib) ? ib : 0;
+    private static readonly int ImpulseBlock = int.TryParse(System.Environment.GetEnvironmentVariable("SA_IMPULSE_BLOCK"), out int ib) ? ib : 0;
 
     public static int Run()
     {
         AcousticRegistry.Initialize();
-        bool parametric = Environment.GetEnvironmentVariable("SA_PARAMETRIC") == "1";
+        bool parametric = System.Environment.GetEnvironmentVariable("SA_PARAMETRIC") == "1";
         // SA_PARAMETRIC=1 asks for the hybrid simulation, which is what the game traces anyway (LabLevers.TracedSimulation).
         var lab = new OpenFPS.Sound.Core.LabLevers { TracedSimulation = Phonon.IPL_REFLECTIONEFFECTTYPE_HYBRID };
         var cs = Phonon.DefaultContextSettings();
@@ -97,7 +97,7 @@ public static class TracedReverbSpike
         {
             using var scene = new SteamAudioScene(ctx);
             scene.Build(boxes);
-            int trFrame = int.TryParse(Environment.GetEnvironmentVariable("SA_FRAME"), out var tf) ? tf : TracedReverb.TracedFrame;
+            int trFrame = int.TryParse(System.Environment.GetEnvironmentVariable("SA_FRAME"), out var tf) ? tf : TracedReverb.TracedFrame;
             using var tr = new TracedReverb(ctx, 44100, trFrame, lab: lab);
             tr.SetScene(scene);
             tr.SetListener(ear);
@@ -105,7 +105,7 @@ public static class TracedReverbSpike
             while (tr.Runs < 2 && DateTime.UtcNow < until) Thread.Sleep(50);
             if (!tr.TryGetParams(out var prm)) { Console.WriteLine($"{name}: no IR"); continue; }
 
-            int fs = int.TryParse(Environment.GetEnvironmentVariable("SA_FRAME"), out var fsv) ? fsv : TracedReverb.TracedFrame;
+            int fs = int.TryParse(System.Environment.GetEnvironmentVariable("SA_FRAME"), out var fsv) ? fsv : TracedReverb.TracedFrame;
             var au = new Phonon.IPLAudioSettings { samplingRate = 44100, frameSize = fs };
             var es = new Phonon.IPLReflectionEffectSettings { type = Phonon.IPL_REFLECTIONEFFECTTYPE_CONVOLUTION, irSize = tr.IrSize, numChannels = TracedReverb.Channels };
             Phonon.iplReflectionEffectCreate(ctx, ref au, ref es, out IntPtr effect);
@@ -118,7 +118,7 @@ public static class TracedReverbSpike
             // And what the ear gets of it: decoded round the head through an HRTF, as the game does.
             var hs = new Phonon.IPLHRTFSettings { type = Phonon.IPL_HRTFTYPE_DEFAULT, volume = 1f, normType = Phonon.IPL_HRTFNORMTYPE_NONE };
             // The game makes its HRTF for the mixer's block (1024) and decodes in the trace's (256).
-            var hau = au; if (int.TryParse(Environment.GetEnvironmentVariable("SA_HRTF_FRAME"), out int hf)) hau.frameSize = hf;
+            var hau = au; if (int.TryParse(System.Environment.GetEnvironmentVariable("SA_HRTF_FRAME"), out int hf)) hau.frameSize = hf;
             Phonon.iplHRTFCreate(ctx, ref hau, ref hs, out IntPtr hrtf);
             var dsx = new Phonon.IPLAmbisonicsDecodeEffectSettings { speakerLayout = Phonon.StereoLayout(), hrtf = hrtf, maxOrder = TracedReverb.Order };
             Phonon.iplAmbisonicsDecodeEffectCreate(ctx, ref au, ref dsx, out IntPtr dec);

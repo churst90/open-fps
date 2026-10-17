@@ -52,7 +52,7 @@ public static class NanMixSpike
         provider.Traced.Configure(ctx, scene, lscene);
         provider.Traced.SetListener(from, acoustics.GetRegionAt(world, from));
 
-        Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", outPath);
+        System.Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", outPath);
         if (!provider.Initialize()) { Console.WriteLine("FAIL: provider init failed."); return 1; }
         SteamAudioScene? openScene = null, openListener = null;
         var lines = new List<string>();

@@ -1,6 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
-using OpenFPS.Common;
+using OpenFPS.Environment;
 using OpenFPS.Sound;
 using OpenFPS.Physics;
 using OpenFPS.Geometry;

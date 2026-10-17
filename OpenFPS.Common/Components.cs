@@ -4,6 +4,7 @@ using System;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
 using OpenFPS.Sound;
+using OpenFPS.Environment;
 
 namespace OpenFPS.Common.Components;
 

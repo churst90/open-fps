@@ -135,7 +135,7 @@ public sealed class WorldStore
         string dir = TileDir(key, Generator);
         Directory.CreateDirectory(dir);
         string path = TileFile(key, Generator);
-        string temp = path + "." + Environment.ProcessId.ToString(CultureInfo.InvariantCulture) + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        string temp = path + "." + System.Environment.ProcessId.ToString(CultureInfo.InvariantCulture) + "." + Guid.NewGuid().ToString("N") + ".tmp";
         File.WriteAllBytes(temp, bytes);
         File.Move(temp, path, overwrite: true);
         lock (_gate)
@@ -246,7 +246,7 @@ public sealed class WorldStore
             {
                 using var f = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
                 using var w = new StreamWriter(f);
-                w.Write($"{Environment.ProcessId} {DateTime.UtcNow:O}");
+                w.Write($"{System.Environment.ProcessId} {DateTime.UtcNow:O}");
                 return true;
             }
             catch (IOException) when (File.Exists(path))

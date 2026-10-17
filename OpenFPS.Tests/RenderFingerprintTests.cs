@@ -10,6 +10,7 @@ using OpenFPS.Sound.Core.Rail;
 using OpenFPS.Sound.Core.Signals;
 using OpenFPS.Common;
 using Xunit.Abstractions;
+using OpenFPS.Environment;
 
 namespace OpenFPS.Tests;
 
@@ -126,7 +127,7 @@ public class RenderFingerprintTests
         int samples = buffers.Sum(b => b.Length);
 
         var stored = Read();
-        if (Environment.GetEnvironmentVariable("OPENFPS_FINGERPRINT_WRITE") == "1")
+        if (System.Environment.GetEnvironmentVariable("OPENFPS_FINGERPRINT_WRITE") == "1")
         {
             if (stored.Maths != maths) stored.Rows.Clear();   // hashes from other maths would never match here
             stored.Maths = maths;
@@ -310,7 +311,7 @@ public class RenderFingerprintTests
     [Fact]
     public void EveryRenderIsStoredAndNothingElse()
     {
-        if (Environment.GetEnvironmentVariable("OPENFPS_FINGERPRINT_WRITE") == "1") return;
+        if (System.Environment.GetEnvironmentVariable("OPENFPS_FINGERPRINT_WRITE") == "1") return;
         var stored = Read();
         Assert.Equal(Renders.Keys.OrderBy(k => k, StringComparer.Ordinal), stored.Rows.Keys);
     }

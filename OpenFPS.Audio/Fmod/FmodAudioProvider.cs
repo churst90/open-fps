@@ -11,6 +11,7 @@ using OpenFPS.Native.Platform;
 using OpenFPS.Native.SteamAudio;
 
 using OpenFPS.Acoustics;
+using OpenFPS.Environment;
 
 namespace OpenFPS.Audio.Fmod;
 
@@ -904,12 +905,12 @@ public partial class FmodAudioProvider : IAudioProvider
     /// Override with OPENFPS_MASTER_MAKEUP_DB.
     /// </summary>
     public static readonly float MasterMakeupDb =
-        float.TryParse(Environment.GetEnvironmentVariable("OPENFPS_MASTER_MAKEUP_DB"), out float mk)
+        float.TryParse(System.Environment.GetEnvironmentVariable("OPENFPS_MASTER_MAKEUP_DB"), out float mk)
             ? Math.Clamp(mk, 0f, 40f) : 6f;
 
     /// <summary>A trim on the master for a run, dB, on top of the makeup: OPENFPS_MASTER_DB, 0 when unset.</summary>
     public static readonly float MasterTrimDb =
-        float.TryParse(Environment.GetEnvironmentVariable("OPENFPS_MASTER_DB"),
+        float.TryParse(System.Environment.GetEnvironmentVariable("OPENFPS_MASTER_DB"),
                        System.Globalization.NumberStyles.Float,
                        System.Globalization.CultureInfo.InvariantCulture, out float mdb)
             ? Math.Clamp(mdb, -24f, 24f) : 0f;
@@ -924,7 +925,7 @@ public partial class FmodAudioProvider : IAudioProvider
     private float _simReverbDecayMs;
 
     // OPENFPS_AUDIO_DEBUG=1 logs each source's HRTF direction and the listener's yaw about once a second.
-    private static readonly bool _audioDebug = Environment.GetEnvironmentVariable("OPENFPS_AUDIO_DEBUG") == "1";
+    private static readonly bool _audioDebug = System.Environment.GetEnvironmentVariable("OPENFPS_AUDIO_DEBUG") == "1";
     private int _dbgFrame;
 
     private IntPtr _saContext;
@@ -999,7 +1000,7 @@ public partial class FmodAudioProvider : IAudioProvider
 
             // OPENFPS_FMOD_WAV=<path> replaces the sound card with a file writer: exact and silent, for
             // a rig. OPENFPS_AUDIO_CAPTURE taps the master and keeps playing, for finding something by ear.
-            string? wavPath = Environment.GetEnvironmentVariable("OPENFPS_FMOD_WAV");
+            string? wavPath = System.Environment.GetEnvironmentVariable("OPENFPS_FMOD_WAV");
             IntPtr extra = IntPtr.Zero;
             if (string.IsNullOrEmpty(wavPath)) MixerQuality.ApplyOutput(_system);
             if (!string.IsNullOrEmpty(wavPath))
@@ -1120,7 +1121,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 _loudnessMeter.setParameterInt(0, 1);   // state: start metering
             }
 
-            string? capturePath = Environment.GetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE");
+            string? capturePath = System.Environment.GetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE");
             if (!string.IsNullOrEmpty(capturePath))
             {
                 _system.getSoftwareFormat(out int capRate, out _, out _);
@@ -1130,7 +1131,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 else Log.Warning("Could not attach the capture tap; playback is unaffected.");
             }
             // The mix as it reaches the limiter, to compare with what leaves it (the lab's --quality limiter).
-            string? prePath = Environment.GetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_PRE");
+            string? prePath = System.Environment.GetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_PRE");
             if (!string.IsNullOrEmpty(prePath) && master.getDSPIndex(_masterLimiter, out int limiterAt) == RESULT.OK)
             {
                 _system.getSoftwareFormat(out int preRate, out _, out _);
@@ -1163,7 +1164,7 @@ public partial class FmodAudioProvider : IAudioProvider
     {
         _system.getSoftwareFormat(out int rate, out _, out _);
         var state = new EarWindState(rate > 0 ? rate : MixerRate, Weather, Hearing);
-        if (Environment.GetEnvironmentVariable("OPENFPS_EAR_WIND") == "0")
+        if (System.Environment.GetEnvironmentVariable("OPENFPS_EAR_WIND") == "0")
         {
             state.Enabled = false;
             Log.Information("Ear wind: OFF (OPENFPS_EAR_WIND=0).");
@@ -1207,7 +1208,7 @@ public partial class FmodAudioProvider : IAudioProvider
     {
         // OPENFPS_HRTF=0 leaves the binaural stage out: a bisect lever for a crash on an FMOD thread
         // (the stage is the largest native surface in the mixer callback), not a setting.
-        if (Environment.GetEnvironmentVariable("OPENFPS_HRTF") == "0")
+        if (System.Environment.GetEnvironmentVariable("OPENFPS_HRTF") == "0")
         {
             Log.Warning("OPENFPS_HRTF=0 — the Steam Audio binaural stage is OFF. Spatial cues are FMOD "
                       + "panning only. This is a diagnostic lever; unset it for normal listening.");
@@ -1637,7 +1638,7 @@ public partial class FmodAudioProvider : IAudioProvider
 
     /// <summary>OPENFPS_ENGINE_DETAIL=always: every engine at reduced detail however loud, to hear one on
     /// its own. Listening tests only.</summary>
-    private static readonly bool AllEnginesReduced = Environment.GetEnvironmentVariable("OPENFPS_ENGINE_DETAIL") == "always";
+    private static readonly bool AllEnginesReduced = System.Environment.GetEnvironmentVariable("OPENFPS_ENGINE_DETAIL") == "always";
 
     /// <summary>
     /// Sets each engine's detail from how loud it is at the ear against the loudest machine (engines, standing
@@ -4369,7 +4370,7 @@ public partial class FmodAudioProvider : IAudioProvider
     /// is invisible to every sampled instrument; here a staircase is eight identical rows and a jump.
     /// </summary>
     private static readonly int _traceEntity =
-        int.TryParse(Environment.GetEnvironmentVariable("OPENFPS_AUDIO_TRACE"), out int t) ? t : int.MinValue;
+        int.TryParse(System.Environment.GetEnvironmentVariable("OPENFPS_AUDIO_TRACE"), out int t) ? t : int.MinValue;
 
     /// <summary>
     /// A voice's first attribute pass, run as it is made, before the channel is unpaused: its direction,

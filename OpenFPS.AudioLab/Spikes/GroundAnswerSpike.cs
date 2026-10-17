@@ -41,7 +41,7 @@ public static class GroundAnswerSpike
         string? car = args.FirstOrDefault(a => a.StartsWith("car="))?[4..];
         float speed = float.Parse(args.FirstOrDefault(a => a.StartsWith("speed="))?[6..] ?? "50", CultureInfo.InvariantCulture) / 3.6f;
         string outDir = args.FirstOrDefault(a => a.StartsWith("out="))?[4..]
-                        ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "openfps-listen", "ground-answer");
+                        ?? Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile), "openfps-listen", "ground-answer");
 
         var world = PathProbeSpike.LoadAsClient(root, mapId);
         var spatial = new SpatialService();

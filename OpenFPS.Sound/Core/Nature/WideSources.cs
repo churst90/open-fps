@@ -46,7 +46,7 @@ public sealed class WideSources
     public float ForceSpread { get; set; } = float.NaN;
 
     /// <summary>The shipped hearing, unless OPENFPS_WIDE_SOURCES=0 or OPENFPS_EXTENT_RULE=middle says otherwise.</summary>
-    public static WideSources FromEnvironment() => From(Environment.GetEnvironmentVariable);
+    public static WideSources FromEnvironment() => From(System.Environment.GetEnvironmentVariable);
 
     /// <summary>The same, from <paramref name="variable"/> instead of the process's environment.</summary>
     public static WideSources From(Func<string, string?> variable) => new()

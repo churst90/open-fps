@@ -1,5 +1,5 @@
 using OpenFPS.Acoustics;
-using OpenFPS.Common;
+using OpenFPS.Environment;
 using OpenFPS.Materials;
 
 namespace OpenFPS.Sound;

@@ -16,6 +16,7 @@ using OpenFPS.Server.Systems;
 using OpenFPS.Server.Services;
 using OpenFPS.Geometry;
 using OpenFPS.Sound;
+using OpenFPS.Environment;
 using static OpenFPS.Common.PhysicsConstants;
 
 namespace OpenFPS.Server;
@@ -700,7 +701,7 @@ public class GameServer
         catch (IOException) { return ""; }
     }
 
-    public static void WriteMotd(string text) => File.WriteAllText(MotdPath, text.Trim() + Environment.NewLine);
+    public static void WriteMotd(string text) => File.WriteAllText(MotdPath, text.Trim() + System.Environment.NewLine);
 
     /// <summary>Sends to a session over whichever transport it has: a MUD session has no UDP peer.</summary>
     public void SendToSession(UserSession session, IMessage message, DeliveryMethod delivery = DeliveryMethod.ReliableOrdered)

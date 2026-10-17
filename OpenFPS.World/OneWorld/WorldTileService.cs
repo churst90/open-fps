@@ -251,7 +251,7 @@ public sealed class WorldTileService
                         classes, coverName);
         // Which way each cell drains, decided from the window round it as its roads are, so neighbours agree.
         if (laid.Window != null && laid.Surfaces != null)
-            tile.Drainage = Water.Drainage.OfWindow(laid.Window, n, n, o, o, Posts - 1, Spacing, laid.Surfaces, o);
+            tile.Drainage = Environment.Water.Drainage.OfWindow(laid.Window, n, n, o, o, Posts - 1, Spacing, laid.Surfaces, o);
         tile.Entities = laid.Entities;
         if (laid.Entities.Count > 0) tile.Features = Features.Name;
         tile.Buildings = laid.BuildingSources;
@@ -311,10 +311,10 @@ public sealed class WorldTileService
         // Its drainage from its own posts alone (no margin: a tile made without the window round it).
         var surfaces = new byte[(Posts - 1) * (Posts - 1)];
         for (int k = 0; k < surfaces.Length; k++)
-            surfaces[k] = classes != null && k < classes.Length ? Water.SurfaceRaster.OfLandCover(classes[k]) : (byte)OpenFPS.Common.GroundSurface.Open;
+            surfaces[k] = classes != null && k < classes.Length ? Water.SurfaceRaster.OfLandCover(classes[k]) : (byte)OpenFPS.Environment.GroundSurface.Open;
         return new WorldTile
         {
-            Drainage = Water.Drainage.OfWindow(h, Posts, Posts, 0, 0, Posts - 1, Spacing, surfaces, 0),
+            Drainage = Environment.Water.Drainage.OfWindow(h, Posts, Posts, 0, 0, Posts - 1, Spacing, surfaces, 0),
             Key = key.ToString(),
             Generator = WorldStore.GeneratorVersion,
             MadeUtc = DateTime.UtcNow,

@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Text;
 using System.Threading;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Environment;
 
 // Rain running over the ground (docs/RUNNING_WATER.md section 13, docs/MATTER.md 4.2): what each kind of
 // surface lets run off, how fast it gets to a drainage line, and the state of one map's water, worked out

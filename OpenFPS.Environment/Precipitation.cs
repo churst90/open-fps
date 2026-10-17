@@ -1,7 +1,7 @@
 using OpenFPS.Materials;
 using OpenFPS.Physics;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Environment;
 
 /// <summary>What is falling.</summary>
 public enum PrecipitationKind

@@ -206,7 +206,7 @@ public class NetworkService : INetEventListener
                     reader.AvailableBytes, peer.Id, peer.Address, MaxMessageBytes);
             return;
         }
-        if (!Spend(peer.Id, Environment.TickCount64))
+        if (!Spend(peer.Id, System.Environment.TickCount64))
         {
             if (_logLimiter.TryConsume("flood:" + RateLimiter.AddressKey(peer.Address)))
                 Log.Warning("Peer {Id} ({EndPoint}) is sending more than {Rate} messages a second; dropping the excess.", peer.Id, peer.Address, MessagesPerSecond);

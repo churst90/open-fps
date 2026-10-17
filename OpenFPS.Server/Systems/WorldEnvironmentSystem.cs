@@ -4,6 +4,7 @@ using OpenFPS.Common.Components;
 using Serilog;
 using OpenFPS.Geometry;
 using OpenFPS.Physics;
+using OpenFPS.Environment;
 
 namespace OpenFPS.Server.Systems;
 
@@ -109,12 +110,12 @@ public class WorldEnvironmentSystem
     private void ApplyClock()
     {
         var inv = System.Globalization.CultureInfo.InvariantCulture;
-        if (float.TryParse(Environment.GetEnvironmentVariable("OPENFPS_GAME_HOUR"), System.Globalization.NumberStyles.Float, inv, out float hour))
+        if (float.TryParse(System.Environment.GetEnvironmentVariable("OPENFPS_GAME_HOUR"), System.Globalization.NumberStyles.Float, inv, out float hour))
         {
             _env.GameTime = Math.Clamp(hour, 0f, 23.999f);
             Log.Information("WorldEnvironment: the day starts at {Hour:F2} (OPENFPS_GAME_HOUR).", _env.GameTime);
         }
-        if (float.TryParse(Environment.GetEnvironmentVariable("OPENFPS_TIME_MULTIPLIER"), System.Globalization.NumberStyles.Float, inv, out float rate) && rate > 0f)
+        if (float.TryParse(System.Environment.GetEnvironmentVariable("OPENFPS_TIME_MULTIPLIER"), System.Globalization.NumberStyles.Float, inv, out float rate) && rate > 0f)
         {
             _timeMultiplier = rate;
             Log.Information("WorldEnvironment: game time runs {Rate}x real time (OPENFPS_TIME_MULTIPLIER).", rate);
@@ -128,7 +129,7 @@ public class WorldEnvironmentSystem
     /// </summary>
     private void ApplyPinnedWeather()
     {
-        string? pinned = Environment.GetEnvironmentVariable("OPENFPS_WEATHER");
+        string? pinned = System.Environment.GetEnvironmentVariable("OPENFPS_WEATHER");
         if (string.IsNullOrWhiteSpace(pinned)) return;
 
         if (!Enum.TryParse<WeatherType>(pinned.Trim(), ignoreCase: true, out var scenario))

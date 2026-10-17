@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 using System.Numerics;
-using OpenFPS.Common;
+using OpenFPS.Environment;
 using OpenFPS.Acoustics;
 using OpenFPS.Materials;
 using OpenFPS.Physics;

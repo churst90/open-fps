@@ -643,7 +643,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
             float kappa = w.SlipRatioValue, tanAlpha = MathF.Tan(w.SlipAngleRad);
             _wheelDemand[i] = w.DemandFraction;
             // Water in the contact lubricates the stick-snap the squeal is made of (RoadWaterLaw.SquealFactor).
-            float wetSqueal = OpenFPS.Common.RoadWaterLaw.SquealFactor(w.Surface, w.WaterMm);
+            float wetSqueal = OpenFPS.Environment.RoadWaterLaw.SquealFactor(w.Surface, w.WaterMm);
             _wheelWetSqueal[i] = wetSqueal;
             _wheelStickSlip[i] = OpenFPS.Materials.RoadSurfaces.StickSlipOf(w.Surface) * wetSqueal;
             _wheelSlipVelocity[i] = u * MathF.Sqrt(kappa * kappa + tanAlpha * tanAlpha);

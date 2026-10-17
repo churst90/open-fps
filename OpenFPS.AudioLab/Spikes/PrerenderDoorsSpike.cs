@@ -15,7 +15,7 @@ public static class PrerenderDoorsSpike
     {
         string? outDir = args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?[4..];
         if (string.IsNullOrWhiteSpace(outDir)) { Console.Error.WriteLine("--prerender-doors needs out=DIR"); return 2; }
-        int threads = Math.Max(1, Environment.ProcessorCount - 1);
+        int threads = Math.Max(1, System.Environment.ProcessorCount - 1);
         if (args.FirstOrDefault(a => a.StartsWith("threads=", StringComparison.Ordinal)) is { } t && int.TryParse(t[8..], out int n))
             threads = Math.Max(1, n);
 

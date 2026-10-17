@@ -292,10 +292,10 @@ public static class StoveSpike
         string[] only = args.FirstOrDefault(a => a.StartsWith("scenes=", StringComparison.Ordinal))?[7..].Split(',') ?? Array.Empty<string>();
         bool Wanted(string scene) => only.Length == 0 || only.Contains(scene);
         Directory.CreateDirectory(outDir);
-        Environment.SetEnvironmentVariable("OPENFPS_DITHER", "0");
-        Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", Path.Combine(outDir, "capture.wav"));
-        Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(outDir, "capture.post.wav"));
-        Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
+        System.Environment.SetEnvironmentVariable("OPENFPS_DITHER", "0");
+        System.Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", Path.Combine(outDir, "capture.wav"));
+        System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(outDir, "capture.post.wav"));
+        System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
         var spec = ModelLibrary.Presets.GasHob(preset);
         int n = spec.Burners.Length;
         string off = HobKey.Off(n);

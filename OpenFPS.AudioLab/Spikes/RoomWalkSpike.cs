@@ -62,7 +62,7 @@ public static class RoomWalkSpike
         }
 
         // The file writer REPLACES the sound card: exact, and silent, so a measurement run makes no noise.
-        Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", outPath);
+        System.Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", outPath);
 
         var provider = new FmodAudioProvider { Hearing = LabHearing };
         if (!provider.Initialize()) { Console.WriteLine("FAIL: provider init failed."); return 1; }
@@ -257,7 +257,7 @@ public static class RoomWalkSpike
     /// </summary>
     private static int ClockCheck(string outPath)
     {
-        Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", outPath);
+        System.Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", outPath);
         var provider = new FmodAudioProvider { Hearing = LabHearing };
         if (!provider.Initialize()) { Console.WriteLine("FAIL: provider init failed."); return 1; }
         try

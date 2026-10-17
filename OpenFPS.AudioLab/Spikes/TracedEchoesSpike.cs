@@ -145,7 +145,7 @@ public static class TracedEchoesSpike
                 Phonon.iplAudioBufferInterleave(ctx, ref outBuf, inter);
                 double e1 = 0; for (int k = 0; k < 1024; k++) e1 += inter[k * ch] * (double)inter[k * ch];
                 single.Add(10 * Math.Log10(e1 + 1e-20));
-                bool swap = Environment.GetEnvironmentVariable("SWAP") == "1";
+                bool swap = System.Environment.GetEnvironmentVariable("SWAP") == "1";
                 Phonon.iplAudioBufferDeinterleave(ctx, mono, ref inBuf);
                 if (hA) Phonon.iplReflectionEffectApply(swap ? fb : fa, ref pa, ref inBuf, ref ob2, IntPtr.Zero);
                 Phonon.iplAudioBufferDeinterleave(ctx, mono, ref inBuf);

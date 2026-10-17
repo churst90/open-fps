@@ -32,7 +32,7 @@ public static class GroundVoiceSpike
                       ?? OpenFPS.AudioLab.LabPaths.Sounds("VOICES", "tim", "greet_hey_how_s_it_going.ogg");
         float at = Arg(args, "--at=", 3f), angle = Arg(args, "--angle=", 30f);
         string outDir = Array.Find(args, a => a.StartsWith("--out="))?[6..]
-                        ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "openfps-listen", "ground-voice");
+                        ?? Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile), "openfps-listen", "ground-voice");
         Directory.CreateDirectory(outDir);
 
         float[] dry = Decode(line);

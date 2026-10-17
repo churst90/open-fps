@@ -1,6 +1,6 @@
 using OpenFPS.Physics;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Environment;
 
 // The waves a wind raises over water, and the shape of the water it raises them over: the sea state, which
 // the shores' sound reads (ShoreSpec in Waves.cs, ShoreSynth). See docs/WAVES_AND_SHORES.md section 1.

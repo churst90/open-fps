@@ -35,7 +35,7 @@ public static class PhysicsStore
 
     public static string PathOf(params string[] parts) => Path.Combine([RepoRoot(), "OpenFPS.Tests", "PhysicsBoundary", .. parts]);
 
-    public static bool Writing => Environment.GetEnvironmentVariable("OPENFPS_PHYSICS_WRITE") == "1";
+    public static bool Writing => System.Environment.GetEnvironmentVariable("OPENFPS_PHYSICS_WRITE") == "1";
 
     public static PhysicsReplays.MapFolders Folders => new(Path.Combine(AppContext.BaseDirectory, "maps"),
         Path.Combine(AppContext.BaseDirectory, "places"), Path.Combine(AppContext.BaseDirectory, "prefabs"));
@@ -46,7 +46,7 @@ public static class PhysicsStore
     public static string Maths => MathsOnce.Value;
     private static readonly Lazy<string> MathsOnce = new(CrossMachine.MathsFingerprint);
 
-    public static bool Foreign => Environment.GetEnvironmentVariable("OPENFPS_PHYSICS_FOREIGN") == "1";
+    public static bool Foreign => System.Environment.GetEnvironmentVariable("OPENFPS_PHYSICS_FOREIGN") == "1";
 
     /// <summary>A store's maths line and the rest; no maths ("") for a store written before it had one.</summary>
     public static (string Maths, string Text) ReadStored(string path)

@@ -1,7 +1,6 @@
 using System.Numerics;
-using OpenFPS.Common;
 
-namespace OpenFPS.Server.Water;
+namespace OpenFPS.Environment.Water;
 
 /// <summary>
 /// A map's drainage, put together from its tiles' (docs/RUNNING_WATER.md section 13): every cell's way

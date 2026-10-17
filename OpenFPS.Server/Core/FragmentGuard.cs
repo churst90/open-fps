@@ -31,7 +31,7 @@ public sealed class FragmentGuard : PacketLayerBase
     private readonly Dictionary<IPEndPoint, Sender> _senders = new();
     private readonly Func<long> _nowMs;
 
-    public FragmentGuard(Func<long>? nowMs = null) : base(0) => _nowMs = nowMs ?? (() => Environment.TickCount64);
+    public FragmentGuard(Func<long>? nowMs = null) : base(0) => _nowMs = nowMs ?? (() => System.Environment.TickCount64);
 
     public override void ProcessInboundPacket(ref IPEndPoint endPoint, ref byte[] data, ref int length)
     {

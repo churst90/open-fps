@@ -1,6 +1,6 @@
 using System.Threading;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Environment;
 
 /// <summary>
 /// The rain that has landed and is on its way to a gutter, a drain or a downpipe, and keeps them running

@@ -54,7 +54,7 @@ public static class ExtendedSources
 
     /// <summary>How many places a tree's crown is heard from round its middle: one per bough
     /// (FoliageSynth.Boughs). Measured (AudioLab --wide-sources, 2026-10-06) against three.</summary>
-    public static int TreePlaces = int.TryParse(Environment.GetEnvironmentVariable("OPENFPS_WIDE_TREE_PLACES"), out int t) && t >= 1
+    public static int TreePlaces = int.TryParse(System.Environment.GetEnvironmentVariable("OPENFPS_WIDE_TREE_PLACES"), out int t) && t >= 1
         ? Math.Min(t, FoliageSynth.Boughs) : FoliageSynth.Boughs;
 
     /// <summary>How many places a fire pit's bed is heard from round its flames; a bigger fire says its own

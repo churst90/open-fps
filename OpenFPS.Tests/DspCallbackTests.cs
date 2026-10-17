@@ -10,6 +10,7 @@ using OpenFPS.Audio.Fmod;
 using OpenFPS.Audio.SteamAudio;
 using Xunit.Abstractions;
 using OpenFPS.Physics;
+using OpenFPS.Environment;
 
 namespace OpenFPS.Tests;
 

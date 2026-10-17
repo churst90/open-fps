@@ -1,5 +1,6 @@
 using System.Numerics;
 using OpenFPS.Materials;
+using OpenFPS.Environment;
 
 namespace OpenFPS.Common;
 

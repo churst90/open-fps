@@ -64,7 +64,7 @@ public static class ProbableBugsSpike
         if (scene == "upmix") return Upmix();
 
         string wav = Path.Combine(outDir, "capture.wav");
-        Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", wav);
+        System.Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", wav);
         var provider = new FmodAudioProvider { Hearing = LabHearing };
         var facade = new AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();
@@ -509,7 +509,7 @@ public static class ProbableBugsSpike
         provider.Traced.SetListener(ear);
 
         string wav = Path.Combine(outDir, $"capture-{room}{(stereoVoice ? "-stereo" : "")}.wav");
-        Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", wav);
+        System.Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", wav);
         if (!provider.Initialize()) { Console.WriteLine("FAIL: provider init failed."); return 1; }
         var placed = LabHearing.Place(92f);
         try

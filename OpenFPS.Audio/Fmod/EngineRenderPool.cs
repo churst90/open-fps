@@ -34,7 +34,7 @@ public sealed class EngineRenderPool : IDisposable
         // (--tap-balance cost), six threads were short and the nearest cars starved. ProcessorCount is the
         // machine's unless DOTNET_PROCESSOR_COUNT says otherwise: the build and test scripts set it, the
         // client's start scripts do not (24 cores, 12 workers, on Cody's 2026-10-07 log).
-        int count = Math.Clamp(Environment.ProcessorCount / 2, 2, 12);
+        int count = Math.Clamp(System.Environment.ProcessorCount / 2, 2, 12);
         _workers = new Thread[count];
         for (int i = 0; i < count; i++)
         {
@@ -60,7 +60,7 @@ public sealed class EngineRenderPool : IDisposable
         _coordinator.Start();
 
         Log.Information("Engine rendering moved off the mixer: {Threads} dedicated thread(s) of {Cores} cores, {Lead:F0}-{Max:F0} ms ahead.",
-                        count, Environment.ProcessorCount,
+                        count, System.Environment.ProcessorCount,
                         EngineVoiceState.MinLeadSeconds * 1000f, EngineVoiceState.MaxLeadSeconds * 1000f);
     }
 

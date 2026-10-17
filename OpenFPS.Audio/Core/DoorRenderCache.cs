@@ -106,7 +106,7 @@ public sealed class DoorRenderCache
             Directory.CreateDirectory(dir);
             PruneOtherBuilds(dir);
             string path = Path.Combine(dir, FileName(key));
-            string tmp = path + "." + Environment.CurrentManagedThreadId + ".tmp";
+            string tmp = path + "." + System.Environment.CurrentManagedThreadId + ".tmp";
             using (var w = new BinaryWriter(File.Create(tmp)))
             {
                 float peak = 0f;

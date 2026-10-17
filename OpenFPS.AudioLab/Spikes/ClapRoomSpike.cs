@@ -76,7 +76,7 @@ public static class ClapRoomSpike
         provider.Traced.Configure(ctx, scene);
         provider.Traced.SetListener(ear);
 
-        Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", outPath);
+        System.Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", outPath);
         if (!provider.Initialize()) { Console.WriteLine("FAIL: provider init failed."); return 1; }
         string? soundArg = Arg(args, "sound");
         bool gun = soundArg != null && WeaponRegistry.TryGet(soundArg, out _);

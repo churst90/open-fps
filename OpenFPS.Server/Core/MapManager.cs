@@ -246,7 +246,7 @@ public partial class MapManager
 
     /// <summary>The water over the ground of every map this manager loads (docs/RUNNING_WATER.md 13): this world's,
     /// on its soil, its frames waiting on the machine's real time. The server steps it each tick and sends it.</summary>
-    public Systems.GroundWaterSystem GroundWater { get; } = new(() => RealTime.Milliseconds / 1000.0);
+    public Environment.Water.GroundWaterSystem GroundWater { get; } = new(() => RealTime.Milliseconds / 1000.0);
 
     /// <summary>The map a player lands on, overriding whichever map claims <c>IsDefault</c>. Set from
     /// <c>--map &lt;id&gt;</c> before <see cref="Initialize"/>.</summary>

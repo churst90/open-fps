@@ -7,7 +7,8 @@ using OpenFPS.Server.Core;
 using OpenFPS.Server.OneWorld;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
-using OpenFPS.Server.Water;
+using OpenFPS.Environment;
+using OpenFPS.Environment.Water;
 using Xunit.Abstractions;
 using OpenFPS.Materials;
 

@@ -1,4 +1,4 @@
-namespace OpenFPS.Common;
+namespace OpenFPS.Environment;
 
 /// <summary>What a drainage line of the ground is, where it is heard: what its bed is made of.</summary>
 public enum GroundChannelKind

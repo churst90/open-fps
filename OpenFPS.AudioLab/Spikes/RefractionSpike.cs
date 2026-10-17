@@ -8,6 +8,7 @@ using OpenFPS.Common;
 using OpenFPS.Acoustics;
 using OpenFPS.Materials;
 using OpenFPS.Physics;
+using OpenFPS.Environment;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
@@ -45,7 +46,7 @@ public static class RefractionSpike
         int day = int.Parse(S("day") ?? "172", CultureInfo.InvariantCulture);
         var distances = (S("d") ?? "50,100,150,300,600").Split(',').Select(F).ToArray();
         string groundName = S("ground") ?? "Grass";
-        string outDir = S("out") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "openfps-listen", "refraction");
+        string outDir = S("out") ?? Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile), "openfps-listen", "refraction");
         float c = AirLayers.SpeedOfSound(temp);
         var ground = AcousticRegistry.GetProperties(groundName);
 

@@ -11,6 +11,7 @@ using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using Xunit.Abstractions;
 using OpenFPS.Physics;
+using OpenFPS.Environment;
 
 namespace OpenFPS.Tests;
 
@@ -54,7 +55,7 @@ public class RankingByLoudnessProbe
     [Trait("Category", "Probe")]
     public void Probe_city_machine_budget_by_gain_and_by_loudness()
     {
-        string? outDir = Environment.GetEnvironmentVariable("OPENFPS_PROBE_OUT");
+        string? outDir = System.Environment.GetEnvironmentVariable("OPENFPS_PROBE_OUT");
         if (string.IsNullOrEmpty(outDir)) return;
         Directory.CreateDirectory(outDir);
         var report = new StringBuilder();

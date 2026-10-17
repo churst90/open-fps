@@ -1,6 +1,6 @@
 using OpenFPS.Physics;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Environment;
 
 /// <summary>
 /// The one world time the server and every client agree on, s (WindField.Now: UTC seconds since 2026-01-01):

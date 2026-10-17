@@ -178,7 +178,7 @@ public class AudioWorldOptionsTests
         Assert.Equal(Path.Combine(AppContext.BaseDirectory, "ASSETS", "SOUNDS"), bare.Paths.Sounds);
         Assert.Equal(Path.Combine(AppContext.BaseDirectory, "ASSETS", "rendercache", DoorRenderCache.Name), bare.DoorRenders.ShippedFolder);
         var player = ClientAudioPaths.ForPlayer();
-        Assert.Equal(Environment.GetEnvironmentVariable("OPENFPS_RENDER_CACHE"), player.RenderCache);
+        Assert.Equal(System.Environment.GetEnvironmentVariable("OPENFPS_RENDER_CACHE"), player.RenderCache);
         Assert.Equal(player.RenderCache, new AudioEngineFacade(new VoiceLifecycleTests.RecordingProvider(), paths: player).DoorRenders.Folder);
     }
 }

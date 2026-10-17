@@ -67,7 +67,7 @@ public class TrainVoicesInTheMixTests
             }
         });
 
-        if (Environment.GetEnvironmentVariable("OPENFPS_TRAIN_MIX_DUMP") is { Length: > 0 } dump)
+        if (System.Environment.GetEnvironmentVariable("OPENFPS_TRAIN_MIX_DUMP") is { Length: > 0 } dump)
             File.WriteAllLines(dump, r.Mixer.Lines.Where(l => l.Contains("PlanTrain") || IsTrainVoice(l)));
         var playing = new HashSet<int>();
         int most = 0, trainStarts = 0, sourceVoices = 0, signalSeen = 0;

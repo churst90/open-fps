@@ -52,7 +52,7 @@ public sealed class NvdaSpeechOutput : ISpeechOutput
             lock (_gate)
             {
                 if (_controllerMissing) return false;
-                long now = Environment.TickCount64;
+                long now = System.Environment.TickCount64;
                 if (_checkedAt != 0 && now - _checkedAt < 2000) return _nvda;
                 _checkedAt = now;
                 try { _nvda = NvdaNative.nvdaController_testIfRunning() == 0; }

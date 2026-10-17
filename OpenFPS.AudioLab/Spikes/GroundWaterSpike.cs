@@ -16,6 +16,8 @@ using OpenFPS.Geometry;
 using OpenFPS.Sound;
 using OpenFPS.Materials;
 using OpenFPS.Physics;
+using OpenFPS.Environment;
+using OpenFPS.Environment.Water;
 
 namespace OpenFPS.AudioLab.Spikes;
 
@@ -424,10 +426,10 @@ public static class GroundWaterSpike
             notes.AppendLine(string.Create(CultureInfo.InvariantCulture, $"{k}: creek {v.Creek:F3} L/s, ditch {v.Ditch:F3} L/s, rain {v.Rain:F1} mm/h"));
         Console.Write(notes);
 
-        Environment.SetEnvironmentVariable("OPENFPS_DITHER", "0");
-        Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", Path.Combine(outDir, "capture.wav"));
-        Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(outDir, "capture.post.wav"));
-        Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
+        System.Environment.SetEnvironmentVariable("OPENFPS_DITHER", "0");
+        System.Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", Path.Combine(outDir, "capture.wav"));
+        System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(outDir, "capture.post.wav"));
+        System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
         var provider = new OpenFPS.Audio.Fmod.FmodAudioProvider { Hearing = LabHearing };
         var facade = new AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();

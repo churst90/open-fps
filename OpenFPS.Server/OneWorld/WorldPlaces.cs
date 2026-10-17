@@ -8,6 +8,7 @@ using OpenFPS.Server.Repositories;
 using EntityData = OpenFPS.Server.Repositories.EntityData;
 using Serilog;
 using OpenFPS.Materials;
+using OpenFPS.Environment;
 
 namespace OpenFPS.Server.OneWorld;
 
@@ -48,7 +49,7 @@ public sealed class WorldPlaces
         public List<TerrainBuilder.Slab> Slabs = new();
         internal Dictionary<WorldTileKey, float[]>? Ground;
         /// <summary>Each tile's drainage, worked out with its ground (docs/RUNNING_WATER.md 13).</summary>
-        internal Dictionary<WorldTileKey, Water.TileDrainage>? Drainage;
+        internal Dictionary<WorldTileKey, Environment.Water.TileDrainage>? Drainage;
         /// <summary>What covers each 2 m cell of the place's tiles, read off the map's things when it was copied
         /// (Water.SurfaceRaster), row by row from the first tile's south-west corner.</summary>
         internal byte[] Surfaces = Array.Empty<byte>();
@@ -261,9 +262,9 @@ public sealed class WorldPlaces
 
     /// <summary>The drainage of every tile of a place, the place's whole ground routed at once as the map's own is
     /// (Water.MapDrainage), so the place's tiles agree with each other and with the map.</summary>
-    private static Dictionary<WorldTileKey, Water.TileDrainage> DrainageOf(Place p, List<TerrainBuilder.Tile> laid)
+    private static Dictionary<WorldTileKey, Environment.Water.TileDrainage> DrainageOf(Place p, List<TerrainBuilder.Tile> laid)
     {
-        var result = new Dictionary<WorldTileKey, Water.TileDrainage>();
+        var result = new Dictionary<WorldTileKey, Environment.Water.TileDrainage>();
         if (laid.Count == 0) return result;
         int posts = laid[0].Posts, cells = posts - 1;
         int ntx = laid.Max(t => t.X) + 1, ntz = laid.Max(t => t.Z) + 1;
@@ -272,7 +273,7 @@ public sealed class WorldPlaces
         foreach (var t in laid)
             for (int j = 0; j < posts; j++) Array.Copy(t.Heights, j * posts, grid, (t.Z * cells + j) * px + t.X * cells, posts);
         int cx = px - 1;
-        var perTile = Water.Drainage.OfGrid(grid, px, pz, cells, WorldTileService.Spacing, (tx, tz) =>
+        var perTile = Environment.Water.Drainage.OfGrid(grid, px, pz, cells, WorldTileService.Spacing, (tx, tz) =>
         {
             var s = new byte[cells * cells];
             for (int j = 0; j < cells; j++)
@@ -283,7 +284,7 @@ public sealed class WorldPlaces
                     s[j * cells + i] = v == Water.SurfaceRaster.Uncovered ? (byte)GroundSurface.Open : v;
                 }
             return s;
-        }, Water.Drainage.WholeGrid);
+        }, Environment.Water.Drainage.WholeGrid);
         for (int tx = 0; tx < perTile.GetLength(0); tx++)
             for (int tz = 0; tz < perTile.GetLength(1); tz++)
                 result[p.Min.Offset(tx, tz)] = perTile[tx, tz];

@@ -173,7 +173,7 @@ public static class TapBalanceSpike
     /// ports against what leaves the tailpipe, dumped for octave analysis.</summary>
     static int Port(string[] names)
     {
-        string dir = Environment.GetEnvironmentVariable("OPENFPS_WHOOSH_DUMP") ?? ".";
+        string dir = System.Environment.GetEnvironmentVariable("OPENFPS_WHOOSH_DUMP") ?? ".";
         foreach (var n in names)
         {
             var v = VehicleProfile.ByName(n);
@@ -213,7 +213,7 @@ public static class TapBalanceSpike
         voice.Revive();
         var buf = new float[Block];
         double lo = 0, mid = 0, hi = 0; long count = 0;
-        string? dumpDir = tag != null ? Environment.GetEnvironmentVariable("OPENFPS_WHOOSH_DUMP") : null;
+        string? dumpDir = tag != null ? System.Environment.GetEnvironmentVariable("OPENFPS_WHOOSH_DUMP") : null;
         using var dump = dumpDir == null ? null : new BinaryWriter(File.Create(Path.Combine(dumpDir, $"{v.Name}.{tag}.f32")));
         float a300 = 1f - MathF.Exp(-2f * MathF.PI * 300f / Rate), a3k = 1f - MathF.Exp(-2f * MathF.PI * 3000f / Rate);
         float l1 = 0, l1b = 0, l2 = 0, l2b = 0;
@@ -367,7 +367,7 @@ public static class TapBalanceSpike
 
     static void BandsAt(VehicleProfile v, Action<EngineVoiceState> mute, string tag, float speed)
     {
-        string dir = Environment.GetEnvironmentVariable("OPENFPS_WHOOSH_DUMP") ?? "/tmp";
+        string dir = System.Environment.GetEnvironmentVariable("OPENFPS_WHOOSH_DUMP") ?? "/tmp";
         var voice = new EngineVoiceState(v, Rate, 11) { Hearing = LabHearing, TargetSpeed = speed };
         mute(voice);
         voice.PlaceAtSpeed(speed);
@@ -411,7 +411,7 @@ public static class TapBalanceSpike
     /// </summary>
     static int Turbo(string[] names)
     {
-        string dir = Environment.GetEnvironmentVariable("OPENFPS_WHOOSH_DUMP") ?? ".";
+        string dir = System.Environment.GetEnvironmentVariable("OPENFPS_WHOOSH_DUMP") ?? ".";
         foreach (var n in names)
         {
             var v = VehicleProfile.ByName(n);
@@ -445,7 +445,7 @@ public static class TapBalanceSpike
     /// dumped as {name}.{state}.front.{part}.f32 for octave analysis.</summary>
     static int FrontParts(string[] names)
     {
-        string dir = Environment.GetEnvironmentVariable("OPENFPS_WHOOSH_DUMP") ?? ".";
+        string dir = System.Environment.GetEnvironmentVariable("OPENFPS_WHOOSH_DUMP") ?? ".";
         foreach (var n in names)
         {
             var v = VehicleProfile.ByName(n);

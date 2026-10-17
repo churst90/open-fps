@@ -24,10 +24,10 @@ public sealed class MeshAssetFetcher
 
     private static string? DefaultFolder()
     {
-        string? env = Environment.GetEnvironmentVariable("OPENFPS_MESH_CACHE");
+        string? env = System.Environment.GetEnvironmentVariable("OPENFPS_MESH_CACHE");
         if (env == "off") return null;
         if (!string.IsNullOrWhiteSpace(env)) return env;
-        string root = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        string root = System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData);
         return string.IsNullOrEmpty(root) ? null : Path.Combine(root, "OpenFPS", "meshes");
     }
 

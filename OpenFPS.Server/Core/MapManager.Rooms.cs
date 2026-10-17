@@ -42,7 +42,7 @@ public partial class MapManager
     private static readonly ConditionalWeakTable<World, Owner> Worlds = new();
 
     /// <summary>Threads the server floods on: half the machine, the game keeps the rest.</summary>
-    private static int RoomThreads => Math.Max(1, Environment.ProcessorCount / 2);
+    private static int RoomThreads => Math.Max(1, System.Environment.ProcessorCount / 2);
 
     /// <summary>The fixed geometry of a map changed (or it loaded): its rooms are to be flooded again.</summary>
     private void RoomsChanged(string mapId)

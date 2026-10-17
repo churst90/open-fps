@@ -10,6 +10,7 @@ using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
 using OpenFPS.Native.Platform;
 using OpenFPS.Materials;
+using OpenFPS.Environment;
 
 namespace OpenFPS.Client.Core.Session;
 
@@ -423,7 +424,7 @@ public sealed partial class ClientGameSession : IDisposable
         => _bindings.Execute(InputContext.Gameplay, key, modifiers);
 
     /// <summary>The keys, as the in-game window shows them. One text for both heads.</summary>
-    public static readonly string KeyHelp = string.Join(Environment.NewLine,
+    public static readonly string KeyHelp = string.Join(System.Environment.NewLine,
         "In game. W A S D to move, J / L turn, O / K look up and down, Space jump.",
         "Enter fires the gun in your hands; with no gun it interacts, like E. X moves the fire selector, Shift X back; held Enter on auto keeps firing.",
         "Admin gun: X changes its mode (kill, vaporize, freeze, inspect), Y and Shift Y its calibre.",

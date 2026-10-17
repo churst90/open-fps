@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Numerics;
 using System.Text;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Environment;
 
 /// <summary>What outline a fire's burning area has.</summary>
 public enum FireShapeKind

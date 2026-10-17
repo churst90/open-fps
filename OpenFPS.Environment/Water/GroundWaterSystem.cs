@@ -1,9 +1,7 @@
 using System.Collections.Concurrent;
 using System.Numerics;
-using OpenFPS.Common;
-using OpenFPS.Server.Water;
 
-namespace OpenFPS.Server.Systems;
+namespace OpenFPS.Environment.Water;
 
 /// <summary>
 /// The water on each map's ground (docs/RUNNING_WATER.md section 13): the rain each surface sheds through the

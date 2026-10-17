@@ -42,7 +42,7 @@ public static class GunFitSpike
     {
         _args = args;
         string? only = Arg(args, "only");
-        string nij = Arg(args, "nij") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".cache", "openfps-nij");
+        string nij = Arg(args, "nij") ?? Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile), ".cache", "openfps-nij");
         string tag = Arg(args, "tag") ?? "after";
         string outDir = Arg(args, "out") ?? OpenFPS.AudioLab.LabPaths.InRepo("inbox", "gunfire-2026-10-02");
         bool wavs = args.Contains("wavs");

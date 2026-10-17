@@ -1,5 +1,5 @@
 using System.Numerics;
-using OpenFPS.Common;
+using OpenFPS.Environment;
 using OpenFPS.Acoustics;
 using OpenFPS.Materials;
 
@@ -81,7 +81,7 @@ public sealed class ShoreSynth
 
     /// <summary>For the fit: a constant's value from OPENFPS_WAVES_&lt;NAME&gt;, else its own.</summary>
     private static float Knob(string name, float value)
-        => float.TryParse(Environment.GetEnvironmentVariable("OPENFPS_WAVES_" + name), System.Globalization.NumberStyles.Float,
+        => float.TryParse(System.Environment.GetEnvironmentVariable("OPENFPS_WAVES_" + name), System.Globalization.NumberStyles.Float,
                           System.Globalization.CultureInfo.InvariantCulture, out float v) ? v : value;
 
     /// <summary>A crest entrains air from this speed, m/s: a plunging jet's onset (Ervine, McKeogh and

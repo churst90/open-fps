@@ -13,9 +13,9 @@ public static class SettingsFolder
     public const string Variable = "OPENFPS_SETTINGS_DIR";
 
     public static string Path =>
-        Environment.GetEnvironmentVariable(Variable) is { Length: > 0 } moved
+        System.Environment.GetEnvironmentVariable(Variable) is { Length: > 0 } moved
             ? moved
-            : System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "openfps");
+            : System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData), "openfps");
 
     /// <summary>The full name of one of the player's files there.</summary>
     public static string File(string name) => System.IO.Path.Combine(Path, name);

@@ -304,7 +304,7 @@ public class LiveServerSmokeTests
     [Fact]
     public void LogInLoadTheMapAndLeaveByTheGameMenu()
     {
-        string? target = Environment.GetEnvironmentVariable("OPENFPS_SMOKE");
+        string? target = System.Environment.GetEnvironmentVariable("OPENFPS_SMOKE");
         if (string.IsNullOrWhiteSpace(target)) return;
 
         AcousticRegistry.Initialize();
@@ -316,7 +316,7 @@ public class LiveServerSmokeTests
         network.OnMessageReceived += session.HandleMessage;
 
         var started = DateTime.UtcNow;
-        session.Connect(target, "admin", Environment.GetEnvironmentVariable("OPENFPS_SMOKE_PASSWORD") ?? "admin123", register: false);
+        session.Connect(target, "admin", System.Environment.GetEnvironmentVariable("OPENFPS_SMOKE_PASSWORD") ?? "admin123", register: false);
         DateTime? loaded = null;
         while (DateTime.UtcNow - started < TimeSpan.FromSeconds(90))
         {

@@ -29,11 +29,11 @@ public sealed class MasterDither : IDisposable
     /// On for a sound card, off for the WAV writer (OPENFPS_FMOD_WAV): the lab reads that file for exact
     /// silence and two-millisecond holes, which dither would fill. OPENFPS_DITHER=1 or 0 overrides.
     /// </summary>
-    public static bool Enabled => Environment.GetEnvironmentVariable("OPENFPS_DITHER") switch
+    public static bool Enabled => System.Environment.GetEnvironmentVariable("OPENFPS_DITHER") switch
     {
         "0" => false,
         "1" => true,
-        _ => string.IsNullOrEmpty(Environment.GetEnvironmentVariable("OPENFPS_FMOD_WAV")),
+        _ => string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("OPENFPS_FMOD_WAV")),
     };
 
     /// <summary>Puts the dither at the head of the master group: added last, it is the last thing run.</summary>

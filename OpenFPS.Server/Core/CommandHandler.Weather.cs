@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Numerics;
 using OpenFPS.Physics;
-using OpenFPS.Common.Components;
+using OpenFPS.Environment;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Systems;
 using OpenFPS.Words;

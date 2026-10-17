@@ -1,8 +1,7 @@
 using System.Numerics;
-using OpenFPS.Common.Components;
 using OpenFPS.Materials;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Environment;
 
 /// <summary>How a fuel's surface takes heat before it gives off enough gas to burn (Drysdale, An
 /// Introduction to Fire Dynamics, ch. 6).</summary>

@@ -10,6 +10,7 @@ using Xunit.Abstractions;
 using OpenFPS.Geometry;
 using OpenFPS.Audio;
 using OpenFPS.Materials;
+using OpenFPS.Environment;
 
 namespace OpenFPS.Tests;
 

@@ -373,7 +373,7 @@ public class WorldStoreTests : IDisposable
     [Fact]
     public async Task A_real_tile_from_3dep()
     {
-        if (Environment.GetEnvironmentVariable("OPENFPS_WORLD_NET") != "1") return;
+        if (System.Environment.GetEnvironmentVariable("OPENFPS_WORLD_NET") != "1") return;
         var key = WorldTileKey.OfLatLon(30.123703, -95.740935);
         var clock = Stopwatch.StartNew();
         var service = new WorldTileService(new WorldStore(_dir), new Usgs3Dep());

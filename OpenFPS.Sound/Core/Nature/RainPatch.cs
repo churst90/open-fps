@@ -1,4 +1,4 @@
-using OpenFPS.Common;
+using OpenFPS.Environment;
 
 namespace OpenFPS.Sound.Core.Nature;
 

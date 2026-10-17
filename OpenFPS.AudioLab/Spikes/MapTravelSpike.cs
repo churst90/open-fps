@@ -29,7 +29,7 @@ public static class MapTravelSpike
         var second = PathProbeSpike.LoadAsClient(OpenFPS.AudioLab.LabPaths.Server(), to);
         Console.WriteLine($"  {from}: {first.AcousticMap?.Regions.Count ?? 0} region(s); {to}: {second.AcousticMap?.Regions.Count ?? 0}");
 
-        Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", "/tmp/openfps-map-travel.wav");
+        System.Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", "/tmp/openfps-map-travel.wav");
         var provider = new FmodAudioProvider { Hearing = LabHearing };
         if (!provider.Initialize()) { Console.WriteLine("FAIL: provider init failed."); return 1; }
         int mono = 0, placed = 0, silent = 0;

@@ -51,10 +51,10 @@ public static class ResonanceMaybesSpike
 
     private static FmodAudioProvider Provider(string outDir, string name)
     {
-        Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", Path.Combine(outDir, name + ".fmodout.wav"));
-        Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(outDir, name + ".post.wav"));
-        Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
-        Environment.SetEnvironmentVariable("OPENFPS_DITHER", "0");
+        System.Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", Path.Combine(outDir, name + ".fmodout.wav"));
+        System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(outDir, name + ".post.wav"));
+        System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
+        System.Environment.SetEnvironmentVariable("OPENFPS_DITHER", "0");
         var p = new FmodAudioProvider { Hearing = LabHearing };
         if (!p.Initialize()) throw new InvalidOperationException("provider init failed");
         p.UpdateListener(Vector3.Zero, Quaternion.Identity, Vector3.Zero, -1);
@@ -355,8 +355,8 @@ public static class ResonanceMaybesSpike
         int loading = 0;
         for (int round = 0; round < rounds; round++)
         {
-            Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", null);
-            Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", null);
+            System.Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", null);
+            System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", null);
             var p = new FmodAudioProvider { Hearing = LabHearing };
             if (!p.Initialize()) { Console.WriteLine("  provider init failed"); return 1; }
             p.UpdateListener(Vector3.Zero, Quaternion.Identity, Vector3.Zero, -1);

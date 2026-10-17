@@ -1,7 +1,7 @@
 using System.Numerics;
 using OpenFPS.Physics;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Environment;
 
 // Water on the road: how much is under each wheel and how much grip is left. Worked out on the server
 // and sent to every client (WorldStateUpdate.RoadWater, WheelState.Water), so the grip the server drives

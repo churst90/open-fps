@@ -33,13 +33,13 @@ public sealed class RateLimiter
 
     /// <param name="capacity">Attempts allowed in a burst.</param>
     /// <param name="refillPerSecond">Sustained attempts per second once the burst is spent.</param>
-    /// <param name="nowMs">A millisecond clock; the default is <see cref="Environment.TickCount64"/>.
+    /// <param name="nowMs">A millisecond clock; the default is <see cref="System.Environment.TickCount64"/>.
     /// Tests pass their own so the refill rate can be pinned without sleeping.</param>
     public RateLimiter(int capacity, double refillPerSecond, Func<long>? nowMs = null)
     {
         _capacity = Math.Max(1, capacity);
         _refillPerMs = refillPerSecond / 1000.0;
-        _nowMs = nowMs ?? (() => Environment.TickCount64);
+        _nowMs = nowMs ?? (() => System.Environment.TickCount64);
         _lastPruneMs = _nowMs();
     }
 

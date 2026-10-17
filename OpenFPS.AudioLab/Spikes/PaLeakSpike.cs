@@ -55,7 +55,7 @@ public static class PaLeakSpike
         // The worker's answers, door shut, as the game asks them.
         var shut = new Dictionary<string, AcousticPathData>();
         string wav = Path.Combine(outDir, "capture.wav");
-        Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", wav);
+        System.Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", wav);
         var provider = new FmodAudioProvider();
         // Kept running while the scenes play: it traces the reverb at the ear into the provider's set, as in the game.
         using var worker = new AsyncAcousticWorker(acoustics, provider.Traced, provider.Clock);

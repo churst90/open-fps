@@ -1,7 +1,7 @@
 using OpenFPS.Materials;
 using OpenFPS.Physics;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Environment;
 
 /// <summary>
 /// The air's layers near the ground: how the temperature and the wind change with height, from the sun, the cloud, the

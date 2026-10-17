@@ -12,6 +12,7 @@ using OpenFPS.Geometry;
 using OpenFPS.Sound;
 using OpenFPS.Materials;
 using OpenFPS.Physics;
+using OpenFPS.Environment;
 
 namespace OpenFPS.AudioLab.Spikes;
 
@@ -65,7 +66,7 @@ public static class GameLevelsSpike
         string wav = Path.Combine(outDir, "capture.wav");
         AcousticRegistry.Initialize();
 
-        Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", wav);
+        System.Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", wav);
         var provider = new FmodAudioProvider { Hearing = LabHearing };
         var facade = new AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();

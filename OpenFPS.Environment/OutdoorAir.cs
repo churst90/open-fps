@@ -1,7 +1,7 @@
 using System.Numerics;
 using OpenFPS.Materials;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Environment;
 
 /// <summary>
 /// The air outdoors at a place now, as one value (docs/ENGINE_PACKAGES.md, 3.2: one atmosphere): its

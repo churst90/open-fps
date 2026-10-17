@@ -168,7 +168,7 @@ public sealed class OverpassRegions : IOsmSource
         var ways = Parse(answer);
         var region = new RegionFile { Date = DataDate, South = s, West = w, Ways = ways };
         Directory.CreateDirectory(RegionDir);
-        string temp = path + "." + Environment.ProcessId + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        string temp = path + "." + System.Environment.ProcessId + "." + Guid.NewGuid().ToString("N") + ".tmp";
         await using (var f = File.Create(temp))
         await using (var gz = new GZipStream(f, CompressionLevel.SmallestSize))
             await JsonSerializer.SerializeAsync(gz, region, cancellationToken: ct).ConfigureAwait(false);

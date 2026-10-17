@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using System.Numerics;
 using OpenFPS.Audio.Data;
 using OpenFPS.Audio.Fmod;
-using OpenFPS.Common;
+using OpenFPS.Environment;
 using OpenFPS.Acoustics;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;

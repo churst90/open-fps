@@ -52,8 +52,8 @@ public static class ClapCitySpike
         world.SetAcousticMap(snapshot.AcousticMap!);
 
         string wav = Path.Combine(outDir, "capture-float.wav");
-        Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", wav);
-        Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
+        System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", wav);
+        System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
         var provider = new FmodAudioProvider { Hearing = LabHearing };
         var facade = new AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();

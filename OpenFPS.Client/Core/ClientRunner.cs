@@ -210,7 +210,7 @@ public class ClientRunner
             Serilog.Log.Fatal("GAME LOOP STALLED for {Sec:F0} s — the client is hung, not crashed. Writing a dump.", since);
             try
             {
-                string path = Path.Combine(Program.LogDirectory, $"openfps-hang.{Environment.ProcessId}.dmp");
+                string path = Path.Combine(Program.LogDirectory, $"openfps-hang.{System.Environment.ProcessId}.dmp");
                 using var proc = Process.GetCurrentProcess();
                 using var file = new FileStream(path, FileMode.Create, FileAccess.ReadWrite, FileShare.None);
                 bool ok = MiniDumpWriteDump(proc.Handle, (uint)proc.Id, file.SafeFileHandle, DumpType, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);

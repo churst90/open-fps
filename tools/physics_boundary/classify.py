@@ -41,6 +41,7 @@ EN = 'OpenFPS.Sound.Core.Engine.'
 SO = 'OpenFPS.Sound.'
 MA = 'OpenFPS.Materials.'
 PH = 'OpenFPS.Physics.'
+EV = 'OpenFPS.Environment.'
 
 # ── The inventory: (type, group, note) ─────────────────────────────────────────────────────────────
 RULES = [
@@ -116,7 +117,7 @@ RULES = [
     (PH + 'WindAir', 'V', 'the wind the server sends'),
     (PH + 'WindWeather', 'V', 'one weather\'s wind ramp'),
     (PH + 'WindModel', 'P', 'the bullets\' second wind law; to be one law with WindField'),
-    (C + 'WorldWeather', 'S', 'one audio world\'s weather: it holds the wind Physics owns'),
+    (EV + 'WorldWeather', 'S', 'one audio world\'s weather: it holds the wind Physics owns'),
     (SO + 'EarWind', 'S', 'the wind at the ears: reads the air'),
     (SO + 'ImpactAcoustics', 'S', 'the sound of an impact from two masses and a closing speed'),
     # Geometry
@@ -190,7 +191,7 @@ def allowed_for_physics(t):
 
 
 def short(t):
-    for p in ('OpenFPS.Geometry.', 'OpenFPS.Physics.', 'OpenFPS.Materials.', 'OpenFPS.Schema.', 'OpenFPS.Common.Networking.', 'OpenFPS.Common.Components.', 'OpenFPS.Common.',
+    for p in ('OpenFPS.Geometry.', 'OpenFPS.Environment.', 'OpenFPS.Physics.', 'OpenFPS.Materials.', 'OpenFPS.Schema.', 'OpenFPS.Common.Networking.', 'OpenFPS.Common.Components.', 'OpenFPS.Common.',
               'OpenFPS.Sound.Core.Engine.', 'OpenFPS.Server.Systems.', 'OpenFPS.Server.Core.',
               'OpenFPS.Client.Core.'):
         if t.startswith(p):

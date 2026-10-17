@@ -9,6 +9,7 @@ using OpenFPS.Acoustics;
 using OpenFPS.Native.SteamAudio;
 using OpenFPS.Audio.SteamAudio;
 using OpenFPS.Materials;
+using OpenFPS.Environment;
 
 namespace OpenFPS.AudioLab.Spikes;
 
@@ -95,7 +96,7 @@ public static class ThunderSpike
         {
             var sched = new LightningSchedule(seed);
             var got = new List<LightningStrike>();
-            var sky = new StormSky(OpenFPS.Common.Components.WeatherType.Storm, 1f, new Vector3(12f, 0f, -6f));
+            var sky = new StormSky(OpenFPS.Environment.WeatherType.Storm, 1f, new Vector3(12f, 0f, -6f));
             for (float t = 0f; t < 10f * 3600f; t += 1f) sched.Advance(1f, sky, got);
             var cg = got.Where(s => s.Kind == FlashKind.CloudToGround).ToList();
             var near = cg.Select(s => new Vector2(s.To.X, s.To.Z).Length()).ToList();

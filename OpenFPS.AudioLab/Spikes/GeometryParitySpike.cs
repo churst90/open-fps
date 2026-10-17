@@ -108,7 +108,7 @@ public static class GeometryParitySpike
         long bytes = rebuilt.Instances.ToArray().Select(i => i.Piece).Distinct().Sum(p => p.Bytes);
         Console.WriteLine($"{mapId}: {statics.Count:N0} static solid boxes, {movers.Count:N0} door leaves, {unindexedEntities.Count} other statics; "
                         + $"{rebuilt.TriangleCount:N0} triangles in {timeBuilder.TileCount} tile(s) (map loaded in {loadMs:F0} ms)");
-        Console.WriteLine($"  build: {buildOneThread:F0} ms on one thread, {buildParallel:F0} ms on {Environment.ProcessorCount}; per tile median "
+        Console.WriteLine($"  build: {buildOneThread:F0} ms on one thread, {buildParallel:F0} ms on {System.Environment.ProcessorCount}; per tile median "
                         + $"{(pieceTimes.Count > 0 ? pieceTimes[pieceTimes.Count / 2].Ms : 0):F2} ms, max {(pieceTimes.Count > 0 ? pieceTimes[^1].Ms : 0):F1} ms "
                         + $"({(pieceTimes.Count > 0 ? pieceTimes[^1].Tris : 0):N0} triangles); memory {bytes / 1e6:F1} MB");
 
@@ -1105,7 +1105,7 @@ public static class GeometryParitySpike
             Console.WriteLine($"  open past their margin ({opened.Count}):");
             foreach (var line in opened.Take(Math.Max(show, 40))) Console.WriteLine("    " + line);
         }
-        foreach (var part in (Environment.GetEnvironmentVariable("ROOM_DEBUG") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries))
+        foreach (var part in (System.Environment.GetEnvironmentVariable("ROOM_DEBUG") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries))
             if (int.TryParse(part, out int debugId) && rooms.TryGetValue(debugId, out var dbg))
                 TraceRoom(world, data, seeds.First(x => x.Id == debugId), dbg, ecs, lookup);
     }

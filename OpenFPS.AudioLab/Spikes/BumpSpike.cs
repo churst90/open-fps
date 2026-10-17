@@ -56,7 +56,7 @@ public static class BumpSpike
     {
         float speed = Arg(args, "--speed=", 1.4f);   // walking pace, m/s
         string outDir = Array.Find(args, a => a.StartsWith("--out="))?[6..]
-                        ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "openfps-listen", "bumps");
+                        ?? Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile), "openfps-listen", "bumps");
         Directory.CreateDirectory(outDir);
         AcousticRegistry.Initialize();
         foreach (var s in Surfaces)

@@ -23,14 +23,14 @@ public static class FmodDebugLog
     /// </summary>
     public static string? ArmFromEnvironment()
     {
-        string? want = Environment.GetEnvironmentVariable("OPENFPS_FMOD_DEBUG");
+        string? want = System.Environment.GetEnvironmentVariable("OPENFPS_FMOD_DEBUG");
         if (string.IsNullOrEmpty(want)) return null;
 
         var flags = FMOD.DEBUG_FLAGS.ERROR | FMOD.DEBUG_FLAGS.WARNING
                   | FMOD.DEBUG_FLAGS.DISPLAY_TIMESTAMPS | FMOD.DEBUG_FLAGS.DISPLAY_THREAD;
         if (want == "all") flags |= FMOD.DEBUG_FLAGS.LOG | FMOD.DEBUG_FLAGS.TYPE_TRACE;
 
-        string path = Environment.GetEnvironmentVariable("OPENFPS_FMOD_DEBUG_FILE") ?? Path.Combine(Path.GetTempPath(), "fmod-debug.log");
+        string path = System.Environment.GetEnvironmentVariable("OPENFPS_FMOD_DEBUG_FILE") ?? Path.Combine(Path.GetTempPath(), "fmod-debug.log");
         _out = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite,
                               bufferSize: 1, FileOptions.WriteThrough);
         _held = Write;

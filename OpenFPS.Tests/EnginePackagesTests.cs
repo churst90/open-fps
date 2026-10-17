@@ -146,7 +146,7 @@ public class EnginePackagesTests
         foreach (var (key, may) in allowed)
             if (!counts.ContainsKey(key)) under.Add($"{key.File} -> {key.To}: 0 (allowed {may})");
 
-        string? write = Environment.GetEnvironmentVariable("OPENFPS_BOUNDARY_WRITE");
+        string? write = System.Environment.GetEnvironmentVariable("OPENFPS_BOUNDARY_WRITE");
         if (write == "1" && under.Count > 0)
         {
             WriteAllowed(allowed.ToDictionary(kv => kv.Key, kv => Math.Min(counts.GetValueOrDefault(kv.Key), kv.Value)));
@@ -198,7 +198,7 @@ public class EnginePackagesTests
         new object[] { "Models", typeof(OpenFPS.Common.ModelLibrary).Assembly.GetName().Name! },
         new object[] { "World", typeof(OpenFPS.Server.OneWorld.WorldStore).Assembly.GetName().Name! },
         new object[] { "Audio", typeof(OpenFPS.Audio.Core.AudioEngineFacade).Assembly.GetName().Name! },
-        new object[] { "Environment", typeof(OpenFPS.Common.WorldWeather).Assembly.GetName().Name! },
+        new object[] { "Environment", typeof(OpenFPS.Environment.WorldWeather).Assembly.GetName().Name! },
         new object[] { "Editor", typeof(OpenFPS.Server.Editor.MapOverlay).Assembly.GetName().Name! },
         new object[] { "Agents", typeof(OpenFPS.Common.RaceLine).Assembly.GetName().Name! },
     };

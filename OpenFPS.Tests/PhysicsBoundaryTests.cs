@@ -122,7 +122,7 @@ public class PhysicsBoundaryTests
         foreach (var (key, may) in allowed)
             if (!counts.ContainsKey(key)) under.Add($"{key.From} -> {key.To}: 0 (allowed {may})");
 
-        string? write = Environment.GetEnvironmentVariable("OPENFPS_BOUNDARY_WRITE");
+        string? write = System.Environment.GetEnvironmentVariable("OPENFPS_BOUNDARY_WRITE");
         if (write == "1" && under.Count > 0)
         {
             var lowered = allowed.ToDictionary(kv => kv.Key, kv => Math.Min(counts.GetValueOrDefault(kv.Key), kv.Value));

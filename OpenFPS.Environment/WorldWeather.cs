@@ -1,7 +1,7 @@
 using System.Threading;
 using OpenFPS.Physics;
 
-namespace OpenFPS.Common;
+namespace OpenFPS.Environment;
 
 /// <summary>
 /// The weather one audio world hears: the wind over the map, the rain running off to the gutters and

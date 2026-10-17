@@ -502,7 +502,7 @@ public sealed class OvertureBuildings : IBuildingSource
     private static void WriteWhole(string path, byte[] bytes)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        string temp = path + "." + Environment.ProcessId + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        string temp = path + "." + System.Environment.ProcessId + "." + Guid.NewGuid().ToString("N") + ".tmp";
         File.WriteAllBytes(temp, bytes);
         File.Move(temp, path, overwrite: true);
     }

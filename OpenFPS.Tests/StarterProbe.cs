@@ -21,7 +21,7 @@ public class StarterProbe
     {
         var voice = new EngineVoiceState(v, Rate, 3) { TargetSpeed = 0f, Running = false, Interior = inside, CompensateLevel = true, StarterPathCornerHz = corner };
         voice.Engine.StarterMix = starter;
-        if (float.TryParse(Environment.GetEnvironmentVariable("STARTER_TONE"), out float tone)) voice.Engine.StarterToneMix = tone;
+        if (float.TryParse(System.Environment.GetEnvironmentVariable("STARTER_TONE"), out float tone)) voice.Engine.StarterToneMix = tone;
         voice.PlaceAtSpeed(0f); voice.Revive();
         var buf = new float[Block];
         for (int b = 0; b < 300; b++) voice.Render(buf);
@@ -74,7 +74,7 @@ public class StarterProbe
     [Fact]
     public void Probe()
     {
-        string dir = Environment.GetEnvironmentVariable("STARTER_WAV_DIR") ?? "";
+        string dir = System.Environment.GetEnvironmentVariable("STARTER_WAV_DIR") ?? "";
         if (dir.Length > 0) Directory.CreateDirectory(dir);
         foreach (var key in new[] { "i4_economy", "i4_midsize", "v8_muscle", "pickup_v8", "police_interceptor", "transit_bus" })
         {

@@ -32,7 +32,7 @@ public sealed partial class EngineSynth
 
     /// <summary>Whether a reduced engine may replay its own cycles while steady (CycleCache);
     /// OPENFPS_CYCLE_CACHE=0 keeps it running at half rate, for an A/B.</summary>
-    internal static volatile bool CycleCacheOn = Environment.GetEnvironmentVariable("OPENFPS_CYCLE_CACHE") != "0";
+    internal static volatile bool CycleCacheOn = System.Environment.GetEnvironmentVariable("OPENFPS_CYCLE_CACHE") != "0";
 
     /// <summary>What the hand-over is doing, for instruments and tests: Outer, ToTwin, Twin or ToOuter.</summary>
     internal string DetailState => _runner?.State ?? "Outer";

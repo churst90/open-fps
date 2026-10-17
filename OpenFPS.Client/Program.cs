@@ -19,10 +19,10 @@ public static class Program
         // Machines, materials and prefabs are found relative to the working directory, as they are on
         // Linux, where the launcher sets it. A shortcut or a double-click from another folder would
         // otherwise start the game with no engines and no materials.
-        Environment.CurrentDirectory = AppContext.BaseDirectory;
+        System.Environment.CurrentDirectory = AppContext.BaseDirectory;
 
         LogDirectory = ChooseLogDirectory();
-        string? logPath = Environment.GetEnvironmentVariable("OPENFPS_LOG");
+        string? logPath = System.Environment.GetEnvironmentVariable("OPENFPS_LOG");
         var cfg = new LoggerConfiguration().MinimumLevel.Information();
         cfg = string.IsNullOrWhiteSpace(logPath)
             ? cfg.WriteTo.File(Path.Combine(LogDirectory, "client-.log"), rollingInterval: RollingInterval.Day,
@@ -30,7 +30,7 @@ public static class Program
             : cfg.WriteTo.File(logPath, shared: true, flushToDiskInterval: TimeSpan.FromSeconds(2));
         Log.Logger = cfg.CreateLogger();
         Log.Information("OpenFPS Windows client starting (PID {Pid}, build {Build}). Log folder: {Dir}",
-                        Environment.ProcessId, OpenFPS.Common.WireContract.Hash, LogDirectory);
+                        System.Environment.ProcessId, OpenFPS.Common.WireContract.Hash, LogDirectory);
 
         // FMOD's logging build (fmodL.dll) names API misuse by handle and thread. Armed before
         // System::create or not at all; a no-op unless OPENFPS_FMOD_DEBUG is set.
@@ -63,7 +63,7 @@ public static class Program
         foreach (string dir in new[]
                  {
                      Path.Combine(AppContext.BaseDirectory, "logs"),
-                     Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "openfps", "logs"),
+                     Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData), "openfps", "logs"),
                  })
         {
             try

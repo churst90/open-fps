@@ -51,13 +51,13 @@ public static class FloorRenderSpike
         world.SetAcousticMap(snapshot.AcousticMap!);
 
         string wav = Path.Combine(outDir, "capture.wav");
-        Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", wav);
+        System.Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", wav);
         // The WAV writer's file is 16-bit and undithered: a sound through a floor at -70 dBFS is a dozen
         // steps tall in it, and turned up it is grain and holes that the mix does not have. The tap beside
         // it is the same mix in 32-bit float (MasterTap), what the renders are cut from.
         string floatWav = Path.Combine(outDir, "capture-float.wav");
-        Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", floatWav);
-        Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
+        System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", floatWav);
+        System.Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
         var provider = new FmodAudioProvider { Hearing = LabHearing };
         var facade = new AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();

@@ -513,7 +513,7 @@ public sealed partial class VehicleSystem
                     AudioChanged?.Invoke(v.MapId, v.Entity.Id);
                 }
                 // OPENFPS_TRACE_SHUTTLE, as for shuttles: a racer that fails to stop looks like one with no stops.
-                if (Environment.GetEnvironmentVariable("OPENFPS_TRACE_SHUTTLE") is { } rtrace
+                if (System.Environment.GetEnvironmentVariable("OPENFPS_TRACE_SHUTTLE") is { } rtrace
                     && v.DisplayName.Contains(rtrace, StringComparison.OrdinalIgnoreCase)
                     && (int)(v.Phase * 2) != (int)((v.Phase - dt) * 2))
                     Log.Information("RACER {Name}: lap {Lap:F0}/{Len:F0} m speed {Speed:F1} "
@@ -532,7 +532,7 @@ public sealed partial class VehicleSystem
             // Where a shuttle is, twice a second, for a vehicle named by a substring:
             // OPENFPS_TRACE_SHUTTLE="Mower, garden 2" ./run-server.sh city. Settles from the server
             // whether something moves, which the client cannot tell for a slow machine.
-            if (Environment.GetEnvironmentVariable("OPENFPS_TRACE_SHUTTLE") is { } trace
+            if (System.Environment.GetEnvironmentVariable("OPENFPS_TRACE_SHUTTLE") is { } trace
                 && v.DisplayName.Contains(trace, StringComparison.OrdinalIgnoreCase)
                 && (int)(v.Phase * 2) != (int)((v.Phase - dt) * 2))
                 Log.Information("SHUTTLE {Name}: {State} pos {Pos} speed {Speed:F2} progress {Prog:F1}",

@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
 using MemoryPack;
-using OpenFPS.Common;
+using OpenFPS.Environment;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Systems;

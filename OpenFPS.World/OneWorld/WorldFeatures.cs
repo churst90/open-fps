@@ -1,4 +1,4 @@
-using OpenFPS.Common;
+using OpenFPS.Environment;
 using System.Numerics;
 using OpenFPS.Server.Core;
 using EntityData = OpenFPS.Server.Repositories.EntityData;

@@ -26,11 +26,11 @@ public class TrafficBrakingProbe
     [Trait("Category", "Probe")]
     public void Probe_city_traffic_braking_and_slip()
     {
-        string? outDir = Environment.GetEnvironmentVariable("OPENFPS_PROBE_OUT");
+        string? outDir = System.Environment.GetEnvironmentVariable("OPENFPS_PROBE_OUT");
         if (string.IsNullOrEmpty(outDir)) return;
         Directory.CreateDirectory(outDir);
-        float seconds = float.TryParse(Environment.GetEnvironmentVariable("OPENFPS_PROBE_SECONDS"), out var s) ? s : 180f;
-        bool life = Environment.GetEnvironmentVariable("OPENFPS_PROBE_LIFE") != "0";
+        float seconds = float.TryParse(System.Environment.GetEnvironmentVariable("OPENFPS_PROBE_SECONDS"), out var s) ? s : 180f;
+        bool life = System.Environment.GetEnvironmentVariable("OPENFPS_PROBE_LIFE") != "0";
 
         var (world, vehicles) = CarFollowingTests.City(streetLife: life);
         var list = (IList)typeof(VehicleSystem).GetField("_vehicles", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(vehicles)!;
@@ -147,7 +147,7 @@ public class SteadyTurnProbe
     [Trait("Category", "Probe")]
     public void Probe_steady_turn_demand()
     {
-        if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("OPENFPS_PROBE_OUT"))) return;
+        if (string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("OPENFPS_PROBE_OUT"))) return;
         foreach (var (preset, grip) in new[] { ("i4_midsize", 0.85f), ("v6", 0.85f), ("cummins_compound", 0.75f), ("transit_bus", 0.7f), ("mail_truck", 0.75f) })
         {
             var p = MachineRegistry.VehicleFor(preset);

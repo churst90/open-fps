@@ -11,6 +11,7 @@ using OpenFPS.Common.Networking;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
 using OpenFPS.Materials;
+using OpenFPS.Environment;
 
 namespace OpenFPS.AudioLab.Spikes;
 
@@ -764,7 +765,7 @@ public static class RainSpike
     private static double Capture(string path, Vector3 ear, float sec, Action<OpenFPS.Audio.Fmod.FmodAudioProvider> each)
     {
         // The mixer into a file instead of the sound card: exact, and silent.
-        Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", path);
+        System.Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", path);
         var provider = new OpenFPS.Audio.Fmod.FmodAudioProvider { Hearing = LabHearing };
         if (!provider.Initialize()) throw new InvalidOperationException("provider init failed");
         provider.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, -1);
@@ -776,7 +777,7 @@ public static class RainSpike
             System.Threading.Thread.Sleep(16);
         }
         provider.Dispose();
-        Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", null);
+        System.Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", null);
         var (pcm, sr) = ReadAnyWav(path);
         int from = Math.Min(pcm.Length, 3 * sr);
         double e = 0; int count = 0;

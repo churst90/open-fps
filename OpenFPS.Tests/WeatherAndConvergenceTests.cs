@@ -14,6 +14,7 @@ using OpenFPS.Server.Systems;
 using OpenFPS.Sound.Core;
 using OpenFPS.Materials;
 using OpenFPS.Physics;
+using OpenFPS.Environment;
 
 namespace OpenFPS.Tests;
 

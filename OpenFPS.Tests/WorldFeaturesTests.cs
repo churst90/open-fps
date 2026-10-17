@@ -487,7 +487,7 @@ public class WorldFeaturesTests : IDisposable
     [Fact]
     public async Task Record_the_osm_fixture_from_the_network()
     {
-        if (Environment.GetEnvironmentVariable("OPENFPS_WORLD_NET") != "1") return;
+        if (System.Environment.GetEnvironmentVariable("OPENFPS_WORLD_NET") != "1") return;
         var osm = new OverpassRegions(Fixtures());
         var features = new WorldFeatures(osm, Sizes);
         var centre = WorldTileKey.OfLatLon(Tomball.Lat, Tomball.Lon);
@@ -505,7 +505,7 @@ public class WorldFeaturesTests : IDisposable
     [Fact]
     public async Task Real_tiles_at_tomball()
     {
-        if (Environment.GetEnvironmentVariable("OPENFPS_WORLD_NET") != "1") return;
+        if (System.Environment.GetEnvironmentVariable("OPENFPS_WORLD_NET") != "1") return;
         var store = new WorldStore(Path.Combine(_dir, "real"));
         var service = new WorldTileService(store, new Usgs3Dep())
         {

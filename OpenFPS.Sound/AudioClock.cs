@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using OpenFPS.Common;
+using OpenFPS.Environment;
 using OpenFPS.Physics;
 
 namespace OpenFPS.Sound;
@@ -46,7 +46,7 @@ public static class AudioClockStamps
 public static class RealTime
 {
     /// <summary>Milliseconds on a counter that only goes forward.</summary>
-    public static long Milliseconds => Environment.TickCount64;
+    public static long Milliseconds => System.Environment.TickCount64;
 
     /// <summary>Ticks of 100 ns on a counter that only goes forward.</summary>
     public static long Ticks => (long)(Stopwatch.GetTimestamp() * ((double)TimeSpan.TicksPerSecond / Stopwatch.Frequency));

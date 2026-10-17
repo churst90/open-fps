@@ -15,10 +15,10 @@ public static class ClientAudioPaths
 
     private static string? PlayersRenderCache()
     {
-        string? env = Environment.GetEnvironmentVariable("OPENFPS_RENDER_CACHE");
+        string? env = System.Environment.GetEnvironmentVariable("OPENFPS_RENDER_CACHE");
         if (env == "off") return null;
         if (!string.IsNullOrWhiteSpace(env)) return env;
-        string root = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        string root = System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData);
         if (string.IsNullOrEmpty(root)) return null;
         return Path.Combine(root, "OpenFPS", "rendercache", DoorRenderCache.Name);
     }

@@ -890,7 +890,7 @@ public class WorldBuildingsTests : IDisposable
     [Fact]
     public async Task Record_the_overture_fixture_from_the_network()
     {
-        if (Environment.GetEnvironmentVariable("OPENFPS_WORLD_NET") != "1") return;
+        if (System.Environment.GetEnvironmentVariable("OPENFPS_WORLD_NET") != "1") return;
         var src = new OvertureBuildings(Path.Combine(_dir, "overture"));
         var features = new WorldFeatures(new MadeUpOsm(), Sizes, src, Prefabs);
         var centre = WorldTileKey.OfLatLon(Tomball.Lat, Tomball.Lon);
@@ -954,7 +954,7 @@ public class WorldBuildingsTests : IDisposable
     [Fact]
     public async Task Real_buildings_at_tomball()
     {
-        if (Environment.GetEnvironmentVariable("OPENFPS_WORLD_NET") != "1") return;
+        if (System.Environment.GetEnvironmentVariable("OPENFPS_WORLD_NET") != "1") return;
         string sources = Path.Combine(_dir, "sources");
         OvertureBuildings? overture = null;
         WorldTileService Make(string name)

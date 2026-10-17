@@ -35,7 +35,7 @@ namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 /// </summary>
 public static class PoolCostSpike
 {
-    private static readonly int Rate = int.TryParse(Environment.GetEnvironmentVariable("OPENFPS_LAB_RATE"), out int r) ? r : MixerQuality.DefaultRate;
+    private static readonly int Rate = int.TryParse(System.Environment.GetEnvironmentVariable("OPENFPS_LAB_RATE"), out int r) ? r : MixerQuality.DefaultRate;
     private const int Block = 1024;
 
     /// <summary>A street: cars, a bus, vans, a truck, a bike.</summary>
@@ -54,7 +54,7 @@ public static class PoolCostSpike
         if (rest.Contains("ptracer") && OperatingSystem.IsLinux())
         {
             prctl(0x59616d61, ulong.MaxValue, 0, 0, 0);
-            Console.WriteLine($"pid {Environment.ProcessId}");
+            Console.WriteLine($"pid {System.Environment.ProcessId}");
         }
         _only = rest.FirstOrDefault(a => a.StartsWith("only="))?[5..];
         _sceneSeconds = IntArg(rest, "secs", 6);
@@ -149,7 +149,7 @@ public static class PoolCostSpike
         double cpu = (proc.TotalProcessorTime - cpuAtStart).TotalSeconds;
         double wall = clock.Elapsed.TotalSeconds - wallAtStart;
         int starves = list.Sum(v => v.Starves) - starvesAtStart;
-        Console.WriteLine($"\n  {count} street voices through the render pool, {Environment.ProcessorCount} cores seen, {wall:F1} s measured after {warm:F0} s.");
+        Console.WriteLine($"\n  {count} street voices through the render pool, {System.Environment.ProcessorCount} cores seen, {wall:F1} s measured after {warm:F0} s.");
         Console.WriteLine($"    cores used by the process   {cpu / wall,6:F2}");
         Console.WriteLine($"    starved blocks              {starves,6}");
         return 0;

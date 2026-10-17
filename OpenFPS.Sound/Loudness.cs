@@ -75,12 +75,12 @@ public static class Loudness
     /// <summary>The compression OPENFPS_LEVEL_COMPRESSION asks for, held to <see cref="MinCompression"/>..1, or
     /// the default.</summary>
     internal static float CompressionFromEnvironmentOrDefault()
-        => float.TryParse(Environment.GetEnvironmentVariable("OPENFPS_LEVEL_COMPRESSION"),
+        => float.TryParse(System.Environment.GetEnvironmentVariable("OPENFPS_LEVEL_COMPRESSION"),
                           System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float v)
            ? Math.Clamp(v, MinCompression, 1f) : DefaultCompression;
 
     /// <summary>Whether the environment chose the compression for this run, over any saved setting.</summary>
-    public static bool CompressionFromEnvironment => Environment.GetEnvironmentVariable("OPENFPS_LEVEL_COMPRESSION") != null;
+    public static bool CompressionFromEnvironment => System.Environment.GetEnvironmentVariable("OPENFPS_LEVEL_COMPRESSION") != null;
 
     /// <summary>Below this the engine should not bother playing the voice at all.</summary>
     public const float SilenceGain = 0.0002f;   // about -74 dBFS

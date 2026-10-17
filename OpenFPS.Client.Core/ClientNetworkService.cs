@@ -240,7 +240,7 @@ public class ClientNetworkService : INetEventListener
     private void ReportProtocolError(string spoken, string logTemplate, params object[] logArgs)
     {
         _protocolErrorCount++;
-        long now = Environment.TickCount64;
+        long now = System.Environment.TickCount64;
         if (_protocolErrorCount > 1 && now - _lastProtocolReportTicks < ProtocolReportIntervalMs) return;
         _lastProtocolReportTicks = now;
 

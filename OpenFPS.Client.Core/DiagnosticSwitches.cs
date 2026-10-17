@@ -25,7 +25,7 @@ public static class DiagnosticSwitches
     {
         foreach (string key in Names)
         {
-            string? val = Environment.GetEnvironmentVariable(key);
+            string? val = System.Environment.GetEnvironmentVariable(key);
             if (!string.IsNullOrEmpty(val)) Log.Warning("{Key}={Value} — a diagnostic switch is set.", key, val);
         }
     }
