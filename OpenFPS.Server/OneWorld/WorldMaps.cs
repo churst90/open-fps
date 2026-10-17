@@ -184,13 +184,12 @@ public sealed class WorldMaps
     // ═══ Places ═══════════════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// The places to arrive at: world_places.json in the server's folder (a list of Id, Name, Lat, Lon),
-    /// and every loaded map of a real place, at its origin (where its spawn address is).
+    /// The places to arrive at: world_places.json in the server's folder (WorldRoots.Places: a list of Id,
+    /// Name, Lat, Lon), and every loaded map of a real place, at its origin (where its spawn address is).
     /// </summary>
-    public static List<WorldPlace> LoadPlaces(MapManager maps, string? path = null)
+    public static List<WorldPlace> LoadPlaces(MapManager maps, string path)
     {
         var places = new List<WorldPlace>();
-        path ??= Path.GetFullPath("world_places.json");
         try
         {
             if (File.Exists(path))

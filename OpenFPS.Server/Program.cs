@@ -152,7 +152,7 @@ public class GameServer
     {
         try
         {
-            var store = new OpenFPS.Server.OneWorld.WorldStore(settings.StorePath, settings.CapBytes);
+            var store = new OpenFPS.Server.OneWorld.WorldStore(Roots.Store(settings), settings.CapBytes);
             bool real = survey == null && settings.Generate;
             survey ??= settings.Generate ? new OpenFPS.Server.OneWorld.Usgs3Dep() : new OpenFPS.Server.OneWorld.NoNewTiles();
             var service = new OpenFPS.Server.OneWorld.WorldTileService(store, survey, settings.MaxAtOnce);
@@ -174,7 +174,7 @@ public class GameServer
             int stale = copied.DropStale(store);
             if (stale > 0) Log.Information("World: {Count} stored tile(s) of the places will be copied again from their maps.", stale);
             World = new OpenFPS.Server.OneWorld.WorldMaps(_maps, service, () => _sessions.GetAllSessions(),
-                                                        OpenFPS.Server.OneWorld.WorldMaps.LoadPlaces(_maps), copied);
+                                                        OpenFPS.Server.OneWorld.WorldMaps.LoadPlaces(_maps, Roots.Places), copied);
             // A frame over a real place has its traffic.
             World.FrameMade += mapId => EnqueueCommand(() => _vehicles?.SpawnMap(_maps, _composites, mapId));
             // The rings round the listed places, made after anything a player wants.
@@ -420,6 +420,20 @@ public class GameServer
     // The tick rate lives in PhysicsConstants — the client predicts against the same number.
     private const double TickTimeMs = 1000.0 / PhysicsConstants.TickRate;
 
+    /// <summary>
+    /// Where the world is read from and kept (OpenFPS.World reads only what it is told): the maps, prefabs and
+    /// composites folders, world.json and world_places.json, from the working folder. Started from the
+    /// repository's root instead, the maps and the composites are found under OpenFPS.Server, as they always were.
+    /// </summary>
+    public OpenFPS.Server.OneWorld.WorldRoots Roots { get; set; } = ServerRoots();
+
+    internal static OpenFPS.Server.OneWorld.WorldRoots ServerRoots()
+    {
+        static string Found(string folder)
+            => !Directory.Exists(folder) && Directory.Exists(Path.Combine("OpenFPS.Server", folder)) ? Path.Combine("OpenFPS.Server", folder) : folder;
+        return new OpenFPS.Server.OneWorld.WorldRoots(Found("maps"), "prefabs", Found("composites"), "world.json", "world_places.json");
+    }
+
     /// <summary>The map players land on, from <c>--map</c>; null leaves it to whichever claims IsDefault.</summary>
     public string? RequestedMapId { get; set; }
 
@@ -429,7 +443,7 @@ public class GameServer
         // cars, a composite made drivable, and /drivable all resolve through the registry.
         OpenFPS.Common.MachineRegistry.EnsureLoaded();
         OpenFPS.Common.ModelLibrary.EnsureLoaded();
-        var prefabRepo = new PrefabRepository("prefabs");
+        var prefabRepo = new PrefabRepository(Roots.Prefabs);
         // The world editor's changed models, over the library and the prefabs, before anything asks what
         // a model is or a map is built from them. Prefabs and groups are kinds of the server's own.
         Models = new OpenFPS.Server.Editor.ModelStore("model_versions");
@@ -440,7 +454,7 @@ public class GameServer
         var (meshCount, meshProblems) = OpenFPS.Common.Geometry.MeshLibrary.Shared.LoadFolder("meshes");
         foreach (var problem in meshProblems) Log.Warning("Meshes: {Problem}", problem);
         if (meshCount > 0) Log.Information("Meshes: {Count} mesh assets", meshCount);
-        _mapRepo = new MapRepository("maps");
+        _mapRepo = new MapRepository(Roots.Maps);
         // Who owns each map, whether it is public and who is invited: beside teams.json, and laid over
         // each map's own file as it loads (MapAccessRepository). The world editor's edits are laid over
         // it too, from maps/overlays (docs/WORLD_EDITOR.md section 7).
@@ -454,7 +468,7 @@ public class GameServer
         _maps.Initialize();
         // Composites BEFORE vehicles and before the earshot pass: a placed building is geometry that
         // the acoustic scene, the spatial grid and the broadcast radius all have to account for.
-        _composites = new CompositeService(_maps, prefabRepo, new CompositeRepository("composites"));
+        _composites = new CompositeService(_maps, prefabRepo, new CompositeRepository(Roots.Composites));
         _composites.PlaceRecorded(_maps);
         _vehicles.Spawn(_maps, _composites);
         // Somebody with a name and a day of their own (Alex): made once the map's places are known.
@@ -479,7 +493,7 @@ public class GameServer
         _seats = new OccupancyService(_maps, EmitWorldAudio);
         _hands = new HandsService(_maps) { Carried = SyncAudioComponent, Removed = BroadcastRemoval };
         _store = new PlayerStore(_userRepo, _maps, _hands, Clock);
-        StartWorld(OpenFPS.Server.OneWorld.WorldSettings.Load());
+        StartWorld(OpenFPS.Server.OneWorld.WorldSettings.Load(Roots.Settings));
         // Beside openfps.db and motd.txt, in the server's working folder. See FriendRepository for
         // why this is a file and not a table.
         _friends = new FriendRepository("friends.json");

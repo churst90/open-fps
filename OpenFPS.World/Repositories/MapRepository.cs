@@ -476,15 +476,8 @@ public class MapRepository
 
     public MapRepository(string directory)
     {
-        // Found from the repo root or from the server's own folder.
-        if (!Directory.Exists(directory) && Directory.Exists(Path.Combine("OpenFPS.Server", directory)))
-        {
-            _directory = Path.GetFullPath(Path.Combine("OpenFPS.Server", directory));
-        }
-        else
-        {
-            _directory = Path.GetFullPath(directory);
-        }
+        // The folder the host names (WorldRoots.Maps).
+        _directory = Path.GetFullPath(directory);
 
         if (!Directory.Exists(_directory)) Directory.CreateDirectory(_directory);
         Log.Information("MapRepository: Initialized with directory {Path}", _directory);

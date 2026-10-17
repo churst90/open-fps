@@ -78,11 +78,8 @@ public class CompositeRepository
 
     public CompositeRepository(string directory)
     {
-        // Found from the repo root or from the server's own folder.
-        if (!Directory.Exists(directory) && Directory.Exists(Path.Combine("OpenFPS.Server", directory)))
-            _directory = Path.GetFullPath(Path.Combine("OpenFPS.Server", directory));
-        else
-            _directory = Path.GetFullPath(directory);
+        // The folder the host names (WorldRoots.Composites).
+        _directory = Path.GetFullPath(directory);
         Load();
     }
 

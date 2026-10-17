@@ -440,3 +440,4 @@ OpenFPS.World/SurfaceRaster.cs	host
 OpenFPS.World/TerrainBuilder.cs	host		
 OpenFPS.World/Tiles.cs	host		
 OpenFPS.World/TrackClearance.cs	host		
+OpenFPS.World/WorldRoots.cs	host		

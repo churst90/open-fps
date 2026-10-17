@@ -575,3 +575,4 @@ OpenFPS.World/SurfaceRaster.cs	World
 OpenFPS.World/TerrainBuilder.cs	World	
 OpenFPS.World/Tiles.cs	World	
 OpenFPS.World/TrackClearance.cs	World	
+OpenFPS.World/WorldRoots.cs	World	
