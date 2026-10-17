@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Numerics;
 using System.Reflection;
 using OpenFPS.Client.AudioEngine.Acoustics;
+using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.Core;
 using OpenFPS.Common;
@@ -37,6 +38,11 @@ public class AsyncAcousticWorkerTests
         return w.GetSnapshot();
     }
 
+    /// <summary>A worker that never starts Steam Audio, even in a run that has loaded it (the opt-in Steam
+    /// Audio tests): these tests are of the hand-rolled tracer.</summary>
+    private static AsyncAcousticWorker Unsimulated()
+        => new(new SpatialAcoustics()) { Lab = new LabLevers { WithoutSteamAudio = true } };
+
     private static AcousticRequest Ask(int id, Vector3 source) => new()
     {
         EntityId = id, ListenerPos = Ear, SourcePos = source, SourceRadius = AudioEmission.MinOcclusionRadius,
@@ -66,7 +72,7 @@ public class AsyncAcousticWorkerTests
     public void TheLatestRequestForASourceIsAnsweredByTheTracerAndStampedWithWhereItWas()
     {
         var world = Walled();
-        using var worker = new AsyncAcousticWorker(new SpatialAcoustics());
+        using var worker = Unsimulated();
         worker.UpdateWorld(world);
         var last = Behind + new Vector3(4f, 0f, 0f);
         worker.EnqueueRequest(Ask(7, Behind + new Vector3(-8f, 0f, 0f)));
@@ -96,7 +102,7 @@ public class AsyncAcousticWorkerTests
     [Fact]
     public void WithoutSteamAudioNothingSimulatedIsClaimed()
     {
-        using var worker = new AsyncAcousticWorker(new SpatialAcoustics());
+        using var worker = Unsimulated();
         worker.UpdateWorld(Walled());
         worker.EnqueueRequest(Ask(7, Behind));
         worker.Start();
@@ -121,7 +127,7 @@ public class AsyncAcousticWorkerTests
     public void AForgottenSourceHasNoAnswerUntilItIsAskedAgain()
     {
         var world = Walled();
-        using var worker = new AsyncAcousticWorker(new SpatialAcoustics());
+        using var worker = Unsimulated();
         Assert.Null(worker.GetLastWorld());
         worker.UpdateWorld(world);
         Assert.Same(world, worker.GetLastWorld());
@@ -164,7 +170,7 @@ public class AsyncAcousticWorkerTests
     [Fact]
     public void WhenTheTracerFailsASourceKeepsItsLastAnswer()
     {
-        using var worker = new AsyncAcousticWorker(new SpatialAcoustics());
+        using var worker = Unsimulated();
         worker.UpdateWorld(Walled());
         worker.EnqueueRequest(Ask(7, Behind));
         worker.Start();
@@ -244,7 +250,7 @@ public class AsyncAcousticWorkerTests
     [Fact]
     public void AWorkerNeverStartedDisposesCleanly()
     {
-        var worker = new AsyncAcousticWorker(new SpatialAcoustics());
+        var worker = Unsimulated();
         worker.EnqueueRequest(Ask(1, Behind));
         worker.Dispose();
         Assert.False(worker.TryGetResult(1, out _));

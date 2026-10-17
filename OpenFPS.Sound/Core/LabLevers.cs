@@ -46,6 +46,11 @@ public sealed class LabLevers
     /// <summary>Keep a route's answers after its graph is replaced, as before (RouteAnswers).</summary>
     public bool RetainSupersededRoutes { get; set; }
 
+    /// <summary>The acoustic worker never starts Steam Audio: the hand-rolled tracer answers, as with
+    /// OPENFPS_STEAMAUDIO_SIM=0 but for this world only (AsyncAcousticWorker). Once a process has loaded the
+    /// library (the opt-in Steam Audio tests), every worker in it would start Steam Audio without this.</summary>
+    public bool WithoutSteamAudio { get; set; }
+
     /// <summary>An engine's diesel combustion without the ignition delay and the chamber modes, for an A/B against
     /// the full model (EngineSynth; `legacydiesel` on any vehicle render command).</summary>
     public bool LegacyDiesel { get; set; }

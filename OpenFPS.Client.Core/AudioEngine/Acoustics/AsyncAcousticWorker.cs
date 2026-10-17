@@ -1000,6 +1000,7 @@ public class AsyncAcousticWorker : IDisposable
         if (_saTried) return;
         _saTried = true;
         if (_saDisabled) { Console.WriteLine("[AcousticWorker] Steam Audio sim disabled by OPENFPS_STEAMAUDIO_SIM=0; using the hand-rolled ray-tracer for occlusion, portals and reverb."); return; }
+        if (_lab.WithoutSteamAudio) return;
         try
         {
             // Idempotent. Uninitialised, every material lookup in the scene build throws and the simulator

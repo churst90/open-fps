@@ -8,9 +8,10 @@ namespace OpenFPS.Tests;
 /// <summary>
 /// A Steam Audio context with Embree for the few tests that trace real scenes, made once per test run, or
 /// none. Opt-in, by OPENFPS_STEAMAUDIO_TESTS=1 (Steam Audio from the nearest lib/ above the tests, which
-/// is per-developer and not in git) or =DIR (from DIR). The library is never copied next to the tests:
-/// every other test that starts the occlusion worker expects it absent (DegradationTests) and would run
-/// Steam Audio if it could load it, so these run on their own:
+/// is per-developer and not in git) or =DIR (from DIR). The library is never copied next to the tests.
+/// Asked for, it is loaded for the whole run, at discovery, whatever the filter: a test of the worker without
+/// Steam Audio says so (LabLevers.WithoutSteamAudio, as DegradationTests and ClientAudioHarness do), or it
+/// would start Steam Audio here:
 ///
 ///   OPENFPS_STEAMAUDIO_TESTS=1 dotnet test OpenFPS.Tests --filter "FullyQualifiedName~TileSceneSetTests"
 ///

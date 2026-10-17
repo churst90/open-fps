@@ -19,8 +19,10 @@ namespace OpenFPS.Tests;
 public class DegradationTests
 {
     // ── The Steam Audio fallback ────────────────────────────────────────────────────────────────
-    // No phonon library here, so the worker takes the hand-rolled tracer, which must give a real answer,
-    // not a clear one.
+    // The hand-rolled tracer, which must give a real answer, not a clear one. Its workers never start Steam
+    // Audio, even in a run that has loaded it (the opt-in Steam Audio tests).
+    private static AsyncAcousticWorker Unsimulated()
+        => new(new SpatialAcoustics()) { Lab = new OpenFPS.Client.AudioEngine.Core.LabLevers { WithoutSteamAudio = true } };
 
     // Two rooms in maps/default.json joined by a portal (PortalPipelineTests' landmarks).
     private static readonly Vector3 RoomACentre = new(-7, 2, 15);
@@ -53,7 +55,7 @@ public class DegradationTests
         Vector3 listener, Vector3 source, int entityId)
     {
         var snapshot = LoadedWorld.Value.GetSnapshot();
-        using var worker = new AsyncAcousticWorker(new SpatialAcoustics());
+        using var worker = Unsimulated();
         worker.UpdateWorld(snapshot);
         worker.Start();
 
@@ -102,7 +104,7 @@ public class DegradationTests
         // A source the simulator has no answer for (exhausted pool, failed tick) is answered by
         // something real, never DirectResult.Clear.
         var snapshot = LoadedWorld.Value.GetSnapshot();
-        using var worker = new AsyncAcousticWorker(new SpatialAcoustics());
+        using var worker = Unsimulated();
         worker.UpdateWorld(snapshot);
         worker.Start();
 

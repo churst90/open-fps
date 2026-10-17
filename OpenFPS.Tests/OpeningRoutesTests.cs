@@ -316,10 +316,11 @@ public class OpeningRoutesTests
     public void TheOneShotPathAndTheSustainedPathAgree()
     {
         // The worker and the one-shots' path ask the same graph (without the simulator the worker uses the
-        // one-shots' path itself): one source and one ear get one answer.
+        // one-shots' path itself): one source and one ear get one answer. Without Steam Audio even in a run
+        // that has loaded it, whose answer is its own.
         var world = Building(frontDoorOpen: true);
         var acoustics = new SpatialAcoustics();
-        using var worker = new AsyncAcousticWorker(acoustics);
+        using var worker = new AsyncAcousticWorker(acoustics) { Lab = new OpenFPS.Client.AudioEngine.Core.LabLevers { WithoutSteamAudio = true } };
         worker.UpdateWorld(world);
         worker.Start();
         List<AcousticPathData>? paths = null;

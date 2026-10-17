@@ -15,6 +15,12 @@ Recent work, newest first. `git log` has the rest.
   `AudioLab --extent-walk`, walks the real maps (with `rule=middle` for the old rule, or `OPENFPS_EXTENT_RULE=middle`
   in the game), and a new guard, `ExtentWalkTests`. The wire hash does not change; one stored stream
   (places_and_woods) does.
+- Six tests of the acoustic worker failed whenever OPENFPS_STEAMAUDIO_TESTS was set, and a wider run's test
+  host once crashed: xUnit builds every test's attribute at discovery, so the opt-in tests' resolver loaded
+  phonon for the whole run, and every threaded acoustic worker in it started Steam Audio. A lab lever
+  (`LabLevers.WithoutSteamAudio`) keeps one world's worker on the hand-rolled tracer; the tests of that path
+  and the whole-client harness set it, so they hold on any machine. Nothing in the game sets it, and nothing
+  a player hears changes.
 - Package stage 7's clean half finished: the listening-level calibration (/listening) is in
   `OpenFPS.Accessibility`, playing its cues through `IUiCues` as the lists do; Accessibility now references
   Models and Sound. Nothing a player hears or is told changes, and the wire hash does not.

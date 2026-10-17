@@ -33,6 +33,9 @@ internal sealed class ClientAudioHarness
         World.Clear(new Vector3(4000, 400, 4000));
         Facade = new AudioEngineFacade(Mixer);
         Facade.InitializeForTest(soundsPath);
+        // The hand-rolled tracer, as on every runner without phonon, even in a run that has loaded Steam Audio
+        // (the opt-in Steam Audio tests): what the harness's tests hold must not depend on the machine.
+        Facade.Lab.WithoutSteamAudio = true;
         // One clock, as in the game: the world stamps positions on the clock the audio ages them on.
         World.Clock = Facade.Clock;
         World.Hearing = Facade.Hearing;
