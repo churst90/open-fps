@@ -101,6 +101,7 @@ FILE_RULES = [
     ('OpenFPS.Physics/*', 'Physics', ''), ('OpenFPS.Acoustics/*', 'Acoustics', ''), ('OpenFPS.Models/*', 'Models', ''),
     ('OpenFPS.Accessibility/*', 'Accessibility', ''),
     ('OpenFPS.World/*', 'World', ''),
+    ('OpenFPS.Agents/*', 'Agents', ''),
     ('OpenFPS.Audio/*', 'Audio', ''),
     ('OpenFPS.Environment/*', 'Environment', ''),
     ('OpenFPS.Editor/*', 'Editor', ''),
@@ -114,22 +115,17 @@ FILE_RULES = [
     ('OpenFPS.Common/EntityEmission.cs', 'Common', 'entity adapter: where an entity sounds from'),
     ('OpenFPS.Common/EntityGeometry.cs', 'Common', 'entity adapter: geometry'),
     ('OpenFPS.Common/GroundProbeMemo.cs', 'game', 'physics survey: a server cache'),
-    ('OpenFPS.Common/LaneRoutes.cs', 'Agents', 'a vehicle\'s tour of lanes'),
-    ('OpenFPS.Common/LineFollower.cs', 'Agents', 'a driver steering to a line'),
     ('OpenFPS.Common/Messages.cs', 'Common', 'wire'),
     ('OpenFPS.Common/MoverPoses.cs', 'game', 'a server counter'),
     ('OpenFPS.Common/PhysicsConstants.cs', 'Common', 'the game\'s reach and bounds, the tick, the input limits (the body: BodyConstants)'),
     ('OpenFPS.Common/PhysicsUtils.cs', 'Common', 'entity adapter: the ground probes of a world and of a snapshot (the question: Footing)'),
     ('OpenFPS.Common/PhysicsViews.cs', 'Common', 'entity adapter: a world and a snapshot as the physics sees them (IPhysicsWorld)'),
-    ('OpenFPS.Common/RaceLine.cs', 'Agents', 'speeds along a line'),
     ('OpenFPS.Common/Scopes.cs', 'game', 'the scope\'s maths and sway (what a scope is: OpenFPS.Models)'),
     ('OpenFPS.Common/StatePacking.cs', 'Common', 'wire'),
     ('OpenFPS.Common/UpdateThrottle.cs', 'Common', 'a fixed-rate gate'),
     ('OpenFPS.Common/WorldSnapshot.cs', 'Common', 'the client\'s world for one frame'),
 
     # ── Sound: what things are ──
-    ('OpenFPS.Sound/MachinePower.cs', 'Agents', 'how hard a driver works a machine: a notch, a power lever'),
-    ('OpenFPS.Sound/AircraftGroundRun.cs', 'Agents', 'an aeroplane driven along its runway'),
     ('OpenFPS.Sound/*', 'Sound', ''),
 
     # ── Client.Core ──
@@ -153,13 +149,6 @@ FILE_RULES = [
     ('OpenFPS.Client.Core/*', 'game', ''),
 
     # ── Server ──
-    # Traffic's laws, out of VehicleSystem's partial files (stage 5), bound for OpenFPS.Agents.
-    ('OpenFPS.Server/Systems/CarFollowing.cs', 'Agents', 'the gap to the car in front (IDM, ACC)'),
-    ('OpenFPS.Server/Systems/JunctionRules.cs', 'Agents', 'who goes first at a junction'),
-    ('OpenFPS.Server/Systems/CrossingRules.cs', 'Agents', 'where a walker crosses a road, and who waits'),
-    ('OpenFPS.Server/Systems/RouteRules.cs', 'Agents', 'tours of lanes from the road network, and their stops'),
-    ('OpenFPS.Server/Systems/StreetEvents.cs', 'Agents', 'the street\'s random events'),
-    ('OpenFPS.Server/Systems/StreetLines.cs', 'Agents', 'which lines fit which moment'),
     # The server's hosts: they step a package or adapt the entities to it, and stay.
     ('OpenFPS.Server/Systems/VehicleSystem*.cs', 'game', 'host: steps Agents'),
     ('OpenFPS.Server/Systems/CrowdSystem.cs', 'game', 'host: steps Agents'),
@@ -195,7 +184,7 @@ TYPE_RULES = {
 
 SORTED_PROJECTS = ('OpenFPS.Words', 'OpenFPS.Schema', 'OpenFPS.Native', 'OpenFPS.Geometry', 'OpenFPS.Materials', 'OpenFPS.Astronomy',
                    'OpenFPS.Physics', 'OpenFPS.Environment', 'OpenFPS.Acoustics', 'OpenFPS.Sound', 'OpenFPS.Models', 'OpenFPS.Audio', 'OpenFPS.World',
-                   'OpenFPS.Common',
+                   'OpenFPS.Common', 'OpenFPS.Agents',
                    'OpenFPS.Accessibility', 'OpenFPS.Editor',
                    'OpenFPS.Client.Core', 'OpenFPS.Server')
 USERS = ('OpenFPS.Server', 'OpenFPS.Client.Core', 'OpenFPS.Client', 'OpenFPS.Client.Gtk', 'OpenFPS.AudioLab',

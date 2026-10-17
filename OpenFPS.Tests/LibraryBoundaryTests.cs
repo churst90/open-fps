@@ -21,7 +21,7 @@ public class LibraryBoundaryTests
     {
         "OpenFPS.Common", "OpenFPS.Client.Core",
         "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Sound", "OpenFPS.Native", "OpenFPS.Audio", "OpenFPS.Schema",
-        "OpenFPS.Physics", "OpenFPS.Accessibility", "OpenFPS.Models", "OpenFPS.World", "OpenFPS.Environment", "OpenFPS.Editor",
+        "OpenFPS.Physics", "OpenFPS.Accessibility", "OpenFPS.Models", "OpenFPS.World", "OpenFPS.Environment", "OpenFPS.Editor", "OpenFPS.Agents",
     };
 
     private static string RepoRoot([System.Runtime.CompilerServices.CallerFilePath] string here = "")

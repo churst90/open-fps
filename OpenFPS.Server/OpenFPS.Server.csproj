@@ -5,6 +5,9 @@
     <!-- Maps, prefabs, composites and the world's tiles (docs/ENGINE_PACKAGES.md, stage 4): the server makes them
          into entities and names their folders. -->
     <ProjectReference Include="..\OpenFPS.World\OpenFPS.World.csproj" />
+    <!-- Traffic, trains and aircraft as they are driven, and the street's laws (docs/ENGINE_PACKAGES.md, stage 5):
+         the server steps them over its entities. -->
+    <ProjectReference Include="..\OpenFPS.Agents\OpenFPS.Agents.csproj" />
     <!-- The compass points: /wind, /build, the editor and the world's "north east of" say them. -->
     <ProjectReference Include="..\OpenFPS.Words\OpenFPS.Words.csproj" />
     <!-- The beacons' categories and a map's policy for them; coordinates as a player types them. -->

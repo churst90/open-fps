@@ -23,7 +23,7 @@ public class EnginePackagesTests
     {
         "OpenFPS.Words", "OpenFPS.Schema", "OpenFPS.Native", "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Astronomy", "OpenFPS.Physics",
         "OpenFPS.Environment",
-        "OpenFPS.Acoustics", "OpenFPS.Sound", "OpenFPS.Models", "OpenFPS.Audio", "OpenFPS.World", "OpenFPS.Common", "OpenFPS.Accessibility", "OpenFPS.Editor", "OpenFPS.Client.Core", "OpenFPS.Server",
+        "OpenFPS.Acoustics", "OpenFPS.Sound", "OpenFPS.Models", "OpenFPS.Audio", "OpenFPS.World", "OpenFPS.Common", "OpenFPS.Agents", "OpenFPS.Accessibility", "OpenFPS.Editor", "OpenFPS.Client.Core", "OpenFPS.Server",
     };
 
     /// <summary>open-fps itself: the server, the client's session and heads. It may reference anything.</summary>
@@ -200,6 +200,7 @@ public class EnginePackagesTests
         new object[] { "Audio", typeof(OpenFPS.Client.AudioEngine.Core.AudioEngineFacade).Assembly.GetName().Name! },
         new object[] { "Environment", typeof(OpenFPS.Common.WorldWeather).Assembly.GetName().Name! },
         new object[] { "Editor", typeof(OpenFPS.Server.Editor.MapOverlay).Assembly.GetName().Name! },
+        new object[] { "Agents", typeof(OpenFPS.Common.RaceLine).Assembly.GetName().Name! },
     };
 
     [Theory]

@@ -38,6 +38,17 @@ OpenFPS.Acoustics/SparseAcousticOctree.cs	lib	Acoustics
 OpenFPS.Acoustics/Systems/AcousticVolumeGenerator.cs	lib	Acoustics	
 OpenFPS.Acoustics/Systems/FaceOpenings.cs	lib	Acoustics	
 OpenFPS.Acoustics/WallTransmission.cs	lib	Acoustics	
+OpenFPS.Agents/AircraftGroundRun.cs	host		
+OpenFPS.Agents/CarFollowing.cs	host		
+OpenFPS.Agents/CrossingRules.cs	host		
+OpenFPS.Agents/JunctionRules.cs	host		
+OpenFPS.Agents/LaneRoutes.cs	host		
+OpenFPS.Agents/LineFollower.cs	host		
+OpenFPS.Agents/MachinePower.cs	host		
+OpenFPS.Agents/RaceLine.cs	host		
+OpenFPS.Agents/RouteRules.cs	host		
+OpenFPS.Agents/StreetEvents.cs	host		
+OpenFPS.Agents/StreetLines.cs	host		
 OpenFPS.Audio/Acoustics/AsyncAcousticWorker.cs	lib	Audio	
 OpenFPS.Audio/Acoustics/CabinWalls.cs	lib	Audio	
 OpenFPS.Audio/Acoustics/EngineReflections.cs	lib	Audio	
@@ -167,14 +178,11 @@ OpenFPS.Common/EntityAcoustics.cs	host
 OpenFPS.Common/EntityEmission.cs	host		
 OpenFPS.Common/EntityGeometry.cs	host		
 OpenFPS.Common/GroundProbeMemo.cs	host		
-OpenFPS.Common/LaneRoutes.cs	host		
-OpenFPS.Common/LineFollower.cs	host		
 OpenFPS.Common/Messages.cs	host		
 OpenFPS.Common/MoverPoses.cs	host		
 OpenFPS.Common/PhysicsConstants.cs	host		
 OpenFPS.Common/PhysicsUtils.cs	host		
 OpenFPS.Common/PhysicsViews.cs	host		
-OpenFPS.Common/RaceLine.cs	host		
 OpenFPS.Common/Scopes.cs	host		
 OpenFPS.Common/StatePacking.cs	host		
 OpenFPS.Common/UpdateThrottle.cs	host		
@@ -291,7 +299,6 @@ OpenFPS.Schema/FieldDescriptor.cs	lib	Schema
 OpenFPS.Schema/Tunable.cs	lib	Schema	
 OpenFPS.Sound/AdminGun.cs	lib	Sound	
 OpenFPS.Sound/Aircraft.cs	lib	Sound	
-OpenFPS.Sound/AircraftGroundRun.cs	lib	Sound	
 OpenFPS.Sound/Applause.cs	lib	Sound	
 OpenFPS.Sound/AudioClock.cs	lib	Sound	
 OpenFPS.Sound/AudioEmission.cs	lib	Sound	
@@ -399,7 +406,6 @@ OpenFPS.Sound/LockCylinder.cs	lib	Sound
 OpenFPS.Sound/Loudness.cs	lib	Sound	
 OpenFPS.Sound/Loudspeakers.cs	lib	Sound	
 OpenFPS.Sound/MachineParts.cs	lib	Sound	
-OpenFPS.Sound/MachinePower.cs	lib	Sound	
 OpenFPS.Sound/ModelFailures.cs	lib	Sound	
 OpenFPS.Sound/NatureModels.cs	lib	Sound	
 OpenFPS.Sound/PlaybackMode.cs	lib	Sound	

@@ -38,6 +38,17 @@ OpenFPS.Acoustics/SparseAcousticOctree.cs	Acoustics
 OpenFPS.Acoustics/Systems/AcousticVolumeGenerator.cs	Acoustics	
 OpenFPS.Acoustics/Systems/FaceOpenings.cs	Acoustics	
 OpenFPS.Acoustics/WallTransmission.cs	Acoustics	
+OpenFPS.Agents/AircraftGroundRun.cs	Agents	
+OpenFPS.Agents/CarFollowing.cs	Agents	
+OpenFPS.Agents/CrossingRules.cs	Agents	
+OpenFPS.Agents/JunctionRules.cs	Agents	
+OpenFPS.Agents/LaneRoutes.cs	Agents	
+OpenFPS.Agents/LineFollower.cs	Agents	
+OpenFPS.Agents/MachinePower.cs	Agents	
+OpenFPS.Agents/RaceLine.cs	Agents	
+OpenFPS.Agents/RouteRules.cs	Agents	
+OpenFPS.Agents/StreetEvents.cs	Agents	
+OpenFPS.Agents/StreetLines.cs	Agents	
 OpenFPS.Astronomy/AstroMath.cs	Astronomy	
 OpenFPS.Astronomy/Crossings.cs	Astronomy	
 OpenFPS.Astronomy/Moon.cs	Astronomy	
@@ -173,14 +184,11 @@ OpenFPS.Common/EntityAcoustics.cs	Common	entity adapter: rooms, openings and the
 OpenFPS.Common/EntityEmission.cs	Common	entity adapter: where an entity sounds from
 OpenFPS.Common/EntityGeometry.cs	Common	entity adapter: geometry
 OpenFPS.Common/GroundProbeMemo.cs	game	physics survey: a server cache
-OpenFPS.Common/LaneRoutes.cs	Agents	a vehicle's tour of lanes
-OpenFPS.Common/LineFollower.cs	Agents	a driver steering to a line
 OpenFPS.Common/Messages.cs	Common	wire
 OpenFPS.Common/MoverPoses.cs	game	a server counter
 OpenFPS.Common/PhysicsConstants.cs	Common	the game's reach and bounds, the tick, the input limits (the body: BodyConstants)
 OpenFPS.Common/PhysicsUtils.cs	Common	entity adapter: the ground probes of a world and of a snapshot (the question: Footing)
 OpenFPS.Common/PhysicsViews.cs	Common	entity adapter: a world and a snapshot as the physics sees them (IPhysicsWorld)
-OpenFPS.Common/RaceLine.cs	Agents	speeds along a line
 OpenFPS.Common/Scopes.cs	game	the scope's maths and sway (what a scope is: OpenFPS.Models)
 OpenFPS.Common/StatePacking.cs	Common	wire
 OpenFPS.Common/UpdateThrottle.cs	Common	a fixed-rate gate
@@ -379,10 +387,8 @@ OpenFPS.Server/Repositories/TeamRepository.cs	game
 OpenFPS.Server/Repositories/UserRepository.cs	game	
 OpenFPS.Server/Services/DiscoveryService.cs	game	
 OpenFPS.Server/Services/SocialService.cs	game	
-OpenFPS.Server/Systems/CarFollowing.cs	Agents	the gap to the car in front (IDM, ACC)
 OpenFPS.Server/Systems/CharacterSystem.cs	game	host: steps Agents
 OpenFPS.Server/Systems/ContactStreams.cs	game	
-OpenFPS.Server/Systems/CrossingRules.cs	Agents	where a walker crosses a road, and who waits
 OpenFPS.Server/Systems/CrossingSystem.cs	game	host: steps Agents
 OpenFPS.Server/Systems/CrowdSystem.cs	game	host: steps Agents
 OpenFPS.Server/Systems/DoorManners.cs	game	host: Agents once it reads a view
@@ -390,7 +396,6 @@ OpenFPS.Server/Systems/DoorSystem.cs	game
 OpenFPS.Server/Systems/DrivingSystem.cs	game	
 OpenFPS.Server/Systems/FireSystem.cs	game	host: steps Environment
 OpenFPS.Server/Systems/Haunts.cs	game	host: Agents once it reads a view
-OpenFPS.Server/Systems/JunctionRules.cs	Agents	who goes first at a junction
 OpenFPS.Server/Systems/LightningSystem.cs	game	host: steps Environment
 OpenFPS.Server/Systems/MovementSystem.cs	game	
 OpenFPS.Server/Systems/OccupancySystem.cs	game	
@@ -400,9 +405,6 @@ OpenFPS.Server/Systems/PedestrianSpeech.Homeless.cs	game	host: steps Agents (the
 OpenFPS.Server/Systems/PedestrianSpeech.cs	game	host: steps Agents (the lines are Speech)
 OpenFPS.Server/Systems/RailSystem.cs	game	host: steps Agents (physics survey: trains kinematic)
 OpenFPS.Server/Systems/RoadWaterSystem.cs	game	host: steps Environment
-OpenFPS.Server/Systems/RouteRules.cs	Agents	tours of lanes from the road network, and their stops
-OpenFPS.Server/Systems/StreetEvents.cs	Agents	the street's random events
-OpenFPS.Server/Systems/StreetLines.cs	Agents	which lines fit which moment
 OpenFPS.Server/Systems/VehicleSignals.cs	game	
 OpenFPS.Server/Systems/VehicleSystem.AdminGun.cs	game	host: steps Agents
 OpenFPS.Server/Systems/VehicleSystem.Casualties.cs	game	host: steps Agents
@@ -419,7 +421,6 @@ OpenFPS.Server/Systems/WorldEnvironmentSystem.cs	game	host: steps Environment
 OpenFPS.Server/Water/MapDrainage.cs	game	host: adapts the map to Environment
 OpenFPS.Sound/AdminGun.cs	Sound	
 OpenFPS.Sound/Aircraft.cs	Sound	
-OpenFPS.Sound/AircraftGroundRun.cs	Agents	an aeroplane driven along its runway
 OpenFPS.Sound/Applause.cs	Sound	
 OpenFPS.Sound/AudioClock.cs	Sound	
 OpenFPS.Sound/AudioEmission.cs	Sound	
@@ -527,7 +528,6 @@ OpenFPS.Sound/LockCylinder.cs	Sound
 OpenFPS.Sound/Loudness.cs	Sound	
 OpenFPS.Sound/Loudspeakers.cs	Sound	
 OpenFPS.Sound/MachineParts.cs	Sound	
-OpenFPS.Sound/MachinePower.cs	Agents	how hard a driver works a machine: a notch, a power lever
 OpenFPS.Sound/ModelFailures.cs	Sound	
 OpenFPS.Sound/NatureModels.cs	Sound	
 OpenFPS.Sound/PlaybackMode.cs	Sound	

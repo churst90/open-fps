@@ -1,6 +1,7 @@
 <Solution>
   <Project Path="OpenFPS.Accessibility/OpenFPS.Accessibility.csproj" />
   <Project Path="OpenFPS.Acoustics/OpenFPS.Acoustics.csproj" />
+  <Project Path="OpenFPS.Agents/OpenFPS.Agents.csproj" />
   <Project Path="OpenFPS.Astronomy/OpenFPS.Astronomy.csproj" />
   <Project Path="OpenFPS.Audio/OpenFPS.Audio.csproj" />
   <Project Path="OpenFPS.AudioLab/OpenFPS.AudioLab.csproj" />

@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- What drives things (docs/ENGINE_PACKAGES.md, 3.5 and stage 5): a racing line's speeds, a driver steering to
+       a line, a tour of lanes from the road network, an aeroplane driven along its runway, how hard a driver
+       works a train or an aeroplane, and traffic's laws: the gap to the car in front, who goes first at a
+       junction, where a walker crosses and who waits, a route's stops, the street's random events and which
+       lines fit which moment. Every law takes what it reads as values: the road network, the road's water,
+       positions and distances along a line. The hosts that step them over the entities stay in the server
+       (VehicleSystem, RailSystem, PedestrianSpeech); the people (Alex, haunts, door manners, pavements) join
+       in stage 10, once they read a view of the world.
+
+       It sits on World (the roads), Physics (a vehicle on its tyres), Environment (the water on the road and
+       the weather), Sound (an aircraft's profile, a gun, a horn, the sounds it makes) and Models (the presets and
+       the voices' lines), never on OpenFPS.Common. Nothing of it is on the wire (a lever's byte is
+       StatePacking's), so it is not in the wire hash (decision 11). Namespaces are those the files had
+       (OpenFPS.Common, OpenFPS.Server.Systems), as for the other packages' moves. -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenFPS.Physics\OpenFPS.Physics.csproj" />
+    <ProjectReference Include="..\OpenFPS.Environment\OpenFPS.Environment.csproj" />
+    <ProjectReference Include="..\OpenFPS.Sound\OpenFPS.Sound.csproj" />
+    <ProjectReference Include="..\OpenFPS.Models\OpenFPS.Models.csproj" />
+    <ProjectReference Include="..\OpenFPS.World\OpenFPS.World.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- A route the roads cannot make says why in the log (RouteRules.Build). -->
+    <PackageReference Include="Serilog" Version="4.2.0" />
+  </ItemGroup>
+
+</Project>
