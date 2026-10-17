@@ -65,6 +65,7 @@ internal class FmodResourceManager : IDisposable
     {
         if (string.IsNullOrEmpty(soundId) || !_cache.TryGetValue(soundId, out var sound)) return false;
         _cache.Remove(soundId);
+        _registeredPcm.Remove(soundId);
         sound.release();
         return true;
     }
@@ -98,7 +99,7 @@ internal class FmodResourceManager : IDisposable
         return true;
     }
 
-    /// <summary>Sounds made in memory (RegisterPcmFloat). One of these asked for as a loop is the same
+    /// <summary>Sounds made in memory (RegisterPcm, RegisterPcmFloat). One of these asked for as a loop is the same
     /// sound with its channel set to loop: there is no file to load a looping copy from.</summary>
     private readonly HashSet<string> _registeredPcm = new();
     public bool IsRegisteredPcm(string soundId) => _registeredPcm.Contains(soundId);
@@ -132,6 +133,7 @@ internal class FmodResourceManager : IDisposable
             return false;
         }
         _cache[soundId] = sound;
+        _registeredPcm.Add(soundId);
         return true;
     }
 

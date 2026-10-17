@@ -4,6 +4,11 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-17
 
+- A 16-bit sound made in memory and asked for as a loop loops (`FmodResourceManager.RegisterPcm`; Resonance's
+  report, approved by Cody 2026-10-17). Only float ones were marked as made in memory, so a 16-bit one asked to loop
+  played once: it has no file to load a looping copy from. Releasing one now forgets it too. Nothing in the game plays
+  a 16-bit one as a loop today (rain's drops are one-shots), so nothing heard changes; FMOD is not in the test suite,
+  so no test holds it.
 - Speakers sharing a program keep one track clock (Resonance's 3.3; docs/CLIENT_NOTES.md "Speakers sharing a
   program"). A loudspeaker's program is its recording and how often it repeats, and its time is the world's
   (`IWorldClock.WorldTime`, which every client and the server agree on): every speaker of it is where that clock has

@@ -6,6 +6,8 @@ tag (docs/SOUND_LIBRARY_BOUNDARY.md, stage 8 and decision 8) and references the 
 
 ## Unreleased
 
+- A 16-bit buffer registered with `RegisterSynthesisedSound` and played as a loop loops; it played once. A host need
+  do nothing.
 - Speakers sharing a program keep one track clock (Resonance's 3.3; changes.md, 2026-10-17). A loudspeaker's program
   (its recording and repeat interval) is timed on the audio clock's world time (`IWorldClock.WorldTime`), so every
   speaker of it is where that clock has it, each heard after its own flight; a repeating line leaves every horn at
