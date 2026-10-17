@@ -25,8 +25,8 @@ using OpenFPS.Models;
 namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
-/// --extent-walk [walks=creek,creek-out,gutter,shore,fountain,fountain-out,fire,oak,oak-out] [render] [out=DIR] [speed=1]
-///               [rule=middle|pieces] [rain=60]
+/// --extent-walk [walks=creek,creek-out,gutter,shore,fountain,fountain-out,fire,fire-round,car,car-out,big,wood,oak,oak-out]
+///               [render] [out=DIR] [speed=1] [rule=middle|pieces] [rain=60]
 ///
 /// The walks away from a source face across the way they go, so the source is at one side. rule=middle plays the
 /// extended sources as before 2026-10-16 (ExtendedSources.PlaceRule.Middle), for the before and after; rain= is how
@@ -34,7 +34,8 @@ namespace OpenFPS.AudioLab.Spikes;
 ///
 /// Walks beside, along and away from the extended sources of the real maps at standing height (docs/RUNNING_WATER.md
 /// 15): a creek of Albany's drainage lines, its gutter and fountain and fire pit on the city, a stretch of
-/// Albany's pond shores. Every 0.5 m it reports what the client places there, through ClientAudioSystem over a
+/// Albany's pond shores; and fires and a wood (2026-10-17, step 5): round the fire pit, round and away from a car
+/// burning on Foundry Street, along a stand of trees burning in Elm Park, and through Magnolia's thickest wood. Every 0.5 m it reports what the client places there, through ClientAudioSystem over a
 /// mixer that only records: the power of every voice of the walk's sources by the mixer's own law
 /// (Loudness.RenderedGain, each voice at its share of its source), where it comes from (the bearing of their
 /// power-weighted directions), how wide it is (twice the arc cosine of their resultant: two equal sources ±θ
@@ -55,7 +56,13 @@ public static class ExtentWalkSpike
 
     /// <summary>A walk: the feet at every step, the way the walker faces, and which sources it is about.</summary>
     private sealed record Walk(string Name, string Map, string About, List<Vector3> Feet, Vector3 Heading, Func<string, bool> Source,
-                               float WindMetresPerSecond = 1.5f, Func<double, float>? WindAt = null);
+                               float WindMetresPerSecond = 1.5f, Func<double, float>? WindAt = null)
+    {
+        /// <summary>Sources the walk lays itself (a fire lit for it), registered with the map's.</summary>
+        public List<EntityDefinition> Extra { get; init; } = new();
+        /// <summary>A walk through trees: the client makes its woods of them (ClientWorldState.RefreshWoods).</summary>
+        public bool Woods { get; init; }
+    }
 
     public static int Run(string[] args)
     {
@@ -76,7 +83,7 @@ public static class ExtentWalkSpike
                           $"places by the {(LabOptions.WideSources.Rule == ExtendedSources.PlaceRule.Middle ? "old rule (held to the middle)" : "rule of 2026-10-16 (each piece as loud as what it holds)")}");
 
         int failures = 0;
-        foreach (var map in new[] { "albany_or", "city" })
+        foreach (var map in new[] { "albany_or", "city", "magnolia_tx" })
         {
             var names = wanted.Where(w => MapOf(w) == map).ToList();
             if (names.Count == 0) continue;
@@ -101,7 +108,9 @@ public static class ExtentWalkSpike
             {
                 var walk = Make(name, defs, all, Floor);
                 if (walk == null) { Console.WriteLine($"FAIL: no {name} walk on {map}"); failures++; continue; }
-                var near = defs.Where(d => walk.Source(d.SoundEmitter.SoundId!) && walk.Feet.Any(f => Reach(d, f) < 150f)).ToList();
+                // A wood's trees out to where its far crowns are heard as one (WoodChorus), the rest within 150 m.
+                float reach = walk.Woods ? 600f : 150f;
+                var near = defs.Concat(walk.Extra).Where(d => walk.Source(d.SoundEmitter.SoundId!) && walk.Feet.Any(f => Reach(d, f) < reach)).ToList();
                 Console.WriteLine();
                 Console.WriteLine($"== {walk.Name}: {walk.About}; {walk.Feet.Count} steps, {near.Count} sources within 150 m");
                 Console.WriteLine($"   from /tp {PlayerCoordinates.Format(walk.Feet[0])} to /tp {PlayerCoordinates.Format(walk.Feet[^1])}");
@@ -112,7 +121,8 @@ public static class ExtentWalkSpike
         return failures;
     }
 
-    private static string MapOf(string walk) => walk is "creek" or "creek-out" or "shore" or "oak" or "oak-out" or "open" or "open-ramp" ? "albany_or" : "city";
+    private static string MapOf(string walk) => walk is "creek" or "creek-out" or "shore" or "oak" or "oak-out" or "open" or "open-ramp" ? "albany_or"
+                                              : walk is "wood" ? "magnolia_tx" : "city";
 
     // ── The walks ───────────────────────────────────────────────────────────────────────────────
 
@@ -292,8 +302,118 @@ public static class ExtentWalkSpike
                 return new Walk(name, "city", "straight away west from 58 Alder Street's fire pit, 1.5 to 30 m, facing north",
                                 feet, Vector3.UnitZ, id => id.StartsWith("fire:", StringComparison.OrdinalIgnoreCase));
             }
+            case "fire-round":
+            {
+                // Round the pit 1.5 m from its middle (its 0.9 m bed is a 33° fan at the ear), from the south going east.
+                var pit = defs.FirstOrDefault(d => d.SoundEmitter.SoundId!.StartsWith("fire:", StringComparison.OrdinalIgnoreCase));
+                if (pit == null) return null;
+                var (feet, heading) = Round(pit.Transform.Position, 1.5f, floor);
+                return new Walk(name, "city", "round 58 Alder Street's fire pit, 1.5 m from its middle, from the south going east",
+                                feet, heading, id => id.StartsWith("fire:", StringComparison.OrdinalIgnoreCase));
+            }
+            case "car":
+            case "car-out":
+            {
+                // A car burning on Foundry Street, fully alight (FireSpec.BurningCar, 1.8 by 4.5 m, along the street).
+                var pit = defs.FirstOrDefault(d => d.SoundEmitter.SoundId!.StartsWith("fire:", StringComparison.OrdinalIgnoreCase));
+                if (pit == null) return null;
+                var spec = FireSpec.BurningCar;
+                var at = BurningCarAt with { Y = floor(BurningCarAt) + spec.BedHeightMetres };
+                var car = Lit(pit, 900_001, "fire:burning_car", at, Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI / 2f), spec);
+                static bool Fire(string id) => id.StartsWith("fire:burning_car", StringComparison.OrdinalIgnoreCase);
+                if (name == "car")
+                {
+                    var (feet, heading) = Round(at, 4f, floor);
+                    return new Walk(name, "city", "round a car burning on Foundry Street, 4 m from its middle, from the south going east",
+                                    feet, heading, Fire) { Extra = { car } };
+                }
+                var outFeet = new List<Vector3>();
+                for (float d = 2f; d <= 40f + 1e-3f; d += Step)
+                {
+                    var p = at + new Vector3(0f, 0f, d);
+                    outFeet.Add(p with { Y = floor(p with { Y = at.Y }) });
+                }
+                return new Walk(name, "city", "away north from the burning car's side, 2 to 40 m from its middle, facing east",
+                                outFeet, Vector3.UnitX, Fire) { Extra = { car } };
+            }
+            case "big":
+            {
+                // A stand of trees burning in Elm Park (FireSpec.BurningTrees, 15 by 15 m, 10 MW): 60 m along its south side,
+                // 5 m out from its edge, its middle half way.
+                var pit = defs.FirstOrDefault(d => d.SoundEmitter.SoundId!.StartsWith("fire:", StringComparison.OrdinalIgnoreCase));
+                if (pit == null) return null;
+                var spec = FireSpec.BurningTrees;
+                var at = BurningStandAt with { Y = floor(BurningStandAt) + spec.BedHeightMetres };
+                var stand = Lit(pit, 900_002, "fire:burning_trees", at, Quaternion.Identity, spec);
+                var feet = new List<Vector3>();
+                for (float x = -30f; x <= 30f + 1e-3f; x += Step)
+                {
+                    var p = at + new Vector3(x, 0f, -(0.5f * spec.AreaDepth + 5f));
+                    feet.Add(p with { Y = floor(p with { Y = at.Y }) });
+                }
+                return new Walk(name, "city", "east along a stand of trees burning in Elm Park (15 by 15 m), 5 m out from its south edge, 60 m",
+                                feet, Vector3.UnitX, id => id.StartsWith("fire:burning_trees", StringComparison.OrdinalIgnoreCase)) { Extra = { stand } };
+            }
+            case "wood":
+            {
+                // Magnolia's thickest wood (the 200 m square of one kind of tree with the most crowns, as WoodChorus gathers
+                // them): 120 m east through its crowns' middle. Every tree within 600 m counts, its own voice and its wood's.
+                var crowns = defs.Where(d => d.SoundEmitter.SoundId!.StartsWith("foliage:", StringComparison.OrdinalIgnoreCase)).ToList();
+                if (crowns.Count == 0) return null;
+                var cell = crowns.GroupBy(d => ((int)MathF.Floor(d.Transform.Position.X / WoodChorus.CellMetres),
+                                                (int)MathF.Floor(d.Transform.Position.Z / WoodChorus.CellMetres), d.SoundEmitter.SoundId!.ToLowerInvariant()))
+                                 .MaxBy(g => g.Count())!;
+                var middle = cell.Aggregate(Vector3.Zero, (a, d) => a + d.Transform.Position) / cell.Count();
+                var feet = new List<Vector3>();
+                for (float x = -60f; x <= 60f + 1e-3f; x += Step)
+                {
+                    var p = middle + new Vector3(x, 0f, 0f);
+                    feet.Add(p with { Y = floor(p with { Y = middle.Y + 30f }) });
+                }
+                static bool Trees(string id) => id.StartsWith("foliage:", StringComparison.OrdinalIgnoreCase) || id.StartsWith(WoodChorus.Prefix, StringComparison.OrdinalIgnoreCase);
+                return new Walk(name, "magnolia_tx", $"east through Magnolia's thickest wood ({cell.Count()} crowns of {cell.Key.Item3[8..]} in its 200 m square), 120 m through their middle",
+                                feet, Vector3.UnitX, Trees, WindMetresPerSecond: 4.5f) { Woods = true };
+            }
         }
         return null;
+    }
+
+    /// <summary>Where the walks light a car on Foundry Street and a stand of trees in Elm Park (map metres; the floor is
+    /// found there).</summary>
+    private static readonly Vector3 BurningCarAt = new(60f, 0.2f, 126f);
+    private static readonly Vector3 BurningStandAt = new(-325f, 0.2f, 262f);
+
+    /// <summary>A fire the walk lights: the map's fire pit's emitter with another key, at its own place and turn.</summary>
+    private static EntityDefinition Lit(EntityDefinition like, int id, string key, Vector3 at, Quaternion turn, FireSpec spec)
+    {
+        var em = like.SoundEmitter;
+        em.SoundId = key;
+        em.ExtentMetres = spec.ExtentMetres;
+        em.Range = MathF.Max(em.Range, new OpenFPS.Sound.Hearing.HearingSettings().AudibleRange(spec.SourceLevelDb));
+        var def = new EntityDefinition
+        {
+            EntityId = id,
+            Type = EntityType.StaticObject,
+            Transform = new Transform { Position = at, Rotation = turn, Scale = Vector3.One },
+        };
+        def.Identity.Name = spec.Name;
+        def.SoundEmitter = em;
+        return def;
+    }
+
+    /// <summary>Feet every step round a circle of <paramref name="radius"/> about <paramref name="middle"/>, from its south
+    /// going east, on the floor there, and the way the walk faces first.</summary>
+    private static (List<Vector3> Feet, Vector3 Heading) Round(Vector3 middle, float radius, Func<Vector3, float> floor)
+    {
+        var feet = new List<Vector3>();
+        int n = Math.Max(8, (int)MathF.Round(MathF.Tau * radius / Step));
+        for (int i = 0; i <= n; i++)
+        {
+            float a = MathF.Tau * i / n;
+            var p = middle + new Vector3(MathF.Sin(a) * radius, 0f, -MathF.Cos(a) * radius);
+            feet.Add(p with { Y = floor(p with { Y = middle.Y }) });
+        }
+        return (feet, Vector3.UnitX);
     }
 
     /// <summary>The longest run of straight stretches laid end to end (each along its own x, centred on its
@@ -564,6 +684,8 @@ public static class ExtentWalkSpike
         var rig = MakeRig(mixer, () => now, prewarm: false, sounds: null);
         Wet(rig, ground, walk.WindMetresPerSecond);
         foreach (var d in sources) rig.World.RegisterDefinition(d);
+        // The far trees heard as their woods, as the session makes them after a map loads.
+        if (walk.Woods) rig.World.RefreshWoods();
         Flows(rig, walk, sources);
         Face(rig.Player, walk.Heading);
         int framesPerStep = Math.Max(1, (int)MathF.Round(Step / speed * (float)ClientAudioSystem.UpdateHz));
@@ -640,6 +762,8 @@ public static class ExtentWalkSpike
             Material = new MaterialComponent { Material = "Grass" },
         });
         foreach (var d in sources) rig.World.RegisterDefinition(d);
+        // The far trees heard as their woods, as the session makes them after a map loads.
+        if (walk.Woods) rig.World.RefreshWoods();
         Flows(rig, walk, sources);
         Face(rig.Player, walk.Heading);
         int mostVoices = 0, flat = 0, leastFree = int.MaxValue;

@@ -67,7 +67,7 @@ string[] usage =
     "  --loudspeaker bench|game [out=DIR]               the loudspeaker model: datasheet numbers and renders; game: the PA and megaphone through the real mixer",
     "  --probable-bugs scene=pa|landing|bell|yard|rooms|upmix|scatter [out=DIR] [room=flat|stair|street] [wall=Glass|Brick]",
     "                                                the 2026-10-07 probable bugs through the real mixer, captured",
-    "  --extent-walk [walks=creek,creek-out,gutter,shore,fountain,fountain-out,fire,oak,oak-out,open,open-ramp] [render] [out=DIR] [speed=]",
+    "  --extent-walk [walks=creek,creek-out,gutter,shore,fountain,fountain-out,fire,fire-round,car,car-out,big,wood,oak,oak-out,open,open-ramp] [render] [out=DIR] [speed=]",
     "  --band-steps FILE.wav [from=s] [to=s] [ref=REF.wav]  each octave's worst 2 ms frame over the 50 ms round it: a step, a cut-on or cut-off",
     "  --wide-sources [out=DIR] [set=measure|roofs|tree|render|level|all] [wide=on|off] [sec=] [turbulence=] [collapse=on] [spread=] | cost",
     "                                                a tree, the fountain, the fire and rain through the game path, for interaural coherence; cost: what they cost the mixer",
