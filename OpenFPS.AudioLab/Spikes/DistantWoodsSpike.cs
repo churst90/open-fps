@@ -27,6 +27,10 @@ public static class DistantWoodsSpike
     /// the mixers it makes.</summary>
     private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
 
+    /// <summary>This instrument's audio world's options (the wide sources, the cabins' paths), from the environment
+    /// as the game's mixer starts with, shared with the mixers it makes and set by its own arguments.</summary>
+    private static readonly OpenFPS.Client.AudioEngine.Core.AudioWorldOptions LabOptions = OpenFPS.Client.AudioEngine.Core.AudioWorldOptions.FromEnvironment();
+
     private static string? Arg(string[] args, string key) => args.FirstOrDefault(x => x.StartsWith(key, StringComparison.Ordinal))?[key.Length..];
 
     /// <summary>The wood: a stand of park trees over 160 by 120 m, crowns at their height, as gen_osm
@@ -92,7 +96,7 @@ public static class DistantWoodsSpike
         {
             Wood = w,
             Synth = new FoliageSynth(spec, Rate, 7 + j),
-            WindAt = ExtendedSources.Layout(w.Key, ModelLibrary.Presets)![1..],
+            WindAt = LabOptions.WideSources.Layout(w.Key, ModelLibrary.Presets)![1..],
             Gain = new float[ears.Length],
             Delay = new int[ears.Length],
         }).ToArray();
@@ -224,7 +228,7 @@ public static class DistantWoodsSpike
         Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", Path.Combine(dir, "capture.wav"));
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(dir, "capture.post.wav"));
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
-        var provider = new FmodAudioProvider { Hearing = LabHearing };
+        var provider = new FmodAudioProvider { Hearing = LabHearing, Options = LabOptions };
         var facade = new AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();
         facade.InitializeForTest(sounds);

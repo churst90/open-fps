@@ -14,6 +14,9 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class WideSourcesTests
 {
+    /// <summary>A world's wide sources as shipped (AudioWorldOptions.WideSources).</summary>
+    private static readonly OpenFPS.Client.AudioEngine.Core.Nature.WideSources Wide = new();
+
     /// <summary>The law as a world with the shipped hearing places by.</summary>
     private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
 
@@ -70,18 +73,18 @@ public class WideSourcesTests
     [Fact]
     public void TreesFiresAndFountainTapsHavePlacesAndNothingElseDoes()
     {
-        var tree = ExtendedSources.Layout("foliage:park_tree", ModelLibrary.Presets)!;
+        var tree = Wide.Layout("foliage:park_tree", ModelLibrary.Presets)!;
         Assert.Equal(1 + ExtendedSources.TreePlaces, tree.Length);
         Assert.Equal(Vector3.Zero, tree[0]);
         float reach = ExtendedSources.Reach(tree);
         _o.WriteLine($"tree: {tree.Length} places, reach {reach:F2} m");
         Assert.InRange(reach, 2f, FoliageSpec.ParkTree.CrownRadiusMetres);
         // The bed's places and the flames' above them (docs/FIRE.md 12.2).
-        Assert.Equal(1 + ExtendedSources.FirePlaces + FireSynth.FlamePlaces, ExtendedSources.Layout("fire:fire_pit", ModelLibrary.Presets)!.Length);
-        Assert.Equal(1 + ExtendedSources.WaterTapPlaces, ExtendedSources.Layout("water:park_fountain/elm_park/3", ModelLibrary.Presets)!.Length);
-        Assert.Null(ExtendedSources.Layout("water:park_fountain", ModelLibrary.Presets));
-        Assert.Null(ExtendedSources.Layout("machine:ac_window", ModelLibrary.Presets));
-        Assert.Null(ExtendedSources.Layout("rain:0", ModelLibrary.Presets));
+        Assert.Equal(1 + ExtendedSources.FirePlaces + FireSynth.FlamePlaces, Wide.Layout("fire:fire_pit", ModelLibrary.Presets)!.Length);
+        Assert.Equal(1 + ExtendedSources.WaterTapPlaces, Wide.Layout("water:park_fountain/elm_park/3", ModelLibrary.Presets)!.Length);
+        Assert.Null(Wide.Layout("water:park_fountain", ModelLibrary.Presets));
+        Assert.Null(Wide.Layout("machine:ac_window", ModelLibrary.Presets));
+        Assert.Null(Wide.Layout("rain:0", ModelLibrary.Presets));
     }
 
     /// <summary>
@@ -101,7 +104,7 @@ public class WideSourcesTests
             ("water:park_fountain/elm_park/1", new Vector3(0f, 0.8f, 0f), tap.SourceLevelDb, tap.Taps[1].ExtentMetres),
         })
         {
-            var layout = ExtendedSources.Layout(key, ModelLibrary.Presets)!;
+            var layout = Wide.Layout(key, ModelLibrary.Presets)!;
             var (_, reference) = Law.Place(levelDb, extent);
             float range = Law.AudibleRange(levelDb);
             var at = layout.Select(o => middle + o).ToArray();
@@ -305,9 +308,9 @@ public class WideSourcesTests
         Assert.False(RainFeeds.TryParse("rain:0/x", out _, out _));
         Assert.Equal("rain:0/2", RainFeeds.Key(0, 2));
         Assert.Equal("rain:4", RainFeeds.Key(4, 0));
-        Assert.Equal(RainFeeds.RoofParts, RainFeeds.PartsFor(RainSurvey.OverheadSlot));
-        Assert.Equal(RainFeeds.NearParts, RainFeeds.PartsFor(1));
-        Assert.Equal(1, RainFeeds.PartsFor(6));
+        Assert.Equal(RainFeeds.RoofParts, RainFeeds.PartsFor(RainSurvey.OverheadSlot, wide: true));
+        Assert.Equal(RainFeeds.NearParts, RainFeeds.PartsFor(1, wide: true));
+        Assert.Equal(1, RainFeeds.PartsFor(6, wide: true));
     }
 
     private static RainPatch SteelRoof()
@@ -411,7 +414,7 @@ public class WideSourcesTests
         var voices = new VoiceRegistry();
         foreach (string key in keys)
         {
-            var layout = ExtendedSources.Layout(key, ModelLibrary.Presets);
+            var layout = Wide.Layout(key, ModelLibrary.Presets);
             if (layout == null) continue;
             widest = Math.Max(widest, layout.Length);
             // Source 41 and its neighbour 42, each with this layout: no id of one is an id of the other.

@@ -19,11 +19,11 @@ namespace OpenFPS.Client.AudioEngine.Core.Engine;
 /// (<see cref="WheelDynamics"/>); nothing is authored per vehicle. A vehicle with no cabin (a
 /// motorcycle, a formula car) has no layout and keeps the one interior voice.
 ///
-/// OPENFPS_CABIN_PATHS=0 plays the interior from one point.
+/// Whether a world splits its cabins at all, and the lab's lever that plays every path from where the one voice
+/// was, are that world's (AudioWorldOptions: OPENFPS_CABIN_PATHS=0 plays the interior from one point).
 /// </summary>
 public static class CabinPaths
 {
-    public static bool Enabled = Environment.GetEnvironmentVariable("OPENFPS_CABIN_PATHS") != "0";
 
     public enum Kind
     {
@@ -81,17 +81,14 @@ public static class CabinPaths
     /// <summary>Where the one interior voice was played from, against the head in the vehicle's frame.</summary>
     public static readonly Vector3 OnePlace = new(0f, -0.4f, 0.6f);
 
-    /// <summary>For the lab: every path from where the one voice was (still separate streams), to tell
-    /// what the directions do from what the split does.</summary>
-    internal static bool LabOnePlace;
-
     private static readonly ConcurrentDictionary<string, Layout?> _layouts = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>The paths into this vehicle's cabin, or null if it has no cabin (or the split is off). Its air
-    /// system, which says where the door is, is <paramref name="presets"/>' (the catalogue's).</summary>
+    /// <summary>The paths into this vehicle's cabin, or null if it has no cabin. Its air system, which says where
+    /// the door is, is <paramref name="presets"/>' (the catalogue's). Whether a world splits it is the world's
+    /// (AudioWorldOptions.CabinLayout).</summary>
     public static Layout? For(VehicleProfile v, IPresets presets)
     {
-        if (!Enabled || v == null) return null;
+        if (v == null) return null;
         return _layouts.GetOrAdd(v.Name ?? "", _ => Build(v, presets));
     }
 
@@ -184,11 +181,11 @@ public static class CabinPaths
 
     /// <summary>
     /// Where path <paramref name="path"/> is played from, relative to the head, in the vehicle's frame:
-    /// the direction from the ear to where it comes in, at <see cref="PlacedMetres"/>.
+    /// the direction from the ear to where it comes in, at <see cref="PlacedMetres"/>. (The lab's lever that plays
+    /// every path from <see cref="OnePlace"/> is a world's: AudioWorldOptions.CabinOffset.)
     /// </summary>
     public static Vector3 Offset(Layout layout, int path, Vector3 ear)
     {
-        if (LabOnePlace) return OnePlace;
         var d = layout.Paths[path].At - ear;
         float len = d.Length();
         if (!(len > 1e-3f)) return new Vector3(0f, 0f, PlacedMetres);

@@ -122,7 +122,7 @@ internal static partial class GtkClientProgram
 
         // Built before login so the session handles the login response itself; audio starts on a
         // background thread in BeginAudioInit.
-        var audioEngine = new AudioEngineFacade();
+        var audioEngine = new AudioEngineFacade(OpenFPS.Client.Core.ClientAudioPaths.ForPlayer());
         _shell = new GtkClientShell(_speech, onQuit: () => _app?.Quit(), onCue: cue => _session?.Ui.Play(cue));
         _session = new ClientGameSession(_network, _speech, _shell, audioEngine,
             // FMOD's own recording, on the microphone chosen in Settings (Windows uses NAudio).

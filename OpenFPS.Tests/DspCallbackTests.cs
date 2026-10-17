@@ -22,6 +22,9 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class DspCallbackTests
 {
+    /// <summary>A world's wide sources as shipped (AudioWorldOptions.WideSources).</summary>
+    private static readonly OpenFPS.Client.AudioEngine.Core.Nature.WideSources Wide = new();
+
     private readonly ITestOutputHelper _o;
     public DspCallbackTests(ITestOutputHelper o) => _o = o;
 
@@ -55,7 +58,7 @@ public class DspCallbackTests
         "fire place" => new NaturePlaceState(new PlacedNatureVoice("fire:fire_pit", ModelLibrary.Presets.Fire("fire_pit"), 3, Rate, 13, Somewhere, weather) { TargetSpread = 1f }, 0, Rate, Somewhere),
         "tree" => new FoliageVoiceState(FoliageSpec.ParkTree, Rate, 9, Somewhere, weather),
         "tree place" => new NaturePlaceState(new PlacedNatureVoice("foliage:park_tree", FoliageSpec.ParkTree, 1 + FoliageSynth.Boughs, Rate, 9, Somewhere, weather) { TargetSpread = 1f }, 0, Rate, Somewhere),
-        "creek" => new NaturePlaceState(new PlacedNatureVoice("flow:creek", RunningWaterSpec.Creek, Rate, 19, Somewhere, weather), 0, Rate, Somewhere),
+        "creek" => new NaturePlaceState(new PlacedNatureVoice("flow:creek", RunningWaterSpec.Creek, Rate, 19, Somewhere, weather, Wide), 0, Rate, Somewhere),
         "shore" => new NaturePlaceState(new PlacedNatureVoice("shore:sea", ShoreSpec.SeaSand, ShoreSpec.SeaSand.DefaultGeometry, Rate, 23, Somewhere, weather), 0, Rate, Somewhere),
         // A burner being lit now: the knob, the sparks, the light-up (the twin is made in the same second, so
         // both take the change as heard as it happened).

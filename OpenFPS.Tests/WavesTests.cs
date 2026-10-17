@@ -12,6 +12,9 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class WavesTests
 {
+    /// <summary>A world's wide sources as shipped (AudioWorldOptions.WideSources).</summary>
+    private static readonly OpenFPS.Client.AudioEngine.Core.Nature.WideSources Wide = new();
+
     private readonly ITestOutputHelper _o;
     public WavesTests(ITestOutputHelper o)
     {
@@ -131,10 +134,10 @@ public class WavesTests
         Assert.Equal("sea_sand", preset);
         Assert.Null(g);
         // Its places lie along it, the stretch's own length, and a surf beach has a row on its break line.
-        var layout = ExtendedSources.Layout(key, ModelLibrary.Presets)!;
+        var layout = Wide.Layout(key, ModelLibrary.Presets)!;
         Assert.Equal(ShoreSpec.PondBank.TotalPlaces, layout.Length);
         Assert.True(layout.Max(p => MathF.Abs(p.X)) <= 9f && layout.All(p => p.Z == 0f));
-        var surf = ExtendedSources.Layout("shore:sea_sand", ModelLibrary.Presets)!;
+        var surf = Wide.Layout("shore:sea_sand", ModelLibrary.Presets)!;
         Assert.Equal(2 * ShoreSpec.SeaSand.Places, surf.Length);
         Assert.Contains(surf, p => p.Z == ShoreSpec.SeaSand.BreakRowMetres);
     }

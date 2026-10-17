@@ -92,7 +92,7 @@ public class DoorPrewarmTests
                                   LockCylinder.KeyPrefix, ElevatorDoor.KeyPrefix, CarWindow.KeyPrefix, GlassFracture.KeyPrefix })
             Assert.Contains(p, prefixes);
         Assert.False(WorldAudioPlayer.IsDoorModelKey("revolvingdoor:open:0"));
-        Assert.Throws<ArgumentException>(() => WorldAudioPlayer.RenderDoorKey("revolvingdoor:open:0", new()));
+        Assert.Throws<ArgumentException>(() => WorldAudioPlayer.RenderDoorKey("revolvingdoor:open:0", new(), null));
         Assert.Equal(WorldAudioPlayer.GlassRenderLateness, WorldAudioPlayer.DoorModelOf(GlassFracture.KeyPrefix + "break:x")!.Value.Lateness);
     }
 
@@ -100,32 +100,30 @@ public class DoorPrewarmTests
     public void AKeptRenderComesBackAsItWent()
     {
         string dir = Path.Combine(Path.GetTempPath(), "openfps-rendercache-" + Guid.NewGuid().ToString("N"));
-        string? was = DoorRenderCache.Folder;
+        var cache = new DoorRenderCache(dir, shippedFolder: null);
         try
         {
-            DoorRenderCache.Folder = dir;
             string key = KnobDoor.Key(false, KnobDoor.Construction.HollowCore, 1, 0.9f, KnobDoor.Shut.Normal, 1.1f, 2.1f);
-            Assert.False(DoorRenderCache.TryLoad(key, out _, out _));
+            Assert.False(cache.TryLoad(key, out _, out _));
             var pcm = new[] { 0f, 0.5f, -1f, 0.25f };
-            DoorRenderCache.Store(key, pcm, 97.5f);
-            Assert.True(DoorRenderCache.TryLoad(key, out var back, out float db));
+            cache.Store(key, pcm, 97.5f);
+            Assert.True(cache.TryLoad(key, out var back, out float db));
             Assert.Equal(pcm.Length, back.Length);
             for (int i = 0; i < pcm.Length; i++) Assert.InRange(back[i], pcm[i] - 1e-4f, pcm[i] + 1e-4f);
             // Over full scale (a car window's render is not peak-normalised) comes back whole, not clipped.
-            DoorRenderCache.Store(key, new[] { 1.5f, -0.75f }, 0f);
-            Assert.True(DoorRenderCache.TryLoad(key, out var loud, out _));
+            cache.Store(key, new[] { 1.5f, -0.75f }, 0f);
+            Assert.True(cache.TryLoad(key, out var loud, out _));
             Assert.InRange(loud[0], 1.4999f, 1.5001f);
-            DoorRenderCache.Store(key, pcm, 97.5f);
-            Assert.True(DoorRenderCache.TryLoad(key, out back, out db));
+            cache.Store(key, pcm, 97.5f);
+            Assert.True(cache.TryLoad(key, out back, out db));
             Assert.Equal(97.5f, db);
             // Another key is not this one's render.
-            Assert.False(DoorRenderCache.TryLoad(key + ":push", out _, out _));
+            Assert.False(cache.TryLoad(key + ":push", out _, out _));
             // A pane breaking has a key of its own each time: never kept.
             Assert.False(DoorRenderCache.Keeps(GlassFracture.KeyPrefix + "break:x"));
         }
         finally
         {
-            DoorRenderCache.Folder = was;
             try { Directory.Delete(dir, recursive: true); } catch (IOException) { }
         }
     }

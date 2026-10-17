@@ -14,6 +14,9 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class WoodChorusTests
 {
+    /// <summary>A world's wide sources as shipped (AudioWorldOptions.WideSources).</summary>
+    private static readonly OpenFPS.Client.AudioEngine.Core.Nature.WideSources Wide = new();
+
     /// <summary>The law as a world with the shipped hearing places by.</summary>
     private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
 
@@ -42,7 +45,7 @@ public class WoodChorusTests
         Assert.Equal(("park_tree", 60f, 40f), (preset, rx, rz));
         Assert.False(WoodChorus.ParseKey("foliage:park_tree", out _, out _, out _));
         // A wood's places are spread over the wood, not a crown.
-        var layout = ExtendedSources.Layout(key, ModelLibrary.Presets)!;
+        var layout = Wide.Layout(key, ModelLibrary.Presets)!;
         Assert.Equal(1 + FoliageSynth.Boughs, layout.Length);
         Assert.InRange(ExtendedSources.Reach(layout), 25f, 41f);
     }

@@ -463,7 +463,9 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
         if (silent >= 0 && at + mono.Length >= silent) FadedOut = true;
     }
 
-    public EngineVoiceState(VehicleProfile v, float sampleRate, int seed)
+    /// <param name="cabinPaths">Its cabin split into the paths its sound comes in by (CabinPaths), as its world has
+    /// it (AudioWorldOptions.CabinPathsOn); false plays the interior from one point.</param>
+    public EngineVoiceState(VehicleProfile v, float sampleRate, int seed, bool cabinPaths = true)
     {
         // The engine, its driveline and its body calibrate themselves: 15-70 ms.
         OpenFPS.Client.AudioEngine.Core.PlacementThread.Heavy("An engine's model");
@@ -591,7 +593,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
 
         // The paths into the cabin, if it has one (CabinPaths). Each wheel rolls at its share of its
         // axle group's power, so the wheels together are the two axles.
-        _cabinLayout = CabinPaths.For(v, ModelLibrary.Presets);
+        _cabinLayout = cabinPaths ? CabinPaths.For(v, ModelLibrary.Presets) : null;
         if (_cabinLayout is { } cl && cl.PathOfWheel.Length == nw)
         {
             _cabinTapLive = new int[cl.Count];

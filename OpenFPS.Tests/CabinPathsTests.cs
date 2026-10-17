@@ -71,13 +71,10 @@ public class CabinPathsTests
     /// <summary>Mean square of the voice inside, pascals, over <paramref name="seconds"/> after one to settle.</summary>
     private static double Inside(bool paths, float kmh, float seconds = 3f)
     {
-        bool was = CabinPaths.Enabled;
-        CabinPaths.Enabled = paths;
-        try
         {
             var v = MachineRegistry.VehicleFor("i4_economy");
             float speed = kmh / 3.6f;
-            var voice = new EngineVoiceState(v, Rate, 7) { TargetSpeed = speed, CompensateLevel = false, Interior = true };
+            var voice = new EngineVoiceState(v, Rate, 7, cabinPaths: paths) { TargetSpeed = speed, CompensateLevel = false, Interior = true };
             Assert.Equal(paths, voice.CabinLayout != null);
             voice.PlaceAtSpeed(speed);
             voice.Revive();
@@ -94,7 +91,6 @@ public class CabinPathsTests
             }
             return sum / n;
         }
-        finally { CabinPaths.Enabled = was; }
     }
 
     [Theory]

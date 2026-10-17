@@ -213,7 +213,7 @@ public static class GlassSpike
             var s = s0;
             if (!string.IsNullOrEmpty(s.SynthKey) && s.SynthKey.StartsWith(GlassFracture.KeyPrefix, StringComparison.Ordinal))
             {
-                pcm = OpenFPS.Client.Core.WorldAudioPlayer.RenderDoorKey(s.SynthKey, own);
+                pcm = OpenFPS.Client.Core.WorldAudioPlayer.RenderDoorKey(s.SynthKey, own, new DoorRenderCache(OpenFPS.Client.Core.ClientAudioPaths.ForPlayer()));
                 s = OpenFPS.Client.Core.WorldAudioPlayer.AtOwnLevel(s, own);
                 if (raw != null)
                 {

@@ -17,6 +17,9 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class FireTests : IDisposable
 {
+    /// <summary>A world's wide sources as shipped (AudioWorldOptions.WideSources).</summary>
+    private static readonly OpenFPS.Client.AudioEngine.Core.Nature.WideSources Wide = new();
+
     private const int Rate = 48000;
     private readonly ITestOutputHelper _o;
     private readonly string _dir = Path.Combine(Path.GetTempPath(), $"openfps-fire-{Guid.NewGuid():N}");
@@ -66,7 +69,7 @@ public class FireTests : IDisposable
         foreach (var (name, make) in FireSpec.Presets)
         {
             var spec = make();
-            var all = ExtendedSources.Layout("fire:" + name, ModelLibrary.Presets);
+            var all = Wide.Layout("fire:" + name, ModelLibrary.Presets);
             Assert.NotNull(all);
             int bed = FireSynth.BedPlaces(spec);
             Assert.Equal(bed + Math.Min(FireSynth.FlamePlaces, FireSynth.MaxPlaces - bed), all!.Length);
@@ -94,7 +97,7 @@ public class FireTests : IDisposable
             _o.WriteLine($"{name}: {all.Length} places, {nx * nz} bodies of {d:F1} m");
         }
         // A key with its lighting time has the same places.
-        Assert.Equal(ExtendedSources.Layout("fire:house_fire", ModelLibrary.Presets)!.Length, ExtendedSources.Layout(FireSpec.KeyFor("house_fire", 1234.5), ModelLibrary.Presets)!.Length);
+        Assert.Equal(Wide.Layout("fire:house_fire", ModelLibrary.Presets)!.Length, Wide.Layout(FireSpec.KeyFor("house_fire", 1234.5), ModelLibrary.Presets)!.Length);
     }
 
     [Fact]

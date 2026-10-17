@@ -47,7 +47,9 @@ OpenFPS.Audio/Acoustics/RouteAnswers.cs	lib	Audio
 OpenFPS.Audio/Acoustics/SpatialAcoustics.cs	lib	Audio	
 OpenFPS.Audio/Acoustics/VehicleShadow.cs	lib	Audio	
 OpenFPS.Audio/Core/AudioBank.cs	lib	Audio	
+OpenFPS.Audio/Core/AudioDataPaths.cs	lib	Audio	
 OpenFPS.Audio/Core/AudioEngineFacade.cs	lib	Audio	
+OpenFPS.Audio/Core/AudioWorldOptions.cs	lib	Audio	
 OpenFPS.Audio/Core/DoorRenderCache.cs	lib	Audio	
 OpenFPS.Audio/Core/PlacementThread.cs	lib	Audio	
 OpenFPS.Audio/Core/VoiceManager.cs	lib	Audio	
@@ -107,6 +109,7 @@ OpenFPS.Client.Core/AudioDiagnostics.cs	host
 OpenFPS.Client.Core/BeaconAids.cs	host		
 OpenFPS.Client.Core/BirdLife.cs	host		
 OpenFPS.Client.Core/BuildForm.cs	host		
+OpenFPS.Client.Core/ClientAudioPaths.cs	host		
 OpenFPS.Client.Core/ClientAudioSystem.Trains.cs	host		
 OpenFPS.Client.Core/ClientAudioSystem.Voices.cs	host		
 OpenFPS.Client.Core/ClientAudioSystem.cs	host		
@@ -309,6 +312,7 @@ OpenFPS.Sound/Core/Nature/RunningWaterSynth.cs	lib	Sound
 OpenFPS.Sound/Core/Nature/ShoreReferences.cs	lib	Sound	
 OpenFPS.Sound/Core/Nature/ShoreSynth.cs	lib	Sound	
 OpenFPS.Sound/Core/Nature/TextureStatistics.cs	lib	Sound	
+OpenFPS.Sound/Core/Nature/WideSources.cs	lib	Sound	
 OpenFPS.Sound/Core/Pneumatics/AirSystem.cs	lib	Sound	
 OpenFPS.Sound/Core/Rail/ElectricDrive.cs	lib	Sound	
 OpenFPS.Sound/Core/Rail/RailNoise.cs	lib	Sound	

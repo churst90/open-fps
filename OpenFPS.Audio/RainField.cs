@@ -944,7 +944,7 @@ public sealed class RainField
                 continue;
             }
             var e = Emitter(s, patch, _last, listenerRegion);
-            if (RainFeeds.PartsFor(s) > 1)
+            if (RainFeeds.PartsFor(s, _audio.Options.WideSources.Enabled) > 1)
             {
                 PlayParts(s, e, patch, ear);
                 continue;
@@ -1001,7 +1001,7 @@ public sealed class RainField
     /// </summary>
     private void PlayParts(int slot, SpatialEmitter whole, RainPatch patch, Vector3 ear)
     {
-        int parts = Math.Min(RainFeeds.PartsFor(slot), _partAt.Length);
+        int parts = Math.Min(RainFeeds.PartsFor(slot, _audio.Options.WideSources.Enabled), _partAt.Length);
         float reach = RoofReach(patch);
         for (int k = 0; k < parts; k++)
         {
@@ -1044,7 +1044,7 @@ public sealed class RainField
     /// </summary>
     private void OnYourRoof(ref SpatialEmitter e, Vector3 at)
     {
-        if (!OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.Enabled || _audio.Lab.RainRoofInTheWorld
+        if (!_audio.Options.CabinPathsOn || _audio.Lab.RainRoofInTheWorld
             || _rideVelocity is not { } v || !e.InsideListenersVehicle) return;
         var offset = at - _lastAt;
         e.FollowsListener = true;

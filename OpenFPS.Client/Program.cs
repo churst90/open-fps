@@ -53,7 +53,7 @@ public static class Program
         }
 
         ApplicationConfiguration.Initialize();
-        new ClientRunner(new AudioEngineFacade()).Run();
+        new ClientRunner(new AudioEngineFacade(OpenFPS.Client.Core.ClientAudioPaths.ForPlayer())).Run();
         Log.Information("Client shut down cleanly after {Sec:F0} s.", (DateTime.UtcNow - StartedUtc).TotalSeconds);
         Log.CloseAndFlush();
     }

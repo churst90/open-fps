@@ -33,6 +33,10 @@ public static class FireSpike
     /// the mixers it makes.</summary>
     private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
 
+    /// <summary>This instrument's audio world's options (the wide sources, the cabins' paths), from the environment
+    /// as the game's mixer starts with, shared with the mixers it makes and set by its own arguments.</summary>
+    private static readonly OpenFPS.Client.AudioEngine.Core.AudioWorldOptions LabOptions = OpenFPS.Client.AudioEngine.Core.AudioWorldOptions.FromEnvironment();
+
     private const int Rate = 48000;
     private const float PascalsToFull = 0.1f;
 
@@ -232,8 +236,8 @@ public static class FireSpike
         Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", Path.Combine(outDir, "capture.wav"));
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(outDir, "capture.post.wav"));
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
-        Console.WriteLine($"Extended sources {(ExtendedSources.Enabled ? "spread" : "one point")}; ear model {(LabHearing.EarModelOn ? "on" : "off")}");
-        var provider = new OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider { Hearing = LabHearing };
+        Console.WriteLine($"Extended sources {(LabOptions.WideSources.Enabled ? "spread" : "one point")}; ear model {(LabHearing.EarModelOn ? "on" : "off")}");
+        var provider = new OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider { Hearing = LabHearing, Options = LabOptions };
         var facade = new AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();
         facade.InitializeForTest(sounds);
@@ -357,25 +361,25 @@ public static class FireSpike
                 // The house at 30 m with its places spread 1, 2 and 4 times as wide: how the ears follow the angle.
                 foreach (float k in new[] { 1f, 2f, 4f })
                 {
-                    ExtendedSources.LayoutScale = k;
+                    LabOptions.WideSources.LayoutScale = k;
                     Fire("house_fire", 30f);
                     segments[^1] = segments[^1] with { Name = $"house_fire x{k:0} 30m" };
                 }
-                ExtendedSources.LayoutScale = 1f;
+                LabOptions.WideSources.LayoutScale = 1f;
             }
             if (set is "check")
             {
                 // Do the ears hear the geometry? The house at 30 m as it is, its places at its middle, and as one
                 // voice; then standing among a crown fire's front.
                 Fire("house_fire", 30f);
-                ExtendedSources.LayoutScale = 0f;
+                LabOptions.WideSources.LayoutScale = 0f;
                 Fire("house_fire", 30f);
                 segments[^1] = segments[^1] with { Name = "house_fire collapsed 30m" };
-                ExtendedSources.LayoutScale = 1f;
-                ExtendedSources.Enabled = false;
+                LabOptions.WideSources.LayoutScale = 1f;
+                LabOptions.WideSources.Enabled = false;
                 Fire("house_fire", 30f);
                 segments[^1] = segments[^1] with { Name = "house_fire one voice 30m" };
-                ExtendedSources.Enabled = true;
+                LabOptions.WideSources.Enabled = true;
                 var crown = ModelLibrary.Presets.Fire("crown_fire");
                 var cm = new Vector3(0f, Height(crown), 0f);
                 int cid = Add("crown_fire", cm);

@@ -36,8 +36,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- The host drives the mixer's internal hooks; the tests and the lab's spikes reach its internals directly:
-         that is what a spike is. -->
+    <!-- The host, until stage 7 splits its audio system, reaches the worker's and the rain's hooks (the worker's
+         manual mode and traced set, the rain's ear speed and survey), the voice manager's heard level and the
+         voices' starve count. The tests and the lab's spikes reach its internals directly: that is what a
+         spike is. -->
     <InternalsVisibleTo Include="OpenFPS.Client.Core" />
     <InternalsVisibleTo Include="OpenFPS.Tests" />
     <InternalsVisibleTo Include="OpenFPS.AudioLab" />

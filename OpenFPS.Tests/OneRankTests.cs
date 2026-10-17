@@ -18,6 +18,9 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class OneRankTests
 {
+    /// <summary>A world's wide sources as shipped (AudioWorldOptions.WideSources).</summary>
+    private static readonly OpenFPS.Client.AudioEngine.Core.Nature.WideSources Wide = new();
+
     /// <summary>The law as a world with the shipped hearing places by.</summary>
     private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
 
@@ -247,8 +250,8 @@ public class OneRankTests
         AddSource(h, Tree, "foliage:park_tree", new Vector3(9f, 0f, 0f));
         AddSource(h, Fire, "fire:bonfire", new Vector3(-14f, 0f, 0f), new Vector3(3f, 1f, 3f));
         Assert.True(h.TickUntil(() => h.Mixer.Latest.ContainsKey(Tree) && h.Mixer.Latest.ContainsKey(Fire), 60), "the two were never voiced");
-        int treePlaces = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Layout(h.Mixer.Latest[Tree].PhysicalKey, ModelLibrary.Presets)!.Length - 1;
-        int firePlaces = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Layout(h.Mixer.Latest[Fire].PhysicalKey, ModelLibrary.Presets)!.Length - 1;
+        int treePlaces = Wide.Layout(h.Mixer.Latest[Tree].PhysicalKey, ModelLibrary.Presets)!.Length - 1;
+        int firePlaces = Wide.Layout(h.Mixer.Latest[Fire].PhysicalKey, ModelLibrary.Presets)!.Length - 1;
         _o.WriteLine($"the tree: {treePlaces} places, {20 * MathF.Log10(h.Audio.HeardInRanking(Tree)):F1} dB at 9 m; the fire: {firePlaces} places, {20 * MathF.Log10(h.Audio.HeardInRanking(Fire)):F1} dB at 14 m");
         Assert.True(h.Audio.HeardInRanking(Fire) > h.Audio.HeardInRanking(Tree), "the fire is not the louder from here");
         Assert.True(treePlaces > 0 && firePlaces > 0);

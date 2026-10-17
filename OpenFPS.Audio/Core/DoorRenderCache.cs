@@ -11,7 +11,8 @@ namespace OpenFPS.Client.AudioEngine.Core;
 /// 2026-10-05: "it doesn't play a sound for the first few times I open it, then it works").
 ///
 /// Read first from the folder shipped with the client (ASSETS/rendercache/BUILD), then from the player's
-/// own cache. Both are named by <see cref="Name"/>, the hash of the door models' sources
+/// own cache, both where the host says (AudioDataPaths; one per world, AudioEngineFacade.DoorRenders). Both
+/// are named by <see cref="Name"/>, the hash of the door models' sources
 /// (<see cref="DoorModelFingerprint"/>) and <c>Version</c>, so a changed model is never played from an
 /// old render and other changes to OpenFPS.Common keep them. Glass breaking is not kept: every break has
 /// a key of its own.
@@ -19,7 +20,7 @@ namespace OpenFPS.Client.AudioEngine.Core;
 /// Kept at <see cref="TransientSynth.SampleRate"/> and brought to the mixer's rate on registration
 /// (WorldAudioPlayer.AtMixerRate). If TransientSynth's rate ever changes, bump <c>Version</c>.
 /// </summary>
-public static class DoorRenderCache
+public sealed class DoorRenderCache
 {
     private const int Magic = 0x4352464F;   // "OFRC"
     private const int Version = 2;
@@ -30,25 +31,25 @@ public static class DoorRenderCache
     // Stored as 16-bit scaled by the render's own peak, so a render over full scale (a car window) is
     // not clipped: half the size of floats, and the shipped folder is in every Windows zip.
 
-    /// <summary>Where renders are written, and read after the shipped folder. Null turns the cache off.
-    /// OPENFPS_RENDER_CACHE overrides it; the lab's prerender points it at the folder it is filling.</summary>
-    public static string? Folder { get; set; } = DefaultFolder();
+    /// <summary>The renders in the folders <paramref name="paths"/> names.</summary>
+    public DoorRenderCache(AudioDataPaths paths) : this(paths.RenderCache, paths.ShippedRenderCache) { }
 
-    /// <summary>The renders shipped with the client, read only.</summary>
-    public static string ShippedFolder { get; set; } =
-        Path.Combine(AppContext.BaseDirectory, "ASSETS", "rendercache", Name);
-
-    private static int _pruned;
-
-    private static string? DefaultFolder()
+    /// <param name="folder">Where renders are written, and read after the shipped folder; null keeps none (the
+    /// lab's prerender gives the folder it is filling).</param>
+    /// <param name="shippedFolder">The renders shipped with the program, read only; null for none.</param>
+    public DoorRenderCache(string? folder, string? shippedFolder)
     {
-        string? env = Environment.GetEnvironmentVariable("OPENFPS_RENDER_CACHE");
-        if (env == "off") return null;
-        if (!string.IsNullOrWhiteSpace(env)) return env;
-        string root = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        if (string.IsNullOrEmpty(root)) return null;
-        return Path.Combine(root, "OpenFPS", "rendercache", Name);
+        Folder = folder;
+        ShippedFolder = shippedFolder;
     }
+
+    /// <summary>Where renders are written, and read after the shipped folder. Null: none are kept.</summary>
+    public string? Folder { get; }
+
+    /// <summary>The renders shipped with the program, read only.</summary>
+    public string? ShippedFolder { get; }
+
+    private int _pruned;
 
     /// <summary>Whether a key's render is kept: every model key but a pane of glass breaking.</summary>
     public static bool Keeps(string key) => !key.StartsWith(GlassFracture.KeyPrefix, StringComparison.Ordinal);
@@ -57,7 +58,7 @@ public static class DoorRenderCache
         => Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(key))).ToLowerInvariant() + ".pcm";
 
     /// <summary>A kept render of <paramref name="key"/>, and the level its full scale stands for.</summary>
-    public static bool TryLoad(string key, out float[] pcm, out float fullScaleDb)
+    public bool TryLoad(string key, out float[] pcm, out float fullScaleDb)
     {
         pcm = Array.Empty<float>(); fullScaleDb = 0f;
         if (!Keeps(key)) return false;
@@ -95,7 +96,7 @@ public static class DoorRenderCache
 
     /// <summary>Keeps a render. Written to a temporary file and moved, so a reader never sees half of it.
     /// Any failure only means it is rendered again next time.</summary>
-    public static void Store(string key, float[] pcm, float fullScaleDb)
+    public void Store(string key, float[] pcm, float fullScaleDb)
     {
         string? dir = Folder;
         if (dir == null || !Keeps(key) || pcm.Length == 0) return;
@@ -125,8 +126,9 @@ public static class DoorRenderCache
         }
     }
 
-    /// <summary>The player's renders for other door models are stale: removed, once a run.</summary>
-    private static void PruneOtherBuilds(string dir)
+    /// <summary>The player's renders for other door models are stale: removed, once a run (once a cache: the
+    /// game makes one).</summary>
+    private void PruneOtherBuilds(string dir)
     {
         if (Interlocked.Exchange(ref _pruned, 1) == 1) return;
         try

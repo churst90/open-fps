@@ -1567,7 +1567,7 @@ public partial class FmodAudioProvider : IAudioProvider
     }
 
     /// <summary>The models made off the placing threads (VoiceBuilds), on this mixer's clock.</summary>
-    private VoiceBuilds _voiceBuilds => LazyInitializer.EnsureInitialized(ref _builds, () => new VoiceBuilds(Clock, Atmosphere, Mix));
+    private VoiceBuilds _voiceBuilds => LazyInitializer.EnsureInitialized(ref _builds, () => new VoiceBuilds(Clock, Atmosphere, Mix, Options));
     private VoiceBuilds? _builds;
 
     /// <summary>See IAudioProvider.PrepareVoice.</summary>
@@ -1722,6 +1722,11 @@ public partial class FmodAudioProvider : IAudioProvider
     /// response, far engines' detail and the valves' rush. The host turns the same one (AudioEngineFacade.Mix).
     /// The run's environment chooses it until the console does.</summary>
     public MixSettings Mix { get; init; } = MixSettings.FromEnvironment();
+
+    /// <summary>This mixer's world's options: how it hears extended sources and whether its cabins are split into
+    /// paths. Its voices are made with them; the host places by the same one (AudioEngineFacade.Options). The run's
+    /// environment chooses it.</summary>
+    public OpenFPS.Client.AudioEngine.Core.AudioWorldOptions Options { get; init; } = OpenFPS.Client.AudioEngine.Core.AudioWorldOptions.FromEnvironment();
 
     /// <summary>A chosen source keeps its trace at least this long, so it does not flicker passing
     /// behind something.</summary>
@@ -2551,7 +2556,7 @@ public partial class FmodAudioProvider : IAudioProvider
 
     /// <summary>
     /// A tree's or a fire's voice: its middle (the map's emitter) makes the one synth, with as many
-    /// places as the source has (ExtendedSources.Layout); an outer place (SpatialEmitter.PlaceOfEntity)
+    /// places as the source has in this world (WideSources.Layout); an outer place (SpatialEmitter.PlaceOfEntity)
     /// reads the synth of its source's live voice, or is not made.
     /// </summary>
     private PhysicalVoiceState? NaturePlace(OpenFPS.Common.ModelSynth kind, string preset, in SpatialEmitter emitter, int rate)
@@ -2563,16 +2568,16 @@ public partial class FmodAudioProvider : IAudioProvider
             if (shared == null || emitter.Place <= 0 || emitter.Place >= shared.Places) return null;
             return new NaturePlaceState(shared, emitter.Place, rate, emitter.Position);
         }
-        int places = ExtendedSources.Layout(emitter.PhysicalKey, ModelLibrary.Presets)?.Length ?? 1;
+        int places = Options.WideSources.Layout(emitter.PhysicalKey, ModelLibrary.Presets)?.Length ?? 1;
         PlacedNatureVoice voice = kind == OpenFPS.Common.ModelSynth.Shore
             ? ShoreVoice(emitter, rate)
             : kind == OpenFPS.Common.ModelSynth.Wood && OpenFPS.Common.WoodChorus.ParseKey(emitter.PhysicalKey, out string woodPreset, out _, out _)
             ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.ModelLibrary.Presets.Foliage(woodPreset), places, rate,
                                     emitter.Seed * 43 + 17, emitter.Position, Weather)
-              { WindPlaces = ExtendedSources.Layout(emitter.PhysicalKey, ModelLibrary.Presets)?[1..], TargetTrees = emitter.Trees }
+              { WindPlaces = Options.WideSources.Layout(emitter.PhysicalKey, ModelLibrary.Presets)?[1..], TargetTrees = emitter.Trees }
             : kind == OpenFPS.Common.ModelSynth.Flow
             ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.ModelLibrary.Presets.Flow(preset), rate,
-                                    emitter.Seed * 47 + 19, emitter.Position, Weather) { TargetCut = PiecesOf(emitter.EntityId) }
+                                    emitter.Seed * 47 + 19, emitter.Position, Weather, Options.WideSources) { TargetCut = PiecesOf(emitter.EntityId) }
             : kind == OpenFPS.Common.ModelSynth.Fire
             ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Common.ModelLibrary.Presets.Fire(preset), places, rate,
                                     emitter.Seed * 41 + 13, emitter.Position, Weather)
@@ -2600,7 +2605,7 @@ public partial class FmodAudioProvider : IAudioProvider
     }
 
     /// <summary>How many voices a rain slot is played as (RainFeeds.PartsFor).</summary>
-    private static int RainParts(int slot) => RainFeeds.PartsFor(slot);
+    private int RainParts(int slot) => RainFeeds.PartsFor(slot, Options.WideSources.Enabled);
 
     // A map names each tap of a water feature "water:<preset>/<feature>/<tap>"; the one synth for
     // <preset>/<feature> is made on the first tap, at the mixer's rate. See NatureVoices.cs.
@@ -2626,7 +2631,7 @@ public partial class FmodAudioProvider : IAudioProvider
             {
                 w = new WaterFeatureVoice(shared, OpenFPS.Common.ModelLibrary.Presets.Water(preset), rate,
                                           (int)((uint)shared.GetHashCode() & 0x7fff),
-                                          ExtendedSources.Layout(emitter.PhysicalKey, ModelLibrary.Presets)?.Length ?? 1);
+                                          Options.WideSources.Layout(emitter.PhysicalKey, ModelLibrary.Presets)?.Length ?? 1);
                 _waterFeatures[shared] = w;
                 Log.Information("Water feature '{Feature}' ({Spec}): one synth, {Taps} tap(s)", shared, w.Spec.Name, w.Water.TapCount);
             }

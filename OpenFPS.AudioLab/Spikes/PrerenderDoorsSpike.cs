@@ -20,8 +20,7 @@ public static class PrerenderDoorsSpike
         if (args.FirstOrDefault(a => a.StartsWith("threads=", StringComparison.Ordinal)) is { } t && int.TryParse(t[8..], out int n))
             threads = Math.Max(1, n);
 
-        DoorRenderCache.Folder = outDir;
-        DoorRenderCache.ShippedFolder = outDir;
+        var cache = new DoorRenderCache(outDir, outDir);
         var maps = new OpenFPS.Server.Core.MapManager(new OpenFPS.Server.Repositories.MapRepository(OpenFPS.AudioLab.LabPaths.Server("maps")),
                                                       new OpenFPS.Server.Repositories.PrefabRepository(OpenFPS.AudioLab.LabPaths.Server("prefabs")));
         maps.Initialize();
@@ -43,7 +42,7 @@ public static class PrerenderDoorsSpike
         {
             try
             {
-                var pcm = WorldAudioPlayer.RenderDoorKey(key, levels);
+                var pcm = WorldAudioPlayer.RenderDoorKey(key, levels, cache);
                 if (pcm.Length <= 16 || pcm.Any(v => !float.IsFinite(v))) { Interlocked.Increment(ref failed); Console.Error.WriteLine($"!! {key}: empty or not finite"); }
             }
             catch (Exception ex) { Interlocked.Increment(ref failed); Console.Error.WriteLine($"!! {key}: {ex.Message}"); }

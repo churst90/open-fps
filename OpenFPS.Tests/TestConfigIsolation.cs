@@ -22,7 +22,7 @@ internal static class TestConfigIsolation
         // A folder of its own, not $XDG_CONFIG_HOME/openfps: on Linux that is the platform's folder in a test,
         // and a test that unsets the variable must see the folder change.
         Environment.SetEnvironmentVariable(SettingsFolder.Variable, Path.Combine(scratch, "settings"));
-        // And the player's data: DoorRenderCache prunes other builds' folders beside its own.
+        // And the player's data: the door render cache (ClientAudioPaths) prunes other builds' folders beside its own.
         string data = Path.Combine(scratch, "data");
         Directory.CreateDirectory(data);
         Environment.SetEnvironmentVariable("XDG_DATA_HOME", data);
@@ -56,7 +56,7 @@ public class TestConfigIsolationTests
     [Fact]
     public void TestsNeverWriteThePlayersRenderCache()
     {
-        string? folder = DoorRenderCache.Folder;
+        string? folder = ClientAudioPaths.ForPlayer().RenderCache;
         if (folder != null) Assert.StartsWith(Path.GetTempPath(), folder);
     }
 
@@ -79,7 +79,7 @@ public class TestConfigIsolationTests
             // Moved by OPENFPS_SETTINGS_DIR.
             "OpenFPS.Client.Core/SettingsFolder.cs: SpecialFolder.ApplicationData",
             // Moved by OPENFPS_RENDER_CACHE and OPENFPS_MESH_CACHE.
-            "OpenFPS.Audio/Core/DoorRenderCache.cs: SpecialFolder.LocalApplicationData",
+            "OpenFPS.Client.Core/ClientAudioPaths.cs: SpecialFolder.LocalApplicationData",
             "OpenFPS.Client.Core/MeshAssetFetcher.cs: SpecialFolder.LocalApplicationData",
             // The two programs' own start-up (a log folder, a crash folder): no test runs a program's Main.
             "OpenFPS.Client/Program.cs: SpecialFolder.LocalApplicationData",

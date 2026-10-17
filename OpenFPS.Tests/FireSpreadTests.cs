@@ -13,6 +13,9 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class FireSpreadTests
 {
+    /// <summary>A world's wide sources as shipped (AudioWorldOptions.WideSources).</summary>
+    private static readonly OpenFPS.Client.AudioEngine.Core.Nature.WideSources Wide = new();
+
     private readonly ITestOutputHelper _o;
     public FireSpreadTests(ITestOutputHelper o) { _o = o; AcousticRegistry.Initialize(); }
 
@@ -90,8 +93,8 @@ public class FireSpreadTests
         // Not a fire: untouched.
         Assert.Equal("foliage:park_tree", FireSpec.KeyForPlaced("foliage:park_tree", ColliderShape.Box.IsRound(), Vector3.One, ModelLibrary.Presets.Fire));
         // And the places follow the shape: a round bed's ring is narrower than its square's.
-        var square = ExtendedSources.Layout("fire:fire_pit", ModelLibrary.Presets)!;
-        var circle = ExtendedSources.Layout(round, ModelLibrary.Presets)!;
+        var square = Wide.Layout("fire:fire_pit", ModelLibrary.Presets)!;
+        var circle = Wide.Layout(round, ModelLibrary.Presets)!;
         Assert.Equal(square.Length, circle.Length);
         Assert.True(circle[1].Length() < 1.2f / 0.9f * square[1].Length());
     }

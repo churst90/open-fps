@@ -300,9 +300,12 @@ public sealed class PlacedNatureVoice
     /// <summary>When a fire was lit on the shared clock (its key), or null for one always burning.</summary>
     private readonly double? _litAt;
 
-    public PlacedNatureVoice(string key, RunningWaterSpec spec, float sampleRate, int seed, Vector3 position, WorldWeather weather)
-        : this(ExtendedSources.FlowPlaces(key, spec, ModelLibrary.Presets), sampleRate, position, spec.SourceLevelDb, spec.PeakHeadroomDb, 1f, weather)
-        => Flow = new RunningWaterSynth(spec, sampleRate, seed, ExtendedSources.FlowPlaces(key, spec, ModelLibrary.Presets));
+    /// <summary>Running water, rendering as many streams as its world hears it from (<paramref name="wide"/>:
+    /// a line it cuts into pieces, or its own places).</summary>
+    public PlacedNatureVoice(string key, RunningWaterSpec spec, float sampleRate, int seed, Vector3 position, WorldWeather weather,
+                             WideSources wide)
+        : this(wide.FlowPlaces(key, spec, ModelLibrary.Presets), sampleRate, position, spec.SourceLevelDb, spec.PeakHeadroomDb, 1f, weather)
+        => Flow = new RunningWaterSynth(spec, sampleRate, seed, wide.FlowPlaces(key, spec, ModelLibrary.Presets));
 
     /// <summary>Waves at an edge (ShoreSynth); fetch, lie and length come from the map's key
     /// (ShoreSpec.KeyFor).</summary>

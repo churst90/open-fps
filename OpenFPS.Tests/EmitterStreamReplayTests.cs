@@ -428,15 +428,12 @@ internal sealed class Replay
         AcousticRegistry.Initialize();
         // The statics the audio system still reads, at the game's defaults whatever ran before, and put back after
         // (docs/SOUND_LIBRARY_BOUNDARY.md, 4.1). The hearing, the air, the mixer's rate, the mix and the talkers
-        // are the replay's facade's own (18.8), so they start as the game's.
-        var saved = (OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Enabled,
-                     OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.Enabled,
-                     (DrivingCues.Enabled, DrivingCues.Guide, DrivingCues.LineSensors, DrivingCues.TurnClicks,
-                      DrivingCues.BrakeCue, DrivingCues.SpeedWarning));
+        // (18.8), and the wide sources and the cabins' paths (19), are the replay's facade's own, so they start as
+        // the game's.
+        var saved = (DrivingCues.Enabled, DrivingCues.Guide, DrivingCues.LineSensors, DrivingCues.TurnClicks,
+                     DrivingCues.BrakeCue, DrivingCues.SpeedWarning);
         (DrivingCues.Enabled, DrivingCues.Guide, DrivingCues.LineSensors, DrivingCues.TurnClicks,
          DrivingCues.BrakeCue, DrivingCues.SpeedWarning) = (true, true, true, true, true, true);
-        OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Enabled = true;
-        OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.Enabled = true;
         // The talker's voice through Concentus's own C#, not a system libopus: the talker is placed at the
         // level measured off the decoded audio (OwnVoiceRing.SpeechRmsDbfs), and a libopus where there is one
         // (Linux with it installed) decodes a little differently from the managed codec where there is not
@@ -451,10 +448,8 @@ internal sealed class Replay
         }
         finally
         {
-            (OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Enabled,
-             OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.Enabled,
-             (DrivingCues.Enabled, DrivingCues.Guide, DrivingCues.LineSensors, DrivingCues.TurnClicks,
-              DrivingCues.BrakeCue, DrivingCues.SpeedWarning)) = saved;
+            (DrivingCues.Enabled, DrivingCues.Guide, DrivingCues.LineSensors, DrivingCues.TurnClicks,
+             DrivingCues.BrakeCue, DrivingCues.SpeedWarning) = saved;
             Concentus.OpusCodecFactory.AttemptToUseNativeLibrary = nativeOpus;
         }
     }

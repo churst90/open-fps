@@ -548,13 +548,14 @@ public static class QualitySpike
     /// </summary>
     private static void OneShots(Session s, float sec, bool legacy)
     {
-        Environment.SetEnvironmentVariable("OPENFPS_RENDER_CACHE", Path.Combine(Path.GetTempPath(), "openfps-quality-rendercache"));
+        var doors = new DoorRenderCache(Path.Combine(Path.GetTempPath(), "openfps-quality-rendercache"),
+                                        AudioDataPaths.Beside(AppContext.BaseDirectory).ShippedRenderCache);
         int sr = TransientSynth.SampleRate;
         var full = new System.Collections.Concurrent.ConcurrentDictionary<string, float>();
         var renders = new List<(string Name, float[] Pcm)>
         {
-            ("knob door opening", WorldAudioPlayer.RenderDoorKey(KnobDoor.Key(false, KnobDoor.Construction.HollowCore, 0, 0.9f, KnobDoor.Shut.Normal, 1.1f, 2.1f), full)),
-            ("knob door shutting", WorldAudioPlayer.RenderDoorKey(KnobDoor.Key(true, KnobDoor.Construction.HollowCore, 0, 0.9f, KnobDoor.Shut.Normal, 1.1f, 2.1f), full)),
+            ("knob door opening", WorldAudioPlayer.RenderDoorKey(KnobDoor.Key(false, KnobDoor.Construction.HollowCore, 0, 0.9f, KnobDoor.Shut.Normal, 1.1f, 2.1f), full, doors)),
+            ("knob door shutting", WorldAudioPlayer.RenderDoorKey(KnobDoor.Key(true, KnobDoor.Construction.HollowCore, 0, 0.9f, KnobDoor.Shut.Normal, 1.1f, 2.1f), full, doors)),
             ("car door shutting", CarDoor.Render(true, sr, 3)),
             ("clap", Applause.RenderClap(sr, 2)),
             ("struck ring", TransientSynth.Render(new TransientSound { Character = SoundCharacter.Ring, Hz = 1400f, DecaySeconds = 1.2f, Noisiness = 0.2f }, 5)),

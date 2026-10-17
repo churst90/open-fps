@@ -31,6 +31,10 @@ public static class CabinSpike
     /// the mixers it makes.</summary>
     private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
 
+    /// <summary>This instrument's audio world's options (the wide sources, the cabins' paths), from the environment
+    /// as the game's mixer starts with, shared with the mixers it makes and set by its own arguments.</summary>
+    private static readonly OpenFPS.Client.AudioEngine.Core.AudioWorldOptions LabOptions = OpenFPS.Client.AudioEngine.Core.AudioWorldOptions.FromEnvironment();
+
     /// <summary>This instrument's mix (cabin= sets its cabin level), shared with the mixer it makes.</summary>
     private static readonly MixSettings LabMix = MixSettings.FromEnvironment();
 
@@ -48,9 +52,9 @@ public static class CabinSpike
     public static int Run(string[] args)
     {
         AcousticRegistry.Initialize();
-        if (Arg(args, "paths=") is "off" or "0") CabinPaths.Enabled = false;
+        if (Arg(args, "paths=") is "off" or "0") LabOptions.CabinPathsOn = false;
         // place=one: the paths split, every one played from where the one voice was.
-        if (Arg(args, "place=") is "one") CabinPaths.LabOnePlace = true;
+        if (Arg(args, "place=") is "one") LabOptions.CabinOnePlace = true;
         // cabin=DB: the cabin's traced response against its physical level, as /cabin sets it (-80: none).
         if (Arg(args, "cabin=") is { } cabinDb) LabMix.CabinDb = float.Parse(cabinDb, CultureInfo.InvariantCulture);
         // probe=align: a click in the engine's voice and its negative in the exhaust's tap (EngineVoiceState.LabAlignProbe).
@@ -109,11 +113,10 @@ public static class CabinSpike
         foreach (float water in kmh > 0f ? new[] { 0f, 1.5f } : new[] { 0f })
         foreach (bool on in new[] { false, true })
         {
-            CabinPaths.Enabled = on;
             var v = MachineRegistry.VehicleFor(key);
             float speed = kmh / 3.6f;
             var rig = new Rig(v);
-            var voice = new EngineVoiceState(v, Rate, 11) { Hearing = LabHearing, TargetSpeed = speed, CompensateLevel = false, Interior = true, LabAlignProbe = LabAlign };
+            var voice = new EngineVoiceState(v, Rate, 11, cabinPaths: on) { Hearing = LabHearing, TargetSpeed = speed, CompensateLevel = false, Interior = true, LabAlignProbe = LabAlign };
             voice.PlaceAtSpeed(speed);
             voice.Revive();
             voice.Wheels = rig.Wire(speed, 0f, water);
@@ -211,7 +214,7 @@ public static class CabinSpike
         Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", Path.Combine(outDir, "capture.wav"));
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(outDir, "capture.post.wav"));
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
-        Console.WriteLine($"Cabin paths {(CabinPaths.Enabled ? "on" : "off (one point)")}; ear model {(LabHearing.EarModelOn ? "on" : "off")}; /levels {LabHearing.Compression:F2}");
+        Console.WriteLine($"Cabin paths {(LabOptions.CabinPathsOn ? "on" : "off (one point)")}; ear model {(LabHearing.EarModelOn ? "on" : "off")}; /levels {LabHearing.Compression:F2}");
 
         // Outside, open asphalt; riding, the room is the cabin traced from the vehicle's shell.
         var cs = Phonon.DefaultContextSettings();
@@ -223,7 +226,7 @@ public static class CabinSpike
             new(new Vector3(0f, 7.5f, FacadeZ), new Vector3(900f, 15f, 0.4f), Quaternion.Identity, "Brick"),
             new(new Vector3(0f, 7.5f, -FacadeZ), new Vector3(900f, 15f, 0.4f), Quaternion.Identity, "Brick"),
         });
-        var provider = new FmodAudioProvider { Hearing = LabHearing, Mix = LabMix, Lab = new() { EngineAlignProbe = LabAlign, RainRoofInTheWorld = LabRoofInTheWorld } };
+        var provider = new FmodAudioProvider { Hearing = LabHearing, Mix = LabMix, Options = LabOptions, Lab = new() { EngineAlignProbe = LabAlign, RainRoofInTheWorld = LabRoofInTheWorld } };
         provider.Traced.Configure(ctx, scene);
 
         var facade = new AudioEngineFacade(provider);

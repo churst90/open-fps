@@ -1942,7 +1942,7 @@ public partial class ClientAudioSystem
         for (int p = 1; p < layout.Count; p++)
         {
             int voiceId = CabinVoiceId(p);
-            var offset = Vector3.Transform(OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.Offset(layout, p, ear), snap.Transform.Rotation);
+            var offset = Vector3.Transform(_audio.Options.CabinOffset(layout, p, ear), snap.Transform.Rotation);
             var e = engine;
             e.EntityId = voiceId;
             e.Seed = VoiceRegistry.SeedOf(VoiceKind.Cabin, VoiceRegistry.NoEntity, p);
@@ -2011,7 +2011,7 @@ public partial class ClientAudioSystem
             if (!world.Entities.TryGetValue(id, out var snap)) continue;
             string key = VoiceKey(snap.Definition);
             var at = OpenFPS.Common.EntityEmission.PointFor(snap);
-            float length = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.LineLength(key, ModelLibrary.Presets);
+            float length = _audio.Options.WideSources.LineLength(key, ModelLibrary.Presets);
             if (length > 0f)
             {
                 // A line: as many pieces as the angle it covers here asks for, the rest of it merged.
@@ -2021,10 +2021,10 @@ public partial class ClientAudioSystem
                 if (c.Wanted > 1) _placeCandidates.Add((-_heardInRanking.GetValueOrDefault(id), id, c.Wanted - 1));
                 continue;
             }
-            var layout = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Layout(key, ModelLibrary.Presets);
+            var layout = _audio.Options.WideSources.Layout(key, ModelLibrary.Presets);
             if (layout == null) continue;
             float d2 = Vector3.DistanceSquared(at, eyePos);
-            if (OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.SpreadFor(
+            if (_audio.Options.WideSources.SpreadFor(
                     OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Reach(layout), MathF.Sqrt(d2)) <= 0f) continue;
             // Louder sorts first, so negated.
             _placeCandidates.Add((-_heardInRanking.GetValueOrDefault(id), id, layout.Length - 1));
@@ -2047,9 +2047,9 @@ public partial class ClientAudioSystem
     /// mixer's law (ExtendedSources.MeanLawPower). One for anything else, and further off than twice its length,
     /// where the two agree within a decibel.
     /// </summary>
-    private static float LineHeard(in EntitySnapshot snap, string key, float reference, Vector3 eyePos, float distance)
+    private float LineHeard(in EntitySnapshot snap, string key, float reference, Vector3 eyePos, float distance)
     {
-        float length = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.LineLength(key, ModelLibrary.Presets);
+        float length = _audio.Options.WideSources.LineLength(key, ModelLibrary.Presets);
         if (length <= 0f || distance > 2f * length) return 1f;
         var view = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.View(OpenFPS.Common.EntityEmission.PointFor(snap), AxisOf(snap), length, eyePos);
         float point = MathF.Min(1f, MathF.Max(0.1f, reference) / MathF.Max(1e-3f, distance));
@@ -2070,10 +2070,10 @@ public partial class ClientAudioSystem
             _spreading[snap.Id] = sp = new Spreading { Layout = layout, At = new Vector3[layout.Length] };
         sp.Frame = _spreadFrame;
         for (int i = 0; i < layout.Length; i++) sp.At[i] = e.Position + Vector3.Transform(layout[i], snap.Transform.Rotation);
-        float target = !_placesGranted.Contains(snap.Id) ? 0f : OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.SpreadFor(
+        float target = !_placesGranted.Contains(snap.Id) ? 0f : _audio.Options.WideSources.SpreadFor(
             OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Reach(layout), Vector3.Distance(eyePos, e.Position));
         sp.Spread = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Slew(sp.Spread, target, MathF.Min(dt, 0.25f));
-        if (OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Rule == OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.PlaceRule.Middle)
+        if (_audio.Options.WideSources.Rule == OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.PlaceRule.Middle)
         {
             Span<float> shares = stackalloc float[layout.Length];
             OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Shares(sp.Spread, shares);
@@ -2251,10 +2251,12 @@ public partial class ClientAudioSystem
     /// spread) times the mixer's law at its own place and gain (Loudness.RenderedGain, its headroom's return taken
     /// off), with where they come from (the bearing of their power-weighted directions on the flat) and how wide
     /// (twice the arc cosine of their resultant: two equal sources ±θ either side are 2θ). Paths are left out.
+    /// The places and lines are those of the world the voices were placed in (<paramref name="wide"/>).
     /// </summary>
     internal static Together HeardTogether(IReadOnlyDictionary<int, SpatialEmitter> latest, IEnumerable<int> live,
                                            IReadOnlyDictionary<int, OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.LineCut> pieces,
-                                           Func<string, bool> source, Vector3 ear)
+                                           Func<string, bool> source, Vector3 ear,
+                                           OpenFPS.Client.AudioEngine.Core.Nature.WideSources wide)
     {
         double power = 0, x = 0, z = 0;
         int voices = 0;
@@ -2263,7 +2265,7 @@ public partial class ClientAudioSystem
             if (!latest.TryGetValue(id, out var e) || !source(e.PhysicalKey ?? "")) continue;
             float g = OpenFPS.Common.Loudness.RenderedGain(OpenFPS.Client.AudioEngine.Core.VoiceManager.WithoutHeadroom(e.Volume, e.HeadroomGain),
                                                           e.MinDistance, e.Range, Vector3.Distance(e.Position, ear));
-            double p = ShareOfVoice(latest, pieces, e) * (double)g * g;
+            double p = ShareOfVoice(latest, pieces, e, wide) * (double)g * g;
             voices++;
             power += p;
             var to = e.Position - ear;
@@ -2278,13 +2280,14 @@ public partial class ClientAudioSystem
 
     /// <summary>A voice's share of its source's power; one for a voice that is a source of its own.</summary>
     private static float ShareOfVoice(IReadOnlyDictionary<int, SpatialEmitter> latest,
-                                      IReadOnlyDictionary<int, OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.LineCut> pieces, in SpatialEmitter e)
+                                      IReadOnlyDictionary<int, OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.LineCut> pieces, in SpatialEmitter e,
+                                      OpenFPS.Client.AudioEngine.Core.Nature.WideSources wide)
     {
         var middle = e;
         if (e.PlaceOfEntity != 0 && !latest.TryGetValue(e.PlaceOfEntity, out middle)) return 0f;
-        if (OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.LineLength(middle.PhysicalKey, ModelLibrary.Presets) > 0f)
+        if (wide.LineLength(middle.PhysicalKey, ModelLibrary.Presets) > 0f)
             return pieces.TryGetValue(middle.EntityId, out var cut) ? cut.ShareOfPlace(e.Place) : e.Place == 0 ? 1f : 0f;
-        var layout = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Layout(middle.PhysicalKey, ModelLibrary.Presets);
+        var layout = wide.Layout(middle.PhysicalKey, ModelLibrary.Presets);
         if (layout == null) return 1f;
         Span<float> shares = stackalloc float[layout.Length];
         OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Shares(middle.Spread, shares);
@@ -2983,8 +2986,8 @@ public partial class ClientAudioSystem
                 engineExtent = extent;
                 engineRange = MathF.Max(engineRange, _audio.Hearing.AudibleRange(levelDb));
                 earLevel = levelDb;
-                extentLayout = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Layout(physicalKey, ModelLibrary.Presets);
-                lineLength = OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.LineLength(physicalKey, ModelLibrary.Presets);
+                extentLayout = _audio.Options.WideSources.Layout(physicalKey, ModelLibrary.Presets);
+                lineLength = _audio.Options.WideSources.LineLength(physicalKey, ModelLibrary.Presets);
                 if (physicalSynth == OpenFPS.Common.ModelSynth.Aircraft)
                 {
                     // Its power lever as the server that flies it sends it (MachinePower: from its flight path
@@ -3051,7 +3054,7 @@ public partial class ClientAudioSystem
                     engineMinDistance = 1f;
                     engineExtent = 0f;
                     // With a cabin (CabinPaths) this voice is the bulkhead; every other path gets its own.
-                    cabinLayout = OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.For(profile, ModelLibrary.Presets);
+                    cabinLayout = _audio.Options.CabinLayout(profile, ModelLibrary.Presets);
                     cabinEar = Vector3.Transform(eyePos - snap.Transform.Position, Quaternion.Inverse(snap.Transform.Rotation));
                 }
             }
@@ -3142,7 +3145,7 @@ public partial class ClientAudioSystem
             // a cabin), turned with the car so the engine stays in front through a corner.
             FollowsListener = interior,
             ListenerOffset = !interior ? Vector3.Zero
-                           : cabinLayout != null ? Vector3.Transform(OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.Offset(cabinLayout, 0, cabinEar), snap.Transform.Rotation)
+                           : cabinLayout != null ? Vector3.Transform(_audio.Options.CabinOffset(cabinLayout, 0, cabinEar), snap.Transform.Rotation)
                            : Vector3.Transform(OpenFPS.Client.AudioEngine.Core.Engine.CabinPaths.OnePlace, snap.Transform.Rotation),
             CabinEarX = cabinEar.X,
             PhysicalKey = physicalKey,

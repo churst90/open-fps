@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Numerics;
 using OpenFPS.Common;
 
@@ -20,16 +19,16 @@ namespace OpenFPS.Client.AudioEngine.Core.Nature;
 /// <see cref="FullDegrees"/>, slewed at <see cref="SlewPerSecond"/> so walking up to a tree widens it
 /// with no step in level. Merged, the outer places' voices are let go.
 ///
-/// OPENFPS_WIDE_SOURCES=0 plays every one from one point, as before 2026-10-06.
-///
 /// Each place is as loud as what it holds, by the mixer's law from where it is (2026-10-16, Cody: "a sound
 /// source should have its sound be the entire area of the sound source"). A line of running water is cut,
-/// at the listener, into pieces by the angle each covers (<see cref="Cut"/>). OPENFPS_EXTENT_RULE=middle plays
-/// them as before (<see cref="PlaceRule.Middle"/>), for an A/B.
+/// at the listener, into pieces by the angle each covers (<see cref="Cut"/>).
+///
+/// Whether a world spreads its sources at all, by which rule, and the lab's two levers are that world's
+/// (<see cref="WideSources"/>: OPENFPS_WIDE_SOURCES=0 plays every one from one point, as before 2026-10-06;
+/// OPENFPS_EXTENT_RULE=middle the old rule, for an A/B). This holds the laws they share.
 /// </summary>
 public static class ExtendedSources
 {
-    public static bool Enabled = Environment.GetEnvironmentVariable("OPENFPS_WIDE_SOURCES") != "0";
 
     /// <summary>How the places of a source share its power.</summary>
     public enum PlaceRule
@@ -41,16 +40,6 @@ public static class ExtendedSources
         /// <summary>Each place as loud as what it holds, by the mixer's law from where it is, and a line cut
         /// by angle into pieces (<see cref="Cut"/>).</summary>
         Pieces,
-    }
-
-    /// <summary>The rule now. Read when a layout or a voice is first made; the lab sets it before either.</summary>
-    internal static PlaceRule Rule = Environment.GetEnvironmentVariable("OPENFPS_EXTENT_RULE") == "middle" ? PlaceRule.Middle : PlaceRule.Pieces;
-
-    /// <summary>For the lab, after it changes <see cref="Rule"/>: the layouts made under the old one forgotten.</summary>
-    internal static void ForgetLayouts()
-    {
-        _layouts.Clear();
-        _lines.Clear();
     }
 
     /// <summary>Under this half-angle the places are one point to the ear, degrees: the localisation
@@ -80,29 +69,6 @@ public static class ExtendedSources
     /// source (ClientAudioSystem.PlaceVoiceId). A layout with more is heard from its middle alone.</summary>
     public const int MaxPlaces = 12;
 
-    /// <summary>For the lab: how far out the places are, as a share of where they belong. Zero puts every
-    /// place on the middle, which leaves the streams independent and changes only where they are heard
-    /// from (AudioLab --wide-sources collapse=1). Read when a layout is first made.</summary>
-    internal static float LayoutScale = 1f;
-
-    /// <summary>For the lab: a spread to use at any distance instead of the one the angle asks for.</summary>
-    internal static float ForceSpread = float.NaN;
-
-    private static readonly ConcurrentDictionary<string, Vector3[]?> _layouts = new(StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>
-    /// The places of a source, by its physical key, as offsets from its middle in the source's own frame
-    /// (x east, y up, z north on an unrotated entity): place 0 is the middle itself. Null for anything
-    /// that is not an extended source of this kind (a machine, a whole fountain at one point, the rain).
-    /// Which kind it is and its model are <paramref name="presets"/>' (the catalogue's).
-    /// </summary>
-    public static Vector3[]? Layout(string? physicalKey, IPresets presets)
-    {
-        if (!Enabled || string.IsNullOrEmpty(physicalKey)) return null;
-        var layout = _layouts.GetOrAdd(physicalKey, static (key, presets) => presets.Places(key), presets);
-        return layout != null && layout.Length <= MaxPlaces ? layout : null;
-    }
-
     /// <summary>A tree's crown: one place per bough, at the middle of the boughs it stands for.</summary>
     internal static Vector3[]? TreePlacesOf(string key, IPresets presets)
     {
@@ -115,7 +81,7 @@ public static class ExtendedSources
             int count = 0;
             for (int b = 0; b < FoliageSynth.Boughs; b++)
                 if (FoliageSynth.PlaceOfBough(b, n) == j) { sum += FoliageSynth.BoughOffset(spec, b); count++; }
-            places[1 + j] = count > 0 ? sum / count * LayoutScale : Vector3.Zero;
+            places[1 + j] = count > 0 ? sum / count : Vector3.Zero;
         }
         return places;
     }
@@ -128,7 +94,7 @@ public static class ExtendedSources
         if (parts.Length != 3 || !int.TryParse(parts[2], out int tap)) return null;
         var spec = presets.Water(parts[0]);
         if (tap < 0 || tap >= spec.Taps.Length) return null;
-        float r = 0.5f * spec.Taps[tap].ExtentMetres * LayoutScale;
+        float r = 0.5f * spec.Taps[tap].ExtentMetres;
         var places = new Vector3[1 + WaterTapPlaces];
         for (int j = 0; j < WaterTapPlaces; j++)
         {
@@ -138,13 +104,13 @@ public static class ExtendedSources
         return places;
     }
 
-    /// <summary>Running water: round where it lands (RunningWaterSynth.Layout); along its length under the old
-    /// rule, a line cut by angle under the new (<see cref="LineLength"/>).</summary>
+    /// <summary>Running water: round where it lands (RunningWaterSynth.Layout), or along its length. A world
+    /// that cuts a line by angle instead asks <see cref="WideSources.LineLength"/> first.</summary>
     internal static Vector3[]? FlowPlacesOf(string key, IPresets presets)
     {
         var spec = presets.Flow(key[5..]);
-        if (spec.Places <= 1 || LineLength(key, presets) > 0f) return null;
-        return Scaled(RunningWaterSynth.Layout(spec));
+        if (spec.Places <= 1) return null;
+        return RunningWaterSynth.Layout(spec);
     }
 
     /// <summary>Waves at an edge: along it, and on its break line (ShoreSynth.Layout), its length the map's.</summary>
@@ -153,7 +119,7 @@ public static class ExtendedSources
         ShoreSpec.ParseKey(key, out string preset, out var geometry);
         var spec = presets.Shore(preset);
         if (spec.TotalPlaces <= 1) return null;
-        return Scaled(ShoreSynth.Layout(spec, geometry?.LengthMetres ?? spec.LengthMetres));
+        return ShoreSynth.Layout(spec, geometry?.LengthMetres ?? spec.LengthMetres);
     }
 
     /// <summary>A wood heard as one (WoodChorus): a place a bough's worth of it, six round the wood at
@@ -166,7 +132,7 @@ public static class ExtendedSources
         for (int j = 0; j < n; j++)
         {
             float a = MathF.Tau * (j + 0.5f) / n;
-            places[1 + j] = new Vector3(MathF.Cos(a) * rx, 0f, MathF.Sin(a) * rz) * (2f / 3f) * LayoutScale;
+            places[1 + j] = new Vector3(MathF.Cos(a) * rx, 0f, MathF.Sin(a) * rz) * (2f / 3f);
         }
         return places;
     }
@@ -175,13 +141,7 @@ public static class ExtendedSources
     internal static Vector3[]? FirePlacesOf(string key, IPresets presets)
     {
         var places = FireSynth.Layout(presets.Fire(key[5..]));
-        return places.Length <= 1 ? null : Scaled(places);
-    }
-
-    private static Vector3[] Scaled(Vector3[] places)
-    {
-        for (int i = 0; i < places.Length; i++) places[i] *= LayoutScale;
-        return places;
+        return places.Length <= 1 ? null : places;
     }
 
     /// <summary>How far the outer places reach from the middle, m.</summary>
@@ -192,10 +152,10 @@ public static class ExtendedSources
         return r;
     }
 
-    /// <summary>The spread a source of this reach wants at this distance from its middle, 0 to 1.</summary>
+    /// <summary>The spread a source of this reach wants at this distance from its middle, 0 to 1 (a world's
+    /// own, which the lab can force, is <see cref="WideSources.SpreadFor"/>).</summary>
     public static float SpreadFor(float reachMetres, float distanceMetres)
     {
-        if (!float.IsNaN(ForceSpread)) return Math.Clamp(ForceSpread, 0f, 1f);
         if (reachMetres <= 0f) return 0f;
         float half = MathF.Atan2(reachMetres, MathF.Max(0.01f, distanceMetres)) * (180f / MathF.PI);
         float x = Math.Clamp((half - PointDegrees) / (FullDegrees - PointDegrees), 0f, 1f);
@@ -246,32 +206,22 @@ public static class ExtendedSources
 
     // ── A line cut into pieces by the angle each covers at the ear (2026-10-16) ───────────────────
 
-    private static readonly ConcurrentDictionary<string, float> _lines = new(StringComparer.OrdinalIgnoreCase);
-
     /// <summary>
     /// The length of a source heard as a line cut into pieces, m: running water laid along its own x (a creek,
-    /// a ditch, a rivulet, a gutter), under <see cref="PlaceRule.Pieces"/>. Zero for anything else. Its model is
-    /// <paramref name="presets"/>' (the catalogue's).
+    /// a ditch, a rivulet, a gutter). Zero for anything else. Whether a world cuts its lines at all is its own
+    /// (<see cref="WideSources.LineLength"/>, which caches this). Its model is <paramref name="presets"/>' (the
+    /// catalogue's).
     /// </summary>
-    public static float LineLength(string? physicalKey, IPresets presets)
+    internal static float LineLengthOf(string physicalKey, IPresets presets)
     {
-        if (!Enabled || Rule != PlaceRule.Pieces || string.IsNullOrEmpty(physicalKey)
-            || !physicalKey.StartsWith("flow:", StringComparison.OrdinalIgnoreCase)) return 0f;
-        return _lines.GetOrAdd(physicalKey, static (key, presets) =>
+        if (!physicalKey.StartsWith("flow:", StringComparison.OrdinalIgnoreCase)) return 0f;
+        try
         {
-            try
-            {
-                var spec = presets.Flow(key[5..]);
-                return spec.Layout == FlowLayout.Line && spec.Places > 1 ? spec.LengthMetres : 0f;
-            }
-            catch (Exception) { return 0f; }
-        }, presets);
+            var spec = presets.Flow(physicalKey[5..]);
+            return spec.Layout == FlowLayout.Line && spec.Places > 1 ? spec.LengthMetres : 0f;
+        }
+        catch (Exception) { return 0f; }
     }
-
-    /// <summary>How many streams a running-water synth renders: one for each piece a line can be cut into, or
-    /// its own places.</summary>
-    public static int FlowPlaces(string? physicalKey, RunningWaterSpec spec, IPresets presets)
-        => LineLength(physicalKey, presets) > 0f ? MaxPlaces : Math.Max(1, spec.Places);
 
     /// <summary>
     /// A straight line source as the ear sees it: where along it the ear's foot falls (m from its middle,

@@ -254,7 +254,7 @@ public sealed class WorldAudioPlayer
             while (_toPrewarm.TryDequeue(out var key))
             {
                 string id = $"synth:{key}";
-                try { _rendered.Enqueue(AtMixerRate(id, RenderDoorKey(key, _fullScaleDb))); }
+                try { _rendered.Enqueue(AtMixerRate(id, RenderDoorKey(key, _fullScaleDb, _audio.DoorRenders))); }
                 // An exception here would end the process; a door that will not render is silent.
                 catch (Exception ex) { Serilog.Log.Warning(ex, "[DOOR] prewarm of {Key} failed", key); }
             }
@@ -285,11 +285,13 @@ public sealed class WorldAudioPlayer
     }
 
     /// <summary>A door model's sound, by its row in <see cref="DoorModels"/>. The render's own peak goes into
-    /// <paramref name="fullScaleDb"/>, the level the sound is placed at.</summary>
-    internal static float[] RenderDoorKey(string key, System.Collections.Concurrent.ConcurrentDictionary<string, float> fullScaleDb)
+    /// <paramref name="fullScaleDb"/>, the level the sound is placed at. Kept in <paramref name="cache"/> (the
+    /// world's, AudioEngineFacade.DoorRenders), or rendered every time without one.</summary>
+    internal static float[] RenderDoorKey(string key, System.Collections.Concurrent.ConcurrentDictionary<string, float> fullScaleDb,
+                                          DoorRenderCache? cache)
     {
         // Rendered before, by this build: from disk, in milliseconds (DoorRenderCache).
-        if (DoorRenderCache.TryLoad(key, out var kept, out float keptDb))
+        if (cache != null && cache.TryLoad(key, out var kept, out float keptDb))
         {
             if (keptDb > 0f) fullScaleDb[key] = keptDb;
             return kept;
@@ -297,7 +299,7 @@ public sealed class WorldAudioPlayer
         if (DoorModelOf(key) is not { } model) throw new ArgumentException($"no door model renders '{key}'", nameof(key));
         var (pcm, db) = model.Render(key, TransientSynth.SampleRate);
         if (db > 0f) fullScaleDb[key] = db;
-        DoorRenderCache.Store(key, pcm, db);
+        cache?.Store(key, pcm, db);
         return pcm;
     }
 
@@ -1323,7 +1325,7 @@ public sealed class WorldAudioPlayer
             return CarDoor.Render(closing, TransientSynth.SampleRate, seed);
         // The simulated models (doors, the key in a lock, a lift door, a car window, breaking glass).
         if (IsDoorModelKey(sound.SynthKey))
-            return RenderDoorKey(sound.SynthKey!, _fullScaleDb);
+            return RenderDoorKey(sound.SynthKey!, _fullScaleDb, _audio.DoorRenders);
         // A struck thing (a bump, a knock or a tap on anything): its own modes, from its key (StruckThings),
         // placed at its own render's level.
         if (StruckThings.TryParseKey(sound.SynthKey, out var struck))

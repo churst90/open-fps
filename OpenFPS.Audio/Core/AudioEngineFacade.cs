@@ -62,11 +62,22 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
 
     public AudioEngineFacade() : this(new FmodAudioProvider()) { }
 
+    /// <summary>The FMOD mixer, reading its data where <paramref name="paths"/> says: the game's.</summary>
+    public AudioEngineFacade(AudioDataPaths paths) : this(new FmodAudioProvider(), paths: paths) { }
+
     /// <param name="clock">The clock when the provider has none of its own (a test's mixer): the test's stepped
     /// one, or none for a stopwatch.</param>
-    public AudioEngineFacade(IAudioProvider provider, IAudioClock? clock = null)
+    /// <param name="paths">Where this world's data is (the host's); none: what ships beside the program, and no
+    /// door renders kept (<see cref="AudioDataPaths.Beside"/>).</param>
+    /// <param name="options">The world's options when the provider has none of its own (a test's or the lab's
+    /// mixer); none: the shipped world.</param>
+    public AudioEngineFacade(IAudioProvider provider, IAudioClock? clock = null, AudioDataPaths? paths = null,
+                             AudioWorldOptions? options = null)
     {
         _provider = provider;
+        Paths = paths ?? AudioDataPaths.Beside(AppContext.BaseDirectory);
+        DoorRenders = new DoorRenderCache(Paths);
+        Options = (provider as FmodAudioProvider)?.Options ?? options ?? new AudioWorldOptions();
         Clock = (provider as FmodAudioProvider)?.Clock ?? clock ?? new StopwatchAudioClock();
         Weather = (provider as FmodAudioProvider)?.Weather ?? new WorldWeather { Clock = Clock };
         Atmosphere = (provider as FmodAudioProvider)?.Atmosphere ?? new Atmosphere();
@@ -111,6 +122,17 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     /// (FmodAudioProvider.Lab), or one of the facade's own. Nothing in the game sets one.</summary>
     public LabLevers Lab { get; }
 
+    /// <summary>This world's options (the wide sources, the cabins' paths), for the host's placing to read as the
+    /// mixer's voices do: the mixer's when there is one (FmodAudioProvider.Options); otherwise one of the facade's
+    /// own, the shipped world.</summary>
+    public AudioWorldOptions Options { get; }
+
+    /// <summary>Where this world's data is, as the host said (or what ships beside the program).</summary>
+    public AudioDataPaths Paths { get; }
+
+    /// <summary>The door models' renders kept on disk for this world, in the folders <see cref="Paths"/> names.</summary>
+    public DoorRenderCache DoorRenders { get; }
+
     /// <summary>Whether the mixer traces this entity's echoes now, so the host stops making its mirror images
     /// (FmodAudioProvider.HasTracedEchoes). Never without an FMOD mixer.</summary>
     public bool HasTracedEchoes(int entityId)
@@ -125,8 +147,7 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     {
         if (_provider.Initialize())
         {
-            string audioPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ASSETS", "SOUNDS");
-            _bank.Initialize(audioPath);
+            _bank.Initialize(Paths.Sounds);
             _isInitialized = true;
             _voiceManager = new VoiceManager(this, _bank, 256) { Hearing = Hearing };
             Serilog.Log.Information("AudioEngine: Initialized with {MaxVoices} voices.", 256);

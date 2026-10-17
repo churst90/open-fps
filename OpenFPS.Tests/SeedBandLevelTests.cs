@@ -17,6 +17,9 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class SeedBandLevelTests
 {
+    /// <summary>A world's wide sources as shipped (AudioWorldOptions.WideSources).</summary>
+    private static readonly OpenFPS.Client.AudioEngine.Core.Nature.WideSources Wide = new();
+
     private const int Rate = 48000;
     private const int Block = 1024;
     private readonly ITestOutputHelper _o;
@@ -42,21 +45,21 @@ public class SeedBandLevelTests
         ["crossing bell"] = new(VoiceKind.Machine, 8, seed => Of(new BellVoiceState(ModelLibrary.Bell("crossing_gong"), Rate, unchecked(seed * 13 + 5)))),
         ["fountain"] = new(VoiceKind.Machine, 8, seed => Of(new WaterVoiceState(ModelLibrary.Presets.Water("park_fountain"), Rate, unchecked(seed * 37 + 11), Somewhere, Weather()))),
         ["tree"] = new(VoiceKind.Machine, 12, seed => Of(new NaturePlaceState(
-            new PlacedNatureVoice("foliage:park_tree", FoliageSpec.ParkTree, ExtendedSources.Layout("foliage:park_tree", ModelLibrary.Presets)?.Length ?? 1, Rate,
+            new PlacedNatureVoice("foliage:park_tree", FoliageSpec.ParkTree, Wide.Layout("foliage:park_tree", ModelLibrary.Presets)?.Length ?? 1, Rate,
                                   unchecked(seed * 43 + 17), Somewhere, Weather()), 0, Rate, Somewhere))),
         ["wood"] = new(VoiceKind.Wood, 12, seed =>
         {
             string key = WoodChorus.KeyFor("pine", 60f, 60f);
             return Of(new NaturePlaceState(
-                new PlacedNatureVoice(key, ModelLibrary.Presets.Foliage("pine"), ExtendedSources.Layout(key, ModelLibrary.Presets)?.Length ?? 1, Rate,
+                new PlacedNatureVoice(key, ModelLibrary.Presets.Foliage("pine"), Wide.Layout(key, ModelLibrary.Presets)?.Length ?? 1, Rate,
                                       unchecked(seed * 43 + 17), Somewhere, Weather())
-                { WindPlaces = ExtendedSources.Layout(key, ModelLibrary.Presets)?[1..], TargetTrees = 9f }, 0, Rate, Somewhere));
+                { WindPlaces = Wide.Layout(key, ModelLibrary.Presets)?[1..], TargetTrees = 9f }, 0, Rate, Somewhere));
         }),
         ["fire"] = new(VoiceKind.Machine, 20, seed => Of(new NaturePlaceState(
-            new PlacedNatureVoice("fire:fire_pit", ModelLibrary.Presets.Fire("fire_pit"), ExtendedSources.Layout("fire:fire_pit", ModelLibrary.Presets)?.Length ?? 1, Rate,
+            new PlacedNatureVoice("fire:fire_pit", ModelLibrary.Presets.Fire("fire_pit"), Wide.Layout("fire:fire_pit", ModelLibrary.Presets)?.Length ?? 1, Rate,
                                   unchecked(seed * 41 + 13), Somewhere, Weather()), 0, Rate, Somewhere))),
         ["creek"] = new(VoiceKind.Machine, 12, seed => Of(new NaturePlaceState(
-            new PlacedNatureVoice("flow:creek", RunningWaterSpec.Creek, Rate, unchecked(seed * 47 + 19), Somewhere, Weather()), 0, Rate, Somewhere))),
+            new PlacedNatureVoice("flow:creek", RunningWaterSpec.Creek, Rate, unchecked(seed * 47 + 19), Somewhere, Weather(), Wide), 0, Rate, Somewhere))),
         ["electric horn"] = new(VoiceKind.Horn, 4, seed => Of(new HornVoiceState("electric:disc_pair", new[] { 60f }, Rate, unchecked(seed * 29 + 1)))),
         ["air horn"] = new(VoiceKind.HeldHorn, 4, seed => Of(new HornVoiceState("air:truck_dual", new[] { 60f }, Rate, unchecked(seed * 29 + 1)))),
         // A wall's smear of an engine's echo (EngineEchoState) and of a recording's copy (EchoWashState): the

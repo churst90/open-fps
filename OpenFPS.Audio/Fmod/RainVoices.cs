@@ -63,8 +63,8 @@ public static class RainFeeds
         : Key(slot) + "/" + part.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     /// <summary>
-    /// How many voices a slot's patch is heard from (RainVoiceState, RainField.PlayParts); one each with
-    /// ExtendedSources off.
+    /// How many voices a slot's patch is heard from (RainVoiceState, RainField.PlayParts); one each in a world
+    /// that does not spread its sources (<paramref name="wide"/>: WideSources.Enabled).
     ///
     /// The roof over the ear, four, each a quarter of its area round the point over the ear: as one voice
     /// overhead both ears heard the same (interaural correlation 1.00 in a car and under a steel attic
@@ -73,9 +73,9 @@ public static class RainFeeds
     /// behind, half the near rain mono (the street 0.53 at 2 kHz, AudioLab --wide-sources). The far ring
     /// stays one a quarter: quieter, and further off the angles matter less.
     /// </summary>
-    public static int PartsFor(int slot)
+    public static int PartsFor(int slot, bool wide)
     {
-        if (!OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Enabled) return 1;
+        if (!wide) return 1;
         if (slot == OpenFPS.Client.Core.RainSurvey.OverheadSlot) return RoofParts;
         return slot >= 1 && slot <= 4 ? NearParts : 1;
     }

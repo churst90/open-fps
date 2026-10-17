@@ -28,6 +28,10 @@ public static class WideSourcesSpike
     /// the mixers it makes.</summary>
     private static readonly OpenFPS.Common.Hearing.HearingSettings LabHearing = OpenFPS.Common.Hearing.HearingSettings.FromEnvironment();
 
+    /// <summary>This instrument's audio world's options (the wide sources, the cabins' paths), from the environment
+    /// as the game's mixer starts with, shared with the mixers it makes and set by its own arguments.</summary>
+    private static readonly OpenFPS.Client.AudioEngine.Core.AudioWorldOptions LabOptions = OpenFPS.Client.AudioEngine.Core.AudioWorldOptions.FromEnvironment();
+
     private sealed record Segment(string Name, double Start, double Seconds, double CpuPercent, float MixerLoad, int Voices, double PlacedDb);
 
     // Where the sources stand, relative to their own middle, as on the city map (tools/gen_city.py).
@@ -49,9 +53,9 @@ public static class WideSourcesSpike
         bool wide = (Arg(args, "wide=") ?? "on") is not ("off" or "0");
         float renderSeconds = float.Parse(Arg(args, "sec=") ?? "30", CultureInfo.InvariantCulture);
         Directory.CreateDirectory(outDir);
-        ExtendedSources.Enabled = wide;
-        if (Arg(args, "collapse=") is "1" or "on") ExtendedSources.LayoutScale = 0f;
-        if (Arg(args, "spread=") is { } forced) ExtendedSources.ForceSpread = float.Parse(forced, CultureInfo.InvariantCulture);
+        LabOptions.WideSources.Enabled = wide;
+        if (Arg(args, "collapse=") is "1" or "on") LabOptions.WideSources.LayoutScale = 0f;
+        if (Arg(args, "spread=") is { } forced) LabOptions.WideSources.ForceSpread = float.Parse(forced, CultureInfo.InvariantCulture);
         // A steady breeze for the level rows: the tree's level then holds still while it is measured.
         if (Arg(args, "turbulence=") is { } turb) _turbulence = float.Parse(turb, CultureInfo.InvariantCulture);
         Console.WriteLine($"Extended sources {(wide ? "spread" : "one point")}; ear model {(LabHearing.EarModelOn ? "on" : "off")}");
@@ -61,7 +65,7 @@ public static class WideSourcesSpike
         Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", Path.Combine(outDir, "capture.wav"));
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(outDir, "capture.post.wav"));
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
-        var provider = new FmodAudioProvider { Hearing = LabHearing };
+        var provider = new FmodAudioProvider { Hearing = LabHearing, Options = LabOptions };
         var facade = new AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();
         facade.InitializeForTest(sounds);
@@ -118,11 +122,10 @@ public static class WideSourcesSpike
         {
             measuredSound = soundId;
             measuredMiddle = middle;
-            var layout = ExtendedSources.Layout(soundId, ModelLibrary.Presets);
+            var layout = LabOptions.WideSources.Layout(soundId, ModelLibrary.Presets);
             measuredPlaces = layout?.Length ?? 1;
             measuredSpread = layout == null ? 0f
-                : float.IsNaN(ExtendedSources.ForceSpread) ? ExtendedSources.SpreadFor(ExtendedSources.Reach(layout), Vector3.Distance(ear, at))
-                : ExtendedSources.ForceSpread;
+                : LabOptions.WideSources.SpreadFor(ExtendedSources.Reach(layout), Vector3.Distance(ear, at));
         }
 
         void Pump(double seconds)

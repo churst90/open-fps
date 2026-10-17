@@ -53,7 +53,9 @@ OpenFPS.Audio/Acoustics/RouteAnswers.cs	Audio
 OpenFPS.Audio/Acoustics/SpatialAcoustics.cs	Audio	
 OpenFPS.Audio/Acoustics/VehicleShadow.cs	Audio	
 OpenFPS.Audio/Core/AudioBank.cs	Audio	
+OpenFPS.Audio/Core/AudioDataPaths.cs	Audio	
 OpenFPS.Audio/Core/AudioEngineFacade.cs	Audio	
+OpenFPS.Audio/Core/AudioWorldOptions.cs	Audio	
 OpenFPS.Audio/Core/DoorRenderCache.cs	Audio	
 OpenFPS.Audio/Core/PlacementThread.cs	Audio	
 OpenFPS.Audio/Core/VoiceManager.cs	Audio	
@@ -113,6 +115,7 @@ OpenFPS.Client.Core/AudioDiagnostics.cs	game
 OpenFPS.Client.Core/BeaconAids.cs	Accessibility	
 OpenFPS.Client.Core/BirdLife.cs	game	library stage 7 (host until split)
 OpenFPS.Client.Core/BuildForm.cs	Editor	
+OpenFPS.Client.Core/ClientAudioPaths.cs	game	
 OpenFPS.Client.Core/ClientAudioSystem.Trains.cs	game	library stage 7 (host until split)
 OpenFPS.Client.Core/ClientAudioSystem.Voices.cs	game	library stage 7 (host until split)
 OpenFPS.Client.Core/ClientAudioSystem.cs	game	library stage 7 (host until split)
@@ -441,6 +444,7 @@ OpenFPS.Sound/Core/Nature/RunningWaterSynth.cs	Sound
 OpenFPS.Sound/Core/Nature/ShoreReferences.cs	Sound	
 OpenFPS.Sound/Core/Nature/ShoreSynth.cs	Sound	
 OpenFPS.Sound/Core/Nature/TextureStatistics.cs	Sound	
+OpenFPS.Sound/Core/Nature/WideSources.cs	Sound	
 OpenFPS.Sound/Core/Pneumatics/AirSystem.cs	Sound	
 OpenFPS.Sound/Core/Rail/ElectricDrive.cs	Sound	
 OpenFPS.Sound/Core/Rail/RailNoise.cs	Sound	

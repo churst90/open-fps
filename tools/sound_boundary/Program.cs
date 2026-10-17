@@ -103,9 +103,9 @@ foreach (var (name, dir, refs, extra) in projects)
     // The InternalsVisibleTo items of each project file.
     string[] friends = name switch
     {
-        "OpenFPS.Native" => new[] { "OpenFPS.Audio", "OpenFPS.Client.Core", "OpenFPS.Tests", "OpenFPS.AudioLab" },
+        "OpenFPS.Native" => new[] { "OpenFPS.Audio", "OpenFPS.Tests", "OpenFPS.AudioLab" },
         "OpenFPS.Acoustics" => new[] { "OpenFPS.Tests" },
-        "OpenFPS.Sound" => new[] { "OpenFPS.Audio", "OpenFPS.Client.Core", "OpenFPS.Tests", "OpenFPS.AudioLab" },
+        "OpenFPS.Sound" => new[] { "OpenFPS.Audio", "OpenFPS.Tests", "OpenFPS.AudioLab" },
         "OpenFPS.Audio" => new[] { "OpenFPS.Client.Core", "OpenFPS.Tests", "OpenFPS.AudioLab" },
         "OpenFPS.Client.Core" or "OpenFPS.Server" or "OpenFPS.World" => new[] { "OpenFPS.Tests", "OpenFPS.AudioLab" },
         _ => Array.Empty<string>(),

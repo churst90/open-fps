@@ -38,7 +38,6 @@
     <!-- The mixer's voices (OpenFPS.Audio, since stage 6) drive the synths' internal parts directly: the
          rail voice its bogies and body drum, the engine processor the aircraft's blade rows. -->
     <InternalsVisibleTo Include="OpenFPS.Audio" />
-    <InternalsVisibleTo Include="OpenFPS.Client.Core" />
     <!-- The tests reach the models' parts and hooks (a track's response, AudioClock.UseForTest). -->
     <InternalsVisibleTo Include="OpenFPS.Tests" />
     <!-- The lab's spikes drive the synths' internals directly (an intake network on its own): that is what

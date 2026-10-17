@@ -15,6 +15,9 @@ namespace OpenFPS.Tests;
 [Collection("Runoff")]
 public class RunningWaterTests
 {
+    /// <summary>A world's wide sources as shipped (AudioWorldOptions.WideSources).</summary>
+    private static readonly OpenFPS.Client.AudioEngine.Core.Nature.WideSources Wide = new();
+
     private readonly ITestOutputHelper _o;
     public RunningWaterTests(ITestOutputHelper o)
     {
@@ -253,12 +256,12 @@ public class RunningWaterTests
         var grate = RunningWaterSynth.Layout(RunningWaterSpec.DrainGrate);
         Assert.All(grate.Skip(1), p => Assert.InRange(p.Length(), 0.24f, 0.26f));
         // And the client: a grate round its middle, a creek cut at the ear along its length (ExtendedSources.Cut).
-        Assert.Equal(grate.Length, ExtendedSources.Layout("flow:drain_grate", ModelLibrary.Presets)?.Length);
-        Assert.Null(ExtendedSources.Layout("flow:creek", ModelLibrary.Presets));
-        Assert.Equal(RunningWaterSpec.Creek.LengthMetres, ExtendedSources.LineLength("flow:creek", ModelLibrary.Presets));
-        Assert.Equal(0f, ExtendedSources.LineLength("flow:drain_grate", ModelLibrary.Presets));
-        Assert.Null(ExtendedSources.Layout("flow:no_such_thing", ModelLibrary.Presets));
-        Assert.Equal(0f, ExtendedSources.LineLength("flow:no_such_thing", ModelLibrary.Presets));
+        Assert.Equal(grate.Length, Wide.Layout("flow:drain_grate", ModelLibrary.Presets)?.Length);
+        Assert.Null(Wide.Layout("flow:creek", ModelLibrary.Presets));
+        Assert.Equal(RunningWaterSpec.Creek.LengthMetres, Wide.LineLength("flow:creek", ModelLibrary.Presets));
+        Assert.Equal(0f, Wide.LineLength("flow:drain_grate", ModelLibrary.Presets));
+        Assert.Null(Wide.Layout("flow:no_such_thing", ModelLibrary.Presets));
+        Assert.Equal(0f, Wide.LineLength("flow:no_such_thing", ModelLibrary.Presets));
     }
 
     // ── Texture: fitted against recordings ─────────────────────────────────────────────────────

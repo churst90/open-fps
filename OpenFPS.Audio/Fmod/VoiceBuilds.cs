@@ -79,6 +79,7 @@ public sealed class VoiceBuilds
     private readonly IAudioClock _clock;
     private readonly OpenFPS.Client.AudioEngine.Core.Atmosphere? _atmosphere;
     private readonly OpenFPS.Client.AudioEngine.Core.MixSettings? _mix;
+    private readonly OpenFPS.Client.AudioEngine.Core.AudioWorldOptions? _options;
     /// <summary>Models being made for a voice, by voice.</summary>
     private readonly ConcurrentDictionary<int, Build> _forVoice = new();
     /// <summary>Models made ahead, by what they are made from.</summary>
@@ -93,12 +94,15 @@ public sealed class VoiceBuilds
     /// <param name="clock">The world's clock, which the models it makes tell time by.</param>
     /// <param name="atmosphere">The world's air, which a machine's thermostat reads; null gives each its own.</param>
     /// <param name="mix">The mixer's live levers, which the engines it makes read; null gives each its own.</param>
+    /// <param name="options">The world's options (whether an engine's cabin is split into paths); null: the shipped.</param>
     public VoiceBuilds(IAudioClock clock, OpenFPS.Client.AudioEngine.Core.Atmosphere? atmosphere = null,
-                       OpenFPS.Client.AudioEngine.Core.MixSettings? mix = null)
+                       OpenFPS.Client.AudioEngine.Core.MixSettings? mix = null,
+                       OpenFPS.Client.AudioEngine.Core.AudioWorldOptions? options = null)
     {
         _clock = clock;
         _atmosphere = atmosphere;
         _mix = mix;
+        _options = options;
     }
 
     /// <summary>What <see cref="Take"/> found.</summary>
@@ -166,9 +170,10 @@ public sealed class VoiceBuilds
         }
         string key = emitter.EngineKey ?? "";
         int seed = emitter.Seed;
+        bool cabinPaths = _options?.CabinPathsOn ?? true;
         _engines[emitter.EntityId] = new EngineBuild
         {
-            Task = OpenFPS.Client.Core.Platform.FlushToZero.Ahead("a voice's build", () => new EngineVoiceState(MachineRegistry.VehicleFor(key), rate, seed)),
+            Task = OpenFPS.Client.Core.Platform.FlushToZero.Ahead("a voice's build", () => new EngineVoiceState(MachineRegistry.VehicleFor(key), rate, seed, cabinPaths)),
             AskedAt = now,
         };
         return Taken.Making;

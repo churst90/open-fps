@@ -41,6 +41,10 @@ public static class ExtentWalkSpike
 {
     private const float Step = 0.5f;
 
+    /// <summary>This instrument's audio world's options, from the environment as the game's mixer starts with
+    /// (rule= sets the wide sources' rule), shared with the mixers and the client it makes.</summary>
+    private static readonly OpenFPS.Client.AudioEngine.Core.AudioWorldOptions LabOptions = OpenFPS.Client.AudioEngine.Core.AudioWorldOptions.FromEnvironment();
+
     /// <summary>A walk: the feet at every step, the way the walker faces, and which sources it is about.</summary>
     private sealed record Walk(string Name, string Map, string About, List<Vector3> Feet, Vector3 Heading, Func<string, bool> Source,
                                float WindMetresPerSecond = 1.5f);
@@ -58,11 +62,10 @@ public static class ExtentWalkSpike
         float rainMinutes = ArgF(args, "rain=", 60f);
         if (Arg(args, "rule=") is { } rule)
         {
-            ExtendedSources.Rule = rule == "middle" ? ExtendedSources.PlaceRule.Middle : ExtendedSources.PlaceRule.Pieces;
-            ExtendedSources.ForgetLayouts();
+            LabOptions.WideSources.Rule = rule == "middle" ? ExtendedSources.PlaceRule.Middle : ExtendedSources.PlaceRule.Pieces;
         }
         Console.WriteLine($"Extent walk: {(render ? "rendered through the game's mixer" : "the client's placing, summed by the mixer's law")}, {speed:F1} m/s, a row every {Step} m; " +
-                          $"places by the {(ExtendedSources.Rule == ExtendedSources.PlaceRule.Middle ? "old rule (held to the middle)" : "rule of 2026-10-16 (each piece as loud as what it holds)")}");
+                          $"places by the {(LabOptions.WideSources.Rule == ExtendedSources.PlaceRule.Middle ? "old rule (held to the middle)" : "rule of 2026-10-16 (each piece as loud as what it holds)")}");
 
         int failures = 0;
         foreach (var map in new[] { "albany_or", "city" })
@@ -351,7 +354,7 @@ public static class ExtentWalkSpike
 
     private static Rig MakeRig(IAudioProvider provider, Func<double> now, bool prewarm, string? sounds)
     {
-        var facade = new AudioEngineFacade(provider);
+        var facade = new AudioEngineFacade(provider, options: LabOptions);
         facade.InitializeForTest(sounds);
         var world = new ClientWorldState();
         world.Clear(new Vector3(4000, 400, 4000));
@@ -441,7 +444,7 @@ public static class ExtentWalkSpike
                 Tick();
             }
             var ear = walk.Feet[s] + new Vector3(0f, LocalPlayerState.StandingEyeHeight, 0f);
-            rows.Add((walk.Feet[s], ClientAudioSystem.HeardTogether(mixer.Latest, mixer.Live, mixer.Pieces, walk.Source, ear)));
+            rows.Add((walk.Feet[s], ClientAudioSystem.HeardTogether(mixer.Latest, mixer.Live, mixer.Pieces, walk.Source, ear, LabOptions.WideSources)));
         }
         rig.Facade.Dispose();
 
@@ -473,7 +476,7 @@ public static class ExtentWalkSpike
         Environment.SetEnvironmentVariable("OPENFPS_DITHER", "0");
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", capture);
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
-        var provider = new FmodAudioProvider();
+        var provider = new FmodAudioProvider { Options = LabOptions };
         var clock = Stopwatch.StartNew();
         var rig = MakeRig(provider, () => clock.Elapsed.TotalSeconds, prewarm: false, sounds: LabPaths.Sounds());
         if (!rig.Facade.IsInitialized) { Console.WriteLine("FAIL: the mixer did not start"); return; }

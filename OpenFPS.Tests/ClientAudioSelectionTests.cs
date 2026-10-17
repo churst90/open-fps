@@ -18,6 +18,9 @@ namespace OpenFPS.Tests;
 [Collection(nameof(LevelCompressionSetting))]
 public class ClientAudioSelectionTests
 {
+    /// <summary>A world's wide sources as shipped (AudioWorldOptions.WideSources).</summary>
+    private static readonly OpenFPS.Client.AudioEngine.Core.Nature.WideSources Wide = new();
+
     /// <summary>The law as a world with the shipped hearing places by.</summary>
     private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
 
@@ -352,8 +355,8 @@ public class ClientAudioSelectionTests
         Assert.True(e.Range >= Law.AudibleRange(level) - 1e-3f, $"range {e.Range} under the level's audible range");
         Assert.Equal("", e.EngineKey);
         // A line cut into pieces (running water) has its own voice moved to its middle piece at that piece's gain.
-        if (OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Layout(e.PhysicalKey, ModelLibrary.Presets) == null
-            && OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.LineLength(e.PhysicalKey, ModelLibrary.Presets) == 0f)
+        if (Wide.Layout(e.PhysicalKey, ModelLibrary.Presets) == null
+            && Wide.LineLength(e.PhysicalKey, ModelLibrary.Presets) == 0f)
             Assert.Equal(gain * PhysicalVoiceState.HeadroomGain(Headroom(soundId)), e.Volume, 5);
         else
             Assert.True(e.Volume > 0f && float.IsFinite(e.Volume));

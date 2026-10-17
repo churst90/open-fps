@@ -26,6 +26,9 @@ namespace OpenFPS.Tests;
 [Collection(nameof(LevelCompressionSetting))]
 public class RankingByLoudnessProbe
 {
+    /// <summary>A world's wide sources as shipped (AudioWorldOptions.WideSources).</summary>
+    private static readonly OpenFPS.Client.AudioEngine.Core.Nature.WideSources Wide = new();
+
     /// <summary>The law as a world with the shipped hearing places by.</summary>
     private static readonly OpenFPS.Common.Hearing.HearingSettings Law = new();
 
@@ -144,7 +147,7 @@ public class RankingByLoudnessProbe
         if (WaterFeatureVoice.ParseKey(id, out string preset, out string feature, out int tap))
             return new WaterTapState(new WaterFeatureVoice(preset + "/" + feature, ModelLibrary.Presets.Water(preset), Rate, 1), tap, Rate, Somewhere, Breeze);
         if (id.StartsWith("flow:", StringComparison.OrdinalIgnoreCase))
-            return new NaturePlaceState(new PlacedNatureVoice(id, ModelLibrary.Presets.Flow(id[5..]), Rate, 19, Somewhere, Breeze), 0, Rate, Somewhere);
+            return new NaturePlaceState(new PlacedNatureVoice(id, ModelLibrary.Presets.Flow(id[5..]), Rate, 19, Somewhere, Breeze, Wide), 0, Rate, Somewhere);
         return null;
     }
 

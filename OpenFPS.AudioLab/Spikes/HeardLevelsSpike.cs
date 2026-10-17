@@ -197,7 +197,7 @@ public static class HeardLevelsSpike
     private static void AddModel(List<Source> list, string name, float declared, string key)
     {
         var own = new System.Collections.Concurrent.ConcurrentDictionary<string, float>();
-        float[] buf = OpenFPS.Client.Core.WorldAudioPlayer.RenderDoorKey(key, own);
+        float[] buf = OpenFPS.Client.Core.WorldAudioPlayer.RenderDoorKey(key, own, new OpenFPS.Client.AudioEngine.Core.DoorRenderCache(OpenFPS.Client.Core.ClientAudioPaths.ForPlayer()));
         float placed = OpenFPS.Client.Core.WorldAudioPlayer.AtOwnLevel(new TransientSound { SynthKey = key, LevelDb = declared }, own).LevelDb;
         list.Add(new Source(name, declared, buf, LafMaxDbfs(buf) + placed, placed) { PlacedDb = placed });
     }
