@@ -2422,21 +2422,45 @@ public partial class FmodAudioProvider : IAudioProvider
         _system.getMasterChannelGroup(out var master);
         master.addGroup(bus);
 
-        // An HRTF voice at the bus's head (its output end, so it places the finished tail): for a
-        // listener outside, the room's reverberation comes from its doorway; inside, it passes the
-        // stereo through. The bus goes 2D so FMOD does not collapse the binaural pair. Held for the
-        // bus's life.
-        if (_steamAudioEnabled && TryCreateSteamAudioVoice(out var rvState, out var rvDsp, out var rvHandle, SaDirectReserve))
-        {
-            rvState!.GuardName = "(a reverb bus's head)";
-            bus.getMode(out MODE bm);
-            bus.setMode((bm & ~(MODE._3D | Rolloff.Either)) | MODE._2D);
-            bus.addDSP(CHANNELCONTROL_DSP_INDEX.HEAD, rvDsp);
-            // Never bypassed: the stage crossfades between the reverb's own stereo and its placement
-            // (SpatialBlend), so there is no switch to click. See SetReverbDirection.
-            rvState!.SpatialBlend = 0f;
-            _reverbSaVoices[regionId] = new SaVoice { State = rvState!, Dsp = rvDsp, Handle = rvHandle };
-        }
+        TryAttachReverbHead(regionId, bus);
+    }
+
+    /// <summary>
+    /// An HRTF voice at a reverb bus's head (its output end, so it places the finished tail): for a listener
+    /// outside, the room's reverberation comes from its doorway; inside, it passes the stereo through. The bus
+    /// goes 2D so FMOD does not collapse the binaural pair. Held for the bus's life. Taken from the pool only
+    /// above the direct sounds' reserve, so a bus made on a busy street has none, and asks again while it is
+    /// heard (SetReverbDirection).
+    /// </summary>
+    private bool TryAttachReverbHead(int regionId, FMOD.ChannelGroup bus)
+    {
+        if (!_steamAudioEnabled || !TryCreateSteamAudioVoice(out var rvState, out var rvDsp, out var rvHandle, SaDirectReserve))
+            return false;
+        rvState!.GuardName = "(a reverb bus's head)";
+        SetBusPanning(bus, threeD: false);
+        bus.addDSP(CHANNELCONTROL_DSP_INDEX.HEAD, rvDsp);
+        // Never bypassed: the stage crossfades between the reverb's own stereo and its placement
+        // (SpatialBlend), so there is no switch to click. See SetReverbDirection.
+        rvState!.SpatialBlend = 0f;
+        _reverbSaVoices[regionId] = new SaVoice { State = rvState!, Dsp = rvDsp, Handle = rvHandle };
+        return true;
+    }
+
+    /// <summary>
+    /// Whether a reverb bus is placed by FMOD's own 3D panner: only one with no binaural head, heard from
+    /// outside its room (at its doorway). FMOD's panner folds a bus's two channels into one before it places
+    /// them, even at a 3D level of 0, so a bus left 3D played your own room's binaural tail (DiffuseTail) as
+    /// one channel in both ears: Selby House's lobby on 2026-10-17, its bus made while the street's traffic
+    /// held every binaural voice but the reserve (AudioLab --clap-city busy).
+    /// </summary>
+    internal static bool ReverbBusPannedByFmod(bool hasHead, bool outside) => !hasHead && outside;
+
+    /// <summary>Makes a bus 3D (FMOD places it, as one channel) or 2D (its stereo passes as it is), if it is not.</summary>
+    private static void SetBusPanning(FMOD.ChannelGroup bus, bool threeD)
+    {
+        if (bus.getMode(out MODE m) != RESULT.OK) return;
+        if (((m & MODE._3D) != 0) == threeD) return;
+        bus.setMode(threeD ? (m & ~MODE._2D) | MODE._3D | Rolloff.Mode : (m & ~(MODE._3D | Rolloff.Either)) | MODE._2D);
     }
 
     // Trains: one model per consist, heard through a handful of voices (RailVoice.cs). The client asks for
@@ -2678,6 +2702,8 @@ public partial class FmodAudioProvider : IAudioProvider
     /// stereo through when inside. Without Steam Audio for the bus, FMOD's 3D positioning.</summary>
     private void SetReverbDirection(int regionId, FMOD.ChannelGroup bus, Vector3 doorwayPos, bool outside, Vector3 lPos)
     {
+        // A bus made while the pool was dry takes its head once a voice is free.
+        if (!_reverbSaVoices.ContainsKey(regionId)) TryAttachReverbHead(regionId, bus);
         if (_reverbSaVoices.TryGetValue(regionId, out var v) && v.Dsp.hasHandle())
         {
             // Another room's field arrives through its opening (blend 1); your own room's passes its
@@ -2711,13 +2737,15 @@ public partial class FmodAudioProvider : IAudioProvider
 
             v.State.SpatialBlend = MathHelper.Lerp(v.State.SpatialBlend, targetBlend, AcousticConstants.ReverbBlendSpeed);
         }
-        else if (outside)
+        else if (ReverbBusPannedByFmod(hasHead: false, outside))
         {
+            SetBusPanning(bus, threeD: true);
             bus.set3DLevel(1.0f); bus.set3DSpread(0.0f);
             FMOD.VECTOR fp = FmodHelpers.ToFmodVec(doorwayPos); FMOD.VECTOR fv = new FMOD.VECTOR();
             bus.set3DAttributes(ref fp, ref fv);
         }
-        else bus.set3DLevel(0.0f);
+        // Your own room with no head: its stereo as it is, never through FMOD's panner.
+        else SetBusPanning(bus, threeD: false);
     }
 
     internal int ReverbBusCountForLab => _reverbBuses.Count;
@@ -2766,6 +2794,36 @@ public partial class FmodAudioProvider : IAudioProvider
     {
         float blend = _reverbSaVoices.TryGetValue(regionId, out var v) ? v.State.SpatialBlend : -1f;
         return _traced.TryGetValue(regionId, out var t) ? (t.State.InEnergy, t.State.OutEnergy, t.State.ChannelEnergy, t.State.Channels, blend) : (0, 0, 0, 0, blend);
+    }
+
+    /// <summary>The lab: binaural voices taken out of the pool, as a busy street holds them.</summary>
+    private readonly List<SaVoice> _heldForLab = new();
+
+    /// <summary>The lab: holds every binaural voice but <paramref name="leave"/>, as a street full of traffic
+    /// does, so what is made meanwhile is made as it is then.</summary>
+    internal void HoldBinauralVoicesForLab(int leave)
+    {
+        lock (_saPool) while (_saPool.Count > leave) _heldForLab.Add(_saPool.Pop());
+    }
+
+    /// <summary>The lab: gives back what <see cref="HoldBinauralVoicesForLab"/> held.</summary>
+    internal void ReleaseHeldBinauralVoicesForLab()
+    {
+        lock (_saPool) { foreach (var v in _heldForLab) _saPool.Push(v); }
+        _heldForLab.Clear();
+    }
+
+    /// <summary>The lab: how the listener's own room's traced stage plays its tail this tick.</summary>
+    internal string DescribeListenerStage()
+    {
+        int id = _listenerRegionId;
+        if (!_traced.TryGetValue(id, out var t)) return $"region {id}: no traced stage";
+        var s = t.State;
+        var tr = s.Trace;
+        string which = tr == null ? "none" : ReferenceEquals(tr, Traced.Listener) ? "listener's" : tr.IsCabin ? "cabin's" : "a room's";
+        return $"region {id}: trace {which}, tail only {s.TailOnly}, diffuse {(s.Diffuse != null)}, late field convolver {(s.DiffuseLateConv != null)}, "
+             + $"trace's late field {(tr?.DiffuseLate != null)}, directional {(tr?.LateSdm != null)}, late {(tr?.Late != null)}, bailed {s.Bailed}, "
+             + $"running {(_tracedRunning.TryGetValue(id, out bool r) && r)}, volume {_reverbVolumes.GetValueOrDefault(id):F2}";
     }
 
     public string DescribeReverbChain(int regionId)

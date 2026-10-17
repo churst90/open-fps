@@ -172,6 +172,7 @@ string[] usage =
     "",
     "Rooms, paths and the mixer",
     "  --clap-room [out=] [claps=] [sound=click|WEAPON] [dist=] [bed] [tail=raw] [late=velvet] [copies=0] [early=old] [probe=MS]",
+    "  --clap-city [out=DIR] [at=x,y,z] [yaw=] [claps=]: your own clap in Selby House's lobby through the whole client path; the tail's two ears",
     "                                                a clap in Marlow flat 01F through the whole mixer",
     "  --room-walk [seconds= speed= out=] [cone|reverb|boundary|steps|megaphone=off] [still] [echo=on] [clock]",
     "                                                the wood room walked with the megaphone on, captured",
@@ -879,6 +880,10 @@ if (args.Contains("--presence-sounds"))
 if (args.Contains("--room-echoes"))
 {
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.RoomEchoesSpike.Run(args));
+}
+if (args.Contains("--clap-city"))
+{
+    Environment.Exit(OpenFPS.AudioLab.Spikes.ClapCitySpike.Run(args));
 }
 if (args.Contains("--floor-render"))
 {

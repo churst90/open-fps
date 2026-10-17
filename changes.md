@@ -2,6 +2,17 @@
 
 Recent work, newest first. `git log` has the rest.
 
+## 2026-10-17
+
+- Your own room's reverberation is binaural again after walking in from a busy street. A room's reverb bus takes
+  a binaural voice for its head only above the direct sounds' reserve; made while traffic and rain held the rest
+  (Selby House's lobby), it had none and stayed 3D, and FMOD's panner folds a 3D bus's two channels into one even
+  at a 3D level of 0: the clap's and the door's tail came out the same in both ears (0.98 to 1.00 between them).
+  A bus with no head now passes its stereo through (2D) unless it is another room heard from outside, and takes a
+  head once a voice is free. AudioLab `--clap-city [busy[=hold]]`: your own clap in the lobby through the whole
+  client path. The code was the same on 2026-10-13 (d0116bb5); what set it off was the pool running dry outdoors.
+  The wire hash does not change.
+
 ## 2026-10-16
 
 - Package stage 5, Agents, the laws (docs/ENGINE_PACKAGES.md, stage 5 as built). Nothing a player hears, sees or

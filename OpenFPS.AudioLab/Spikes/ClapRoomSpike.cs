@@ -448,7 +448,7 @@ public static class ClapRoomSpike
     }
 
     /// <summary>A band of one ear's tail: two second-order band-passes in a row, run forwards.</summary>
-    private static double[] Band(float[] x, int from, int to, float lo, float hi, int sr)
+    internal static double[] Band(float[] x, int from, int to, float lo, float hi, int sr)
     {
         var y = new double[to - from];
         for (int i = 0; i < y.Length; i++) y[i] = x[from + i];
@@ -469,7 +469,7 @@ public static class ClapRoomSpike
     }
 
     /// <summary>The largest normalised cross-correlation within ±1 ms.</summary>
-    private static double Iacc(double[] a, double[] b)
+    internal static double Iacc(double[] a, double[] b)
     {
         double best = -1; int max = 44;
         double ea = 0, eb = 0; for (int i = 0; i < a.Length; i++) { ea += a[i] * a[i]; eb += b[i] * b[i]; }
@@ -483,7 +483,7 @@ public static class ClapRoomSpike
         return best;
     }
 
-    private static (float[] L, float[] R, int Sr) ReadStereo(string path)
+    internal static (float[] L, float[] R, int Sr) ReadStereo(string path)
     {
         using var br = new BinaryReader(File.OpenRead(path));
         br.ReadBytes(12);
