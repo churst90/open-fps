@@ -7,6 +7,15 @@ Recent work, newest first. `git log` has the rest.
 - Package stage 7's clean half finished: the listening-level calibration (/listening) is in
   `OpenFPS.Accessibility`, playing its cues through `IUiCues` as the lists do; Accessibility now references
   Models and Sound. Nothing a player hears or is told changes, and the wire hash does not.
+- Library stage 6's first half, the world input (docs/SOUND_LIBRARY_BOUNDARY.md 19). Nothing a player hears
+  changes. The sound reads the world through one view of its own (`IAcousticWorld`: the triangles, the rooms, the
+  air, the things with boxes and the door leaves), which the client's snapshot fills; the acoustic worker, the
+  tracer, the routes through openings, the cabins, the vehicle shadows, the engines' echoes, the Steam Audio
+  scene and the rain take it. The occlusion and the room a point is in are asked of the library (`AcousticRays`),
+  the one-off sounds' room echoes are planned there (`RoomEchoes`), and a talker's voice is decoded by a decoder
+  the client hands it. No library file names a game type now (358 references to none). A test holds the view
+  still while the world moves on, as the worker needs. The wire hash changes, so the server and the Windows
+  client go out together.
 - Library stage 5's rest (docs/SOUND_LIBRARY_BOUNDARY.md 18.8). Nothing a player hears changes. The world's air
   (`Atmosphere`), the mixer's rate, how a world is heard (`HearingSettings`: /levels, /ear, /listening), the
   console's levers (`MixSettings`: /tail, /copies, /echoes, /cabin, /valveflow, /enginedetail), the voice chat's

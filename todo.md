@@ -128,7 +128,11 @@ since the last deploy" list below.
    collision and for the acoustic scene (PHYSICS_BOUNDARY.md section 8). Air moved by passing things, leaf
    litter and impacts that pass on momentum ("Next", below) are physics stages 4 and 5.
 5. Sound library stages 6 to 8 on the clean voices: the world input and `OpenFPS.Audio`, splitting
-   `ClientAudioSystem`, `WorldAudioPlayer` and `BirdLife`, versions and Resonance.
+   `ClientAudioSystem`, `WorldAudioPlayer` and `BirdLife`, versions and Resonance. Stage 6's first half, the world
+   input (`IAcousticWorld`, the snapshot filling it; the acoustic queries, the room echoes and the talkers' decoder
+   in the library): BUILT 2026-10-16 (docs/SOUND_LIBRARY_BOUNDARY.md 19; no library file names a host type; the
+   wire hash changes). Next: the second half (19.6), `OpenFPS.Audio` and the moves, with `AudioWorldOptions` and
+   `AudioDataPaths` for the statics left (`CabinPaths`, the wide sources' levers, the door render cache).
 6. Geometry stage 5, diggable ground with strata: held until it is wanted.
 7. Then detail, in this order:
    - weather as a system and wind acting on things (docs/MATTER.md 5.3 and its order of work, steps 5

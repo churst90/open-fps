@@ -32,6 +32,7 @@ library that open-fps and Resonance both reference. Step 1 of
 17. Stage 4 as built: rooms and openings as values
 18. Stage 5 as built: the traced places and the weather per world (18.1-18.5), the clock (18.6), the world
     time (18.7), the air, the mixer's rate, the hearing, the mix and the lab (18.8)
+19. Stage 6 as built (first half): the world input
 
 ---
 
@@ -854,6 +855,7 @@ levers into `LabLevers`.
   five Core files, `RainField`, `NearDrops`.
 - Risk: the acoustic worker runs on its own thread and holds the snapshot it was given; an
   `IAcousticWorld` must be an immutable view per request, as the snapshot is, or results drift.
+- As built: section 19, the first half (the world input, 2026-10-16). `OpenFPS.Audio` and the moves are next.
 
 ### Stage 7: split the integration types (4 to 6 sessions)
 
@@ -2543,3 +2545,130 @@ on bbd3f7f8 and rebased onto a5bada00 (package stage 2's catalogue, the wind's d
 - **Not run here:** nothing through FMOD. The mixer's own reads (the voices' rates, `HasTracedEchoes`, the
   console's levers on a live mix, `/levels` and `/listening` in a session) want a session or the lab's
   `--clap-room` and `--driving` on this machine.
+
+---
+
+## 19. Stage 6 as built (first half, 2026-10-16): the world input
+
+The library reads the world through one interface it owns, and no library file names a host type any more: the
+ratchet's allowance went from 358 crossings in 11 files to none (`OpenFPS.Tests/LibraryBoundary/allowed.tsv` is
+empty). Behaviour unchanged: the stored streams, the render fingerprints and the spoken lines pass unregenerated.
+`OpenFPS.Audio` and the moves are the second half (19.6).
+
+### 19.1 The world input
+
+`IAcousticWorld` (`OpenFPS.Acoustics/AcousticWorld.cs`) is what 7.3 proposed, with what the readers turned out to
+need:
+
+| Member | What it is | Read by |
+|---|---|---|
+| `Geometry`, `GeometryStale`, `GeometryVersion`, `TileMetres` | the static solids as triangles, those being rebuilt, the count of tile changes, the tile size | the worker, the routes, the reflections, `AcousticRays` |
+| `Rooms` | the `AcousticMap` (rooms and openings as values, stage 4) | everything that asks a place |
+| `Air` | `AirState`: °C, humidity, millibars, the absorption multiplier | the air's loss on every path, the rain |
+| `BodyCount`, `TryGetBody`, `AllBodies` | every thing with a box, as an `AcousticBody` | the scene's boxes, the region boxes, the rain's leaves |
+| `MovingCount`, `MovingAt` | what moves, without a list | vehicle shadows, cabins, the rain on cars |
+| `Near`, `Unindexed` | what a ray has to test as boxes: filed round a point, or what the triangles do not hold | `AcousticRays`, the rain survey |
+| `DoorLeaves` | each door leaf where it stands and the doorway it shuts (`DoorLeaf`) | the routes' doors, the worker's door rebuilds, the aids' doorway marks |
+| `TerrainSolids` | the tiles of ground, as solids | the scene and the routes |
+
+`AcousticBody` is an entity as the sound meets it: pose, velocity, collider shape and size, solid, fixed, moves,
+door leaf, material, an authored absorption, hollow and its shell, the wall's build, a room's box, what it is voiced
+as and a vehicle's windows. `AirState` is in Acoustics, not `Atmosphere` (Sound, a layer above): the air the world
+says, not the speed of sound the mixer keeps. `IAcousticWorld` names nothing of the physics: physics stage 3's
+`IPhysicsWorld` is a separate view, and neither project references the other.
+
+**Who fills it.** `WorldSnapshot` implements it (explicitly, so the snapshot's own fields keep their names), reading
+each answer off the snapshot as it is asked; the entity-to-body rules are `EntityAcoustics.BodyOf`, `LeafOf` and
+`IsDoorLeaf` (moved there from `OpeningGraph`), and an `EntitySnapshot` converts to an `AcousticBody` implicitly, so
+the host's call sites read as they did. The grid walk the occlusion did is `WorldSnapshot.EntitiesNear`, which
+`SpatialService` and the view share. A client adapter that is not the snapshot is for the second half.
+
+**The risk (section 10, stage 6).** The worker holds the view it was given on its own thread. A snapshot is
+immutable once built (`ClientWorldState.GetSnapshot`), and the view caches nothing against it, so it is exactly as
+immutable as the snapshot. `AcousticWorldViewTests` holds it: a view taken before a door swung, a bus drove across,
+a wall went up and the air changed reads the same afterwards while the next view differs; and a worker given a view
+answers from it while the world gains a wall between ear and source, until it is handed the next. Proved by
+breaking it: built into the cached snapshot in place (the view following the world), both tests fail.
+
+### 19.2 What takes it
+
+- `AsyncAcousticWorker` (`UpdateWorld`, `GetLastWorld`, the door leaves through `DoorLeaves`), `SpatialAcoustics`,
+  `OpeningGraph`, `CabinWalls` (`AcousticBody` for a car), `VehicleShadow`, `EngineReflections.SyncGeometry`,
+  `SteamAudioScene.BoxesFromWorld`, `RainSurvey.Run` and `RainField.Update`. The rain is handed what is falling
+  (`WorldSnapshot.Falling`, the rule that was inside `RainField`), since precipitation is the weather's, not the
+  world's shape.
+- `SpatialService`'s acoustic queries are `AcousticRays` in Acoustics, over the view: `Occlusion` and
+  `MultiPointOcclusion` (per band, through `Constructions`), `RegionAt`, `FirstSurfaces` (was `RaycastAll`) and
+  `FirstMaterial` (was `RaycastMaterial`). `SpatialService` keeps the game's rays (sight, the scope, prediction) and
+  forwards the moved ones, so its callers are unchanged. `SpatialAcoustics` no longer takes a `SpatialService`; it
+  asks `AcousticRays` and has `RaycastMaterial` for the plain ray the aids and the birds ask, leaving out
+  `ListenerBodyId` (the game set the service's own id to the same value). Naming a zone (`GetZoneAt`, named places
+  first) is the host's, an extension in `SpatialService.cs`.
+- `PlanRoomEchoes`, `RoomEcho`, `MirrorShare` and the window, cap and second-order constants are `RoomEchoes` and
+  `RoomEcho` in Acoustics; `EarlyCopies`, `WorldAudioPlayer` and `ClientAudioSystem` call them there.
+- `TalkerStream` takes an `IVoiceDecoder` (rate, frame, longest frame, decode with forward error correction);
+  `TalkerStreams.For` takes a factory. `VoiceCodec` stays in the client, with `OpusVoiceDecoder` beside it.
+- `AudioEmission` takes values (an authored offset, whether it is synthesised, its sound id; a pose); the entity
+  overloads are `EntityEmission`, in Common, and its callers moved to it.
+- `SightIndex.Refresh` reads the doorways through `DoorLeaves`: the aids read the sound's scene view, as
+  docs/ENGINE_PACKAGES.md's decision 8 has it.
+
+### 19.3 The statics
+
+- `RainField.RoofRidesWithHead` is `LabLevers.RainRoofInTheWorld` (the lab's `--cabin roof=world` sets its mixer's).
+- Left for the second half, and why: `CabinPaths.Enabled` and `LabOnePlace` are read in `CabinPaths.For`, which the
+  engine's processor calls in the mixer; they become options of the audio world with `OpenFPS.Audio`, not of the
+  world input. `ExtendedSources.Enabled`, `LayoutScale` and `ForceSpread` are being worked on in another branch (the
+  extended sources). `DoorRenderCache.Folder` and `ShippedFolder` go into `AudioDataPaths` with the rest of 7.4's
+  paths, which the second half's host interface carries.
+- **Counts** (the survey's section 4): 343 library statics that can change before, 350 after; written from outside
+  their type 24 to 23 (the rain's roof), reassigned by their own type 43 to 43. The rise is per-thread scratch
+  (54 to 62, 4.2's allowed kind): the occlusion's seven buffers came into the library with `AcousticRays`, where
+  they were the host's `SpatialService`'s, and one list of door leaves in `SpatialAcoustics`.
+
+### 19.4 The ratchets
+
+- Library: crossings 358 to 0. `files.tsv` gains `AcousticRays.cs`, `AcousticWorld.cs`, `RoomEchoes.cs`
+  (Acoustics) and `EntityEmission.cs` (host); `tools/sound_boundary/classify.py` sorts `EntityEmission.cs`.
+- Engine packages: crossings 1,178 to 814. `allowed.tsv` falls in every row it changed: the worker, the cabins,
+  the reflections, the routes' graph, the tracer, the vehicle shadows, the talkers, the early copies and the scene
+  to nothing or next to it (their last references are `AudioEmission`'s constants, which are Common's until the
+  second half moves the file), the rain 104 to 2, the aids' doorway marks (`SightWatch`) 68 to 48, `SightGrid` 96
+  to 94, `BeaconAids` 8 to 6. `files.tsv` gains the same four files (`tools/engine_packages/classify.py`).
+- Physics: unchanged (its crossings list is the same).
+
+### 19.5 The wire hash and the checks
+
+- **The wire hash** changes (b5d6b5b0a99d at 12286be3, 8b2a5752e92b after): `WorldSnapshot.cs`, `EntityAcoustics.cs`,
+  `AudioEmission.cs` and the new files are in Common and Acoustics, which it covers. Nothing sent changed. A client
+  and a server from either side of this refuse each other at login. The door fingerprint is unchanged
+  (f401bda46391).
+- **One difference, in tests only.** A snapshot entity with no definition was a throw inside the tracer; it is now a
+  thing with no box. No snapshot the client builds has one. The worker's test of a tracer that fails now hands it
+  a world whose every answer throws (`UnreadableWorld`), and the window test finds the car again after its windows
+  go down, since a body is a value (as the game finds it every frame).
+- **Checks.** Every project builds with no warnings: the server, the GTK client, the Windows client
+  (`-p:EnableWindowsTargeting=true`), the lab and the tests. Filtered runs:
+  - the guards (LibraryBoundary, EnginePackages, RenderFingerprint, EmitterStreamReplay, SpokenLinesReplay,
+    VoiceIdBand, VoiceRegistry, ModelKindTable, MapScoped, PhysicsBoundary, PhysicsReplay, PhysicsCrossMachine,
+    RicochetTable, OneConstantPerLaw, MaterialName, Refraction, WeatherWind) with the new view tests: 221 passed,
+    and 221 passed again with `DOTNET_PROCESSOR_COUNT=4`;
+  - every class of the worker, the tracer, the routes, the cabins, the vehicle shadows, the reflections and echoes,
+    the scene, the rain, the talkers, the room echoes, the beacons, the birds, the floors and walls, the zones and
+    the sight: 790 passed, 4 skipped (the Steam Audio opt-ins), and the changed and failed ones again after the
+    fixes, 311 passed, 1 skipped;
+  - with `OPENFPS_STEAMAUDIO_TESTS`, TileSceneSet, DiffuseLate, LayersInContact, TracedPlacement, ThinPanel,
+    LateLawPlace, SteamAudioScene, OpeningRoutesTerrain, SteamAudioMapping and StaleAcousticResult: 64 passed.
+  None regenerated anything. The three surveys' `run.sh` agree with the lists in the tree.
+- **Not run here:** nothing through FMOD or Steam Audio's mixer. The hand-rolled tracer and the worker are tested;
+  a session on the city (traffic behind a bus, rain on a shelter's roof, a talker in a car) is where the same
+  answers are heard.
+
+### 19.6 Left for the second half
+
+- Create `OpenFPS.Audio` and move `AudioEngine/Fmod`, `SteamAudio`, `Acoustics`, `Data`, the five Core files,
+  `RainField`, `NearDrops` (8, stage 6), now that none of them names a host type; `AudioEmission.cs` to Sound with it.
+- The host interface's options and paths: `AudioWorldOptions` (`CabinPaths.Enabled`, `LabOnePlace`, the wide
+  sources' levers when that branch lands) and `AudioDataPaths` (the door render cache first).
+- A client adapter for `IAcousticWorld` that is not the snapshot itself, when stage 7 gives the audio world its own
+  source table.
