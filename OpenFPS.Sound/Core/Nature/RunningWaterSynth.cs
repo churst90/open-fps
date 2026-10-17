@@ -139,6 +139,11 @@ public sealed partial class RunningWaterSynth
     /// their spray, the falls, the drips. One in the game.</summary>
     public float SitePart = 1f, SprayPart = 1f, FallPart = 1f, DripPart = 1f;
 
+    /// <summary>For the lab: a banked bed's middle's share and its banks' (BedSection). One in the game.</summary>
+    public float MiddlePart = 1f, BankPart = 1f;
+
+    private float LanePart(Site s) => s.Lane == BedSection.Middle ? MiddlePart : BankPart;
+
     /// <summary>How many places it is heard from, its middle first.</summary>
     public int Places => _open.Length;
 
@@ -156,6 +161,9 @@ public sealed partial class RunningWaterSynth
         public float SlopeFactor = 1f; // how steep the water is here against the reach's mean (a riffle, a pool)
         public int Stratum, Strata = 1; // a stand-in: which of its piece's stand-ins, of how many (StandIn)
         public float BreakingShare = 1f; // a stand-in: the share of its stones that break now (StandIn)
+        public int Lane;              // a banked bed's: its middle, a bank, or both banks (BedSection)
+        public BedStrip Across = BedStrip.Whole; // the strip of the bed its water is (BedSection)
+        public float LaneGain = 1f;   // how much louder its lane is heard than its piece's mean (ExtendedSources.LineCut.LaneGain)
         // From the flow (UpdateSites):
         public float JetSpeed, Froude, AirRate, BurstRate, HinzeMm, LargestMm, Thickness, Depth;
         public float NextBurst;       // s
@@ -164,7 +172,9 @@ public sealed partial class RunningWaterSynth
 
     /// <param name="places">How many streams it renders: its spec's places unless a line cut into pieces wants
     /// more (ExtendedSources.FlowPlaces).</param>
-    public RunningWaterSynth(RunningWaterSpec spec, float sampleRate, int seed, int places = 0)
+    /// <param name="banksApart">A wide natural bed heard as its middle and its two banks (BedSection), as the game hears
+    /// it; false is the lab's before, the bed as one strip.</param>
+    public RunningWaterSynth(RunningWaterSpec spec, float sampleRate, int seed, int places = 0, bool banksApart = true)
     {
         Spec = spec;
         _rate = sampleRate;
@@ -197,7 +207,7 @@ public sealed partial class RunningWaterSynth
         var sites = new List<Site>();
         if (FromTheBed(spec))
         {
-            _bed = new StreamBed(spec, seed);
+            _bed = new StreamBed(spec, seed, banksApart);
             _sites = Array.Empty<Site>();
         }
         else if (spec.Obstacles is { } obs && spec.Channel != FlowChannel.None)
@@ -420,8 +430,7 @@ public sealed partial class RunningWaterSynth
     /// as the many it stands for together. Far off and among the rest of the line, the grain this leaves is under its
     /// distance; the cost is a few creeks' (--water-cost line).
     /// </summary>
-    public const int StandInsAPiece = 3, MostStandIns = 16, StandInBubbles = 8;
-    public const float MostBurstsPerSecond = 40f;
+    public const int StandInsAPiece = 3, MostStandIns = 16, StandInBubbles = 8;    public const float MostBurstsPerSecond = 40f;
 
     /// <summary>
     /// Whether a line's sites come from its bed's stones as it is cut (<see cref="Allot"/>): a line longer than
@@ -432,12 +441,19 @@ public sealed partial class RunningWaterSynth
         => spec.Layout == FlowLayout.Line && spec.Channel != FlowChannel.None && spec.Obstacles is { PerMetre: > 0f }
            && (spec.LengthMetres > LongLineMetres || spec.Bed != BedForm.Even || spec.HeadShare < 0.999f);
 
-    // What Allot works with, kept so a recut as the listener walks allocates only the stones new to it.
+    // What Allot works with, kept so a recut as the listener walks allocates only the stones new to it. A cell is a
+    // piece's lane (piece * lanes + lane): a banked bed's middle and banks are stood in for apart.
+    private const int MostCells = ExtendedSources.MaxPlaces * 3;
     private readonly List<StreamBed.Stone> _stones = new();
     private readonly float[] _from = new float[ExtendedSources.MaxPlaces], _to = new float[ExtendedSources.MaxPlaces];
-    private readonly double[] _count = new double[ExtendedSources.MaxPlaces];
-    private readonly int[] _standIns = new int[ExtendedSources.MaxPlaces];
-    private readonly bool[] _listed = new bool[ExtendedSources.MaxPlaces];
+    private readonly double[] _count = new double[MostCells];
+    private readonly int[] _standIns = new int[MostCells];
+    private readonly bool[] _listed = new bool[MostCells];
+    // A cell's stand-ins stand for this lane's stones (BedSection.BothBanks: a piece's two banks together), this many.
+    private readonly int[] _groupLane = new int[MostCells];
+    private readonly double[] _groupCount = new double[MostCells];
+    private readonly int[] _bankGroups = new int[MostCells];
+    private readonly double[] _pieceCount = new double[ExtendedSources.MaxPlaces];
     private readonly List<Site> _made = new(MaxSites);
     private Dictionary<long, Site> _spare = new();
 
@@ -447,6 +463,10 @@ public sealed partial class RunningWaterSynth
     /// it holds, <see cref="StandInsAPiece"/> at most), each standing for its share, spread evenly through where the
     /// stones lie and how big they are. Each site's water is the share of the line's that has reached it, on the slope
     /// of its riffle or pool. A stone already rendered keeps its own state when the cut moves on.
+    ///
+    /// A banked bed (BedSection) does this lane by lane: a near piece listed stone by stone in every lane, a far one stood
+    /// in for in its middle and in its two banks together (far off they are not heard apart), each site in its own lane's
+    /// water over its own lane's stones, as loud as its lane is heard (LineCut.LaneGain).
     /// </summary>
     private void Allot(ExtendedSources.LineCut? cut)
     {
@@ -454,6 +474,7 @@ public sealed partial class RunningWaterSynth
         var obs = Spec.Obstacles!;
         float length = bed.Length, half = 0.5f * length;
         int pieces = Math.Min(cut?.Count ?? 1, ExtendedSources.MaxPlaces);
+        int lanes = bed.Lanes, cells = pieces * lanes;
         // The cut's metres are its path's; the bed's are the spec's, within the rounding of its length.
         float scale = cut != null && cut.Length > 0f ? length / cut.Length : 1f;
         int wanting = 0;
@@ -461,75 +482,111 @@ public sealed partial class RunningWaterSynth
         {
             _from[i] = cut == null ? 0f : (cut.Edges[i] - cut.Edges[0]) * scale;
             _to[i] = cut == null ? length : (cut.Edges[i + 1] - cut.Edges[0]) * scale;
-            _count[i] = bed.CountBetween(_from[i], _to[i]);
-            _listed[i] = false;
-            _standIns[i] = 0;
-            if (_count[i] > 0) wanting++;
+            _pieceCount[i] = 0;
+            for (int l = 0; l < lanes; l++)
+            {
+                int c = i * lanes + l;
+                _count[c] = lanes == 1 ? bed.CountBetween(_from[i], _to[i]) : bed.CountBetween(_from[i], _to[i], l);
+                _listed[c] = false;
+                _standIns[c] = 0;
+                _pieceCount[i] += _count[c];
+            }
+            if (_pieceCount[i] > 0) wanting++;
         }
-        // The near pieces stone by stone, the fewest first, each piece still waiting keeping a site for itself.
+        // The near pieces stone by stone, every lane of them, the fewest first, each piece still waiting keeping a site for
+        // itself: a piece is listed by all its stones, so a banked bed lists no more of its length than one lane would.
         int used = 0;
         for (int pass = 0; pass < pieces; pass++)
         {
             int i = -1;
             for (int j = 0; j < pieces; j++)
-                if (!_listed[j] && _count[j] > 0 && _count[j] <= StonesListedUpTo && _standIns[j] == 0 && (i < 0 || _count[j] < _count[i])) i = j;
+                if (!_listed[j * lanes] && _pieceCount[j] > 0 && _pieceCount[j] <= StonesListedUpTo && _standIns[j * lanes] == 0
+                    && (i < 0 || _pieceCount[j] < _pieceCount[i])) i = j;
             if (i < 0) break;
-            _stones.Clear();
-            bed.StonesBetween(_from[i], _to[i], _stones);
-            if (used + _stones.Count > MaxSites - (wanting - 1)) { _standIns[i] = -1; continue; }
-            _listed[i] = true;
+            int count = 0;
+            for (int l = 0; l < lanes; l++)
+            {
+                _stones.Clear();
+                bed.StonesBetween(_from[i], _to[i], _stones, l);
+                count += _stones.Count;
+            }
+            if (used + count > MaxSites - (wanting - 1)) { _standIns[i * lanes] = -1; continue; }
+            for (int l = 0; l < lanes; l++) _listed[i * lanes + l] = true;
             wanting--;
-            used += _stones.Count;
+            used += count;
         }
-        // The rest stood in for, a few each and not too many in all.
-        int standIns = 0;
-        for (int i = 0; i < pieces; i++)
+        // The rest stood in for, a few each and not too many in all. A banked bed's banks (a piece's two together when
+        // neither is listed) by one site a piece over the line's count: each bursts a few times a second (a bank is 10 to
+        // 16 dB under its middle), and a near piece is listed whole, so the line costs what it did as one lane.
+        int standIns = 0, groups = 0;
+        int banks = 0;
+        for (int c = 0; c < cells; c++)
         {
-            _standIns[i] = 0;
-            if (_listed[i] || _count[i] <= 0) continue;
-            _standIns[i] = (int)Math.Clamp(Math.Round(0.5 * Math.Sqrt(_count[i])), 1, Math.Min(StandInsAPiece, Math.Ceiling(_count[i])));
-            standIns += _standIns[i];
+            _standIns[c] = 0;
+            _groupLane[c] = c % lanes;
+            _groupCount[c] = _count[c];
+            if (_listed[c] || _count[c] <= 0) continue;
+            if (lanes == 3 && c % lanes == BedSection.LeftBank && !_listed[c + 1] && _count[c + 1] > 0)
+            {
+                _groupLane[c] = BedSection.BothBanks;
+                _groupCount[c] = _count[c] + _count[c + 1];
+            }
+            else if (lanes == 3 && c % lanes == BedSection.RightBank && _groupLane[c - 1] == BedSection.BothBanks) continue;
+            if (_groupLane[c] != BedSection.Middle) { _bankGroups[banks++] = c; continue; }
+            double n = _groupCount[c];
+            _standIns[c] = (int)Math.Clamp(Math.Round(0.5 * Math.Sqrt(n)), 1, Math.Min(StandInsAPiece, Math.Ceiling(n)));
+            standIns += _standIns[c];
+            groups++;
         }
-        int most = Math.Min(MostStandIns, Math.Max(wanting, MaxSites - used));
+        int most = Math.Min(MostStandIns, Math.Max(groups, MaxSites - used));
         while (standIns > most)
         {
             int widest = -1;
-            for (int i = 0; i < pieces; i++)
-                if (_standIns[i] > 1 && (widest < 0 || _standIns[i] > _standIns[widest])) widest = i;
+            for (int c = 0; c < cells; c++)
+                if (_standIns[c] > 1 && (widest < 0 || _standIns[c] > _standIns[widest])) widest = c;
             if (widest < 0) break;
             _standIns[widest]--;
             standIns--;
         }
+        for (int b = 0; b < banks; b++) _standIns[_bankGroups[b]] = 1;
         var known = _byId;
         var next = _spare;
         next.Clear();
         _made.Clear();
-        for (int i = 0; i < pieces; i++)
+        for (int c = 0; c < cells; c++)
         {
-            if (_listed[i])
+            int i = c / lanes;
+            if (_listed[c])
             {
                 _stones.Clear();
-                bed.StonesBetween(_from[i], _to[i], _stones);
+                bed.StonesBetween(_from[i], _to[i], _stones, c % lanes);
+                var across = Across(c % lanes);
                 foreach (var st in _stones)
-                    Take(st.Id, st.At, obs.MedianDropMetres * MathF.Exp(obs.DropSpread * NormalQuantile(st.SizeDraw)),
-                         obs.WidthMetres * (0.6f + 0.8f * st.WidthDraw), 1f, i, 0, 1);
+                    Take(st.Id, st.At, obs.MedianDropMetres * across.SizeRatio * MathF.Exp(obs.DropSpread * NormalQuantile(st.SizeDraw)),
+                         obs.WidthMetres * across.SizeRatio * (0.6f + 0.8f * st.WidthDraw), 1f, i, 0, 1, c % lanes);
                 continue;
             }
-            int k = _standIns[i];
+            int k = _standIns[c];
+            int lane = _groupLane[c];
+            float size = Across(lane).SizeRatio;
             for (int j = 0; j < k; j++)
             {
                 // Where they lie, evenly through the stones; how big, each its share of those that break as the water now
-                // runs (StandIn), in another order than where they lie so the biggest are not always the furthest.
-                float at = bed.PointAfter(_from[i], (j + 0.5) / k * _count[i], _to[i]);
+                // runs (StandIn), in another order than where they lie so the biggest are not always the furthest. A
+                // stand-in for both banks stands where one bank's stones lie, which is where the other's do.
+                double count = lane == BedSection.BothBanks ? 0.5 * _groupCount[c] : _groupCount[c];
+                float at = lanes == 1 ? bed.PointAfter(_from[i], (j + 0.5) / k * count, _to[i])
+                                      : bed.PointAfter(_from[i], (j + 0.5) / k * count, _to[i], lane == BedSection.BothBanks ? BedSection.LeftBank : lane);
                 float z = k == 1 ? 0.5f * obs.DropSpread : obs.DropSpread * NormalQuantile(((j + k / 2) % k + 0.5f) / k);
-                Take(-1 - (long)MathF.Round(at * 100f), at, obs.MedianDropMetres * MathF.Exp(z), obs.WidthMetres, (float)(_count[i] / k), i, (j + k / 2) % k, k);
+                Take(-1 - ((long)lane << 40) - (long)MathF.Round(at * 100f), at, obs.MedianDropMetres * size * MathF.Exp(z), obs.WidthMetres * size,
+                     (float)(_groupCount[c] / k), i, (j + k / 2) % k, k, lane);
             }
         }
         _sites = _made.ToArray();
         _spare = known ?? new Dictionary<long, Site>();
         _byId = next;
 
-        void Take(long id, float at, float drop, float strip, float weight, int piece, int stratum, int strata)
+        void Take(long id, float at, float drop, float strip, float weight, int piece, int stratum, int strata, int lane)
         {
             if (known == null || !known.TryGetValue(id, out var site))
             {
@@ -540,6 +597,9 @@ public sealed partial class RunningWaterSynth
             site.Weight = weight;
             site.Stratum = stratum;
             site.Strata = strata;
+            site.Lane = lane;
+            site.Across = Across(lane);
+            site.LaneGain = lanes == 1 || cut == null ? 1f : cut.LaneGain(piece, lane);
             site.FlowShare = Spec.HeadShare + (1f - Spec.HeadShare) * Math.Clamp(at / length, 0f, 1f);
             site.SlopeFactor = bed.SlopeAt(at);
             site.OwnHome = HomeOf(site.Along);
@@ -547,6 +607,8 @@ public sealed partial class RunningWaterSynth
             next[id] = site;
             _made.Add(site);
         }
+
+        BedStrip Across(int lane) => lanes == 1 ? BedStrip.Whole : BedSection.Of(lane, bed.Strips);
     }
 
     /// <summary>The bed's stone sizes as quantiles of its spread, for <see cref="MeanBreaking"/>: the middles of 32 equal
@@ -567,7 +629,7 @@ public sealed partial class RunningWaterSynth
         float sum = 0f;
         for (int m = 0; m < SizeQuantiles.Length; m++)
         {
-            float size = obs.MedianDropMetres * MathF.Exp(obs.DropSpread * SizeQuantiles[m]);
+            float size = obs.MedianDropMetres * s.Across.SizeRatio * MathF.Exp(obs.DropSpread * SizeQuantiles[m]);
             float drop = size * y / (size + y);
             float jet = MathF.Sqrt(v * v + 2f * Hydraulics.Gravity * drop);
             float thickness = q / (jet * strip);
@@ -583,7 +645,7 @@ public sealed partial class RunningWaterSynth
             {
                 upTo += _breaking[m];
                 if (upTo < wanted && m < SizeQuantiles.Length - 1) continue;
-                s.Drop = obs.MedianDropMetres * MathF.Exp(obs.DropSpread * SizeQuantiles[m]);
+                s.Drop = obs.MedianDropMetres * s.Across.SizeRatio * MathF.Exp(obs.DropSpread * SizeQuantiles[m]);
                 break;
             }
         }
@@ -616,6 +678,20 @@ public sealed partial class RunningWaterSynth
     /// many stones it stands for, and the air it drives under now (m³/s, its stones' together).</summary>
     public IReadOnlyList<(float Along, float Weight, float Air, int Home)> Sites
         => _sites.Select(s => (s.Along, s.Weight, s.AirRate, s.Home)).ToList();
+
+    /// <summary>For the lab and the tests: each site's lane across a banked bed (BedSection), how many stones it stands
+    /// for, the air it drives under now (m³/s), its water's depth (from its lee jet's thickness and drop) and its lee
+    /// jet's speed and Froude number, its stone's drop (m) and how loud its lane is heard (LineCut.LaneGain).</summary>
+    public IReadOnlyList<(int Lane, float Weight, float Air, float Jet, float Froude, float Drop, float Gain)> LaneSites
+        => _sites.Select(s => (s.Lane, s.Weight, s.AirRate, s.JetSpeed, s.Froude, s.Drop, s.LaneGain)).ToList();
+
+    /// <summary>The water of a banked bed's lane at the flow now (BedSection): depth (m), speed (m/s) and flow (L/s),
+    /// before its riffles and pools; the whole channel's for a bed of one lane.</summary>
+    public (float Depth, float Speed, float Flow) LaneWater(int lane)
+    {
+        var a = _bed == null || _bed.Lanes == 1 ? BedStrip.Whole : BedSection.Of(lane, _bed.Strips);
+        return (_state.DepthMetres * a.DepthRatio, _state.SpeedMetresPerSecond * a.SpeedRatio, (float.IsNaN(_flow) ? Flow : _flow) * a.FlowShare);
+    }
 
     /// <summary>The cut this line is played by now, if any: one with no more pieces than it has places.</summary>
     private ExtendedSources.LineCut? CutNow
@@ -773,6 +849,16 @@ public sealed partial class RunningWaterSynth
                 v *= MathF.Pow(share, 0.2f) * MathF.Pow(steep, 0.3f);
                 wetted *= MathF.Sqrt(share);
             }
+            if (!s.Across.IsWhole)
+            {
+                // A banked bed's strip (BedSection): its share of the water, as deep and as fast as the section makes it
+                // there, over its share of the width.
+                var a = s.Across;
+                here *= a.FlowShare;
+                y *= a.DepthRatio;
+                v *= a.SpeedRatio;
+                wetted *= a.WidthShare;
+            }
             if (here <= 0f || y <= 0f) { s.AirRate = 0f; s.BurstRate = 0f; continue; }
             // The flow through the site: its strip of the channel, never more than all of it.
             float strip = MathF.Min(s.Strip, MathF.Max(0.01f, wetted));
@@ -889,7 +975,7 @@ public sealed partial class RunningWaterSynth
         {
             // A stand-in (Allot) lets out one bubble a block for all its stones' trickle.
             int n = Math.Min(real, s.Id < 0 ? 1 : MaxSteadyPerBlock);
-            float w = MathF.Sqrt(real / (float)n) * SitePart;
+            float w = MathF.Sqrt(real / (float)n) * SitePart * s.LaneGain * LanePart(s);
             for (int b = 0; b < n; b++)
                 RingNear(PlaceForSite(s), rng, (int)(rng.Uniform() * Block), DrawBubbleMm(rng, s), w, s.Depth, FallingWaterSynth.BubbleRise);
         }
@@ -916,7 +1002,8 @@ public sealed partial class RunningWaterSynth
         // This burst's air: its mean share, log-normally uneven (mean one).
         float size = MathF.Exp(BurstSpread * Gauss(rng) - 0.5f * BurstSpread * BurstSpread);
         float air = BurstShare * s.AirRate / rate * size;
-        float louder = stands > 1f ? MathF.Sqrt(stands) : 1f;
+        // A banked bed's lane is heard as loud as it is from where its piece is placed (LineCut.LaneGain).
+        float louder = (stands > 1f ? MathF.Sqrt(stands) : 1f) * s.LaneGain * LanePart(s);
         int count = rng.Poisson(air / meanVolume);
         var place = PlaceForSite(s);
         int span = (int)(BurstSeconds * MathF.Sqrt(MathF.Max(0.2f, s.Drop / 0.05f)) * _rate);

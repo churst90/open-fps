@@ -26,7 +26,7 @@ namespace OpenFPS.Sound.Core.Nature;
 /// (<see cref="WideSources"/>: OPENFPS_WIDE_SOURCES=0 plays every one from one point, as before 2026-10-06;
 /// OPENFPS_EXTENT_RULE=middle the old rule, for an A/B). This holds the laws they share.
 /// </summary>
-public static class ExtendedSources
+public static partial class ExtendedSources
 {
 
     /// <summary>How the places of a source share its power.</summary>
@@ -116,7 +116,7 @@ public static class ExtendedSources
     internal static Vector3[]? ShorePlacesOf(string key, IPresets presets)
     {
         // A whole outline is cut along itself at the ear (WideSources.IsOutline), not laid out.
-        if (ShoreSpec.TryOutline(key, out _, out _)) return null;
+        if (ShoreSpec.TryOutline(key, out _, out _) || ShoreSpec.TryOpen(key, out _, out _)) return null;
         ShoreSpec.ParseKey(key, out string preset, out var geometry);
         var spec = presets.Shore(preset);
         if (spec.TotalPlaces <= 1) return null;
@@ -290,9 +290,27 @@ public static class ExtendedSources
         public int Count => Edges.Length - 1;
         public float Length => Edges[^1] - Edges[0];
 
-        /// <summary>The path it was cut along, when it was cut along one (<see cref="Cut(LinePath, Vector3, int)"/>,
+        /// <summary>The path it was cut along, when it was cut along one (<see cref="Cut(LinePath, Vector3, int, float)"/>,
         /// <see cref="Whole(LinePath)"/>): what a shore's synth reads where its water lies from, piece by piece.</summary>
         public LinePath? Path { get; init; }
+
+        /// <summary>A banked bed's (LinePath.Banked): each piece's middle and two banks, how much louder each is heard than
+        /// the piece's mean from where it was cut (LaneGainsOf). Null: every lane at one.</summary>
+        public float[]? LaneGains { get; init; }
+
+        /// <summary>How much louder lane <paramref name="lane"/> of piece <paramref name="piece"/> is heard than the piece's
+        /// mean (BedSection's lanes; both banks together their mean power).</summary>
+        public float LaneGain(int piece, int lane)
+        {
+            var g = LaneGains;
+            if (g == null || piece < 0 || 3 * piece + 2 >= g.Length) return 1f;
+            if (lane == BedSection.BothBanks)
+            {
+                float l = g[3 * piece + BedSection.LeftBank], r = g[3 * piece + BedSection.RightBank];
+                return MathF.Sqrt(0.5f * (l * l + r * r));
+            }
+            return lane is >= 0 and < 3 ? g[3 * piece + lane] : 1f;
+        }
 
         /// <summary>The place (the voice: 0 the source's own) that plays piece <paramref name="piece"/>.</summary>
         public int PlaceOfPiece(int piece) => piece == Middle ? 0 : piece < Middle ? piece + 1 : piece;
@@ -321,8 +339,18 @@ public static class ExtendedSources
         {
             if (place < 0 || place >= Count || Length <= 0f) return 0f;
             int i = PieceOfPlace(place);
+            // An area's piece: its share of the surface.
+            if (Area is { } area) return area.TotalArea > 0f ? area.PieceArea[i] / area.TotalArea : 0f;
             return (Edges[i + 1] - Edges[i]) / Length;
         }
+
+        /// <summary>An open water's surface cut at the ear (<see cref="CutArea"/>): its edges are then angles at the ear,
+        /// radians, and this holds each piece's place, gain and the points its synth reads the water at.</summary>
+        public AreaPieces? Area { get; init; }
+
+        /// <summary>How far the ear may move before it is cut again, m: a quarter of the shortest piece of a line, or
+        /// what an area's cut says.</summary>
+        public float RecutMetres => Area?.RecutMetres ?? 0.25f * Shortest;
 
         /// <summary>The shortest piece, m: the one at the ear.</summary>
         public float Shortest
@@ -422,14 +450,14 @@ public static class ExtendedSources
     /// cuts a straight line: the angle each segment covers added along it, and each edge found in its segment by the
     /// straight line's own law. Small beside the ear, long far along it or where it runs away from the ear.
     /// </summary>
-    public static LineCut Cut(LinePath path, Vector3 ear, int pieces)
+    public static LineCut Cut(LinePath path, Vector3 ear, int pieces, float reference = 1f)
     {
         int n = Math.Clamp(pieces, 1, MaxPlaces);
         float half = path.HalfLength;
         var edges = new float[n + 1];
         edges[0] = -half;
         edges[n] = half;
-        if (n == 1) return new LineCut(edges) { Path = path };
+        if (n == 1) return new LineCut(edges) { Path = path, LaneGains = LaneGainsOf(path, ear, edges, reference) };
         int segs = path.Segments;
         Span<double> angle = segs <= 512 ? stackalloc double[segs] : new double[segs];
         double total = 0;
@@ -446,7 +474,48 @@ public static class ExtendedSources
             double t = Math.Clamp(foot + off * Math.Tan(a), 0.0, len);
             edges[i] = Math.Clamp((float)(path.StartOf(seg) + t) - half, edges[i - 1], half);
         }
-        return new LineCut(edges) { Path = path };
+        return new LineCut(edges) { Path = path, LaneGains = LaneGainsOf(path, ear, edges, reference) };
+    }
+
+    /// <summary>
+    /// A banked bed's lanes (BedSection) heard from <paramref name="ear"/>, piece by piece: how much louder each lane is
+    /// than the piece's mean, √(L_lane / L̄), L the mixer's law over the lane's lines of the piece and L̄ over all five as
+    /// <see cref="Place(LinePath, Vector3, float, float, float)"/> takes it. The piece's voice is placed at L̄, so each lane's
+    /// events scaled by this are heard as loud as the law makes that lane there, whatever the lanes carry: beside the
+    /// creek its near bank is near and its far bank far, though both play in one voice. Three a piece (its middle and its
+    /// two banks); null for anything else.
+    /// </summary>
+    private static float[]? LaneGainsOf(LinePath path, Vector3 ear, float[] edges, float reference)
+    {
+        if (!path.Banked) return null;
+        int n = edges.Length - 1;
+        var gains = new float[n * 3];
+        double r = MathF.Max(0.1f, reference);
+        float half = path.HalfLength;
+        Span<double> law = stackalloc double[5];
+        for (int i = 0; i < n; i++)
+        {
+            law.Clear();
+            double s0 = edges[i] + half, s1 = edges[i + 1] + half;
+            for (int k = 0; k < path.Segments; k++)
+            {
+                double a = path.StartOf(k), b = path.StartOf(k + 1);
+                if (b <= s0 || a >= s1) continue;
+                double t0 = Math.Max(s0, a) - a, t1 = Math.Min(s1, b) - a;
+                var across = path.AcrossOf(k);
+                for (int j = 0; j < 5; j++)
+                {
+                    var (_, _, foot, off) = path.ViewOf(k, ear - across * path.OffsetAcross(j));
+                    law[j] += LawIntegral(t1 - foot, off, r) - LawIntegral(t0 - foot, off, r);
+                }
+            }
+            double mean = (law[0] + law[1] + law[2] + law[3] + law[4]) / 5.0;
+            if (!(mean > 1e-30)) { gains[3 * i] = gains[3 * i + 1] = gains[3 * i + 2] = 1f; continue; }
+            gains[3 * i + BedSection.Middle] = (float)Math.Sqrt((law[1] + law[2] + law[3]) / 3.0 / mean);
+            gains[3 * i + BedSection.LeftBank] = (float)Math.Sqrt(law[4] / mean);
+            gains[3 * i + BedSection.RightBank] = (float)Math.Sqrt(law[0] / mean);
+        }
+        return gains;
     }
 
     /// <summary>Where a piece of a path is played from (in the world, and m along the path from its middle) and the
@@ -466,8 +535,8 @@ public static class ExtendedSources
         float half = path.HalfLength;
         double s0 = from + half, s1 = to + half;
         if (!(s1 - s0 > 1e-4)) return new PathPlace(path.PointAt(0.5f * (from + to)), 0.5f * (from + to), 1f);
-        bool wide = path.Width >= LinePath.WideBedMetres;
-        int lines = wide ? 3 : 1;
+        int lines = path.LinesAcross;
+        bool wide = lines > 1;
         double power = 0, along = 0, cx = 0, cy = 0, cz = 0;
         for (int k = 0; k < path.Segments; k++)
         {
@@ -477,7 +546,7 @@ public static class ExtendedSources
             var across = wide ? path.AcrossOf(k) : Vector3.Zero;
             for (int j = 0; j < lines; j++)
             {
-                var shift = across * ((j - 1) * path.Width / 3f);
+                var shift = across * path.OffsetAcross(j);
                 var (start, way, foot, off) = path.ViewOf(k, ear - shift);
                 double u0 = t0 - foot, u1 = t1 - foot;
                 double i0 = LawIntegral(u1, off, r) - LawIntegral(u0, off, r);
@@ -502,8 +571,8 @@ public static class ExtendedSources
     public static float MeanLawPower(LinePath path, Vector3 ear, float reference)
     {
         double r = MathF.Max(0.1f, reference);
-        bool wide = path.Width >= LinePath.WideBedMetres;
-        int lines = wide ? 3 : 1;
+        int lines = path.LinesAcross;
+        bool wide = lines > 1;
         double power = 0;
         for (int k = 0; k < path.Segments; k++)
         {
@@ -511,7 +580,7 @@ public static class ExtendedSources
             var across = wide ? path.AcrossOf(k) : Vector3.Zero;
             for (int j = 0; j < lines; j++)
             {
-                var (_, _, foot, off) = path.ViewOf(k, ear - across * ((j - 1) * path.Width / 3f));
+                var (_, _, foot, off) = path.ViewOf(k, ear - across * path.OffsetAcross(j));
                 power += (LawIntegral(len - foot, off, r) - LawIntegral(-foot, off, r)) / lines;
             }
         }

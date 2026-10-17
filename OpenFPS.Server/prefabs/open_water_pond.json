@@ -1,0 +1,21 @@
+{
+  "Id": "open_water_pond",
+  "Name": "Open water",
+  "Description": "A pond's open water heard from its whole surface (ShoreSpec.OpenPond, ShoreSynth): in a stiff wind its short sea breaks in small whitecaps where the fetch is long enough for a crest to fold air under, more to leeward and where a gust is crossing. Its line is the water's outline; the surface inside it is cut at the listener and each piece plays the crests breaking in it. Silent under 3 m/s. Not a recording and not a loop.",
+  "Material": "Water",
+  "ColliderSize": {
+    "X": 1,
+    "Y": 0.2,
+    "Z": 1
+  },
+  "Type": "StaticObject",
+  "IsSolid": false,
+  "IsItem": false,
+  "HasEmitter": true,
+  "IsSynth": true,
+  "SoundId": "shore:open_pond",
+  "Volume": 1.0,
+  "Range": 200,
+  "MinDistance": 1,
+  "Mode": "LoopOne"
+}

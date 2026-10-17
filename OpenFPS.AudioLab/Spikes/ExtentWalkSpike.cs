@@ -55,7 +55,7 @@ public static class ExtentWalkSpike
 
     /// <summary>A walk: the feet at every step, the way the walker faces, and which sources it is about.</summary>
     private sealed record Walk(string Name, string Map, string About, List<Vector3> Feet, Vector3 Heading, Func<string, bool> Source,
-                               float WindMetresPerSecond = 1.5f);
+                               float WindMetresPerSecond = 1.5f, Func<double, float>? WindAt = null);
 
     public static int Run(string[] args)
     {
@@ -112,7 +112,7 @@ public static class ExtentWalkSpike
         return failures;
     }
 
-    private static string MapOf(string walk) => walk is "creek" or "creek-out" or "shore" or "oak" or "oak-out" ? "albany_or" : "city";
+    private static string MapOf(string walk) => walk is "creek" or "creek-out" or "shore" or "oak" or "oak-out" or "open" or "open-ramp" ? "albany_or" : "city";
 
     // ── The walks ───────────────────────────────────────────────────────────────────────────────
 
@@ -202,6 +202,39 @@ public static class ExtentWalkSpike
                 var (feet, heading) = Beside(line, 2f * sign, 60f, floor);
                 return new Walk(name, "albany_or", $"along a pond's shore of {chain.Count} stretches ({LengthOf(line):F0} m), 2 m back from the edge",
                                 feet, heading, id => id.StartsWith("shore:", StringComparison.OrdinalIgnoreCase), WindMetresPerSecond: 8f);
+            }
+            case "open":
+            case "open-ramp":
+            {
+                // Albany's biggest pond (docs/RUNNING_WATER.md 15.11): its open water's whitecaps and its shore's lapping.
+                // open: 60 m along the shore the wind blows onto, 2 m back, in a 12 m/s wind from the prevailing quarter.
+                // open-ramp: straight from 10 m inland out over the water to 40 m from that shore, the wind rising from
+                // calm to 12 m/s and back over the walk, broadcast once a second as the server does: the onset, the cut
+                // stepping over the edge (all round once over the water), the pieces parting and merging.
+                var waters = defs.Where(d => d.SoundEmitter.SoundId!.StartsWith("shore:", StringComparison.OrdinalIgnoreCase) && PointsOf(d) is { Length: >= 4 }).ToList();
+                if (waters.Count == 0) return null;
+                var pond = waters.MaxBy(d => ShoreSpec.AreaOf(PointsOf(d)!))!;
+                var ring = PointsOf(pond)!.ToList();
+                float from = WindWeather.PrevailingFromDegrees * MathF.PI / 180f;
+                var downwind = new Vector3(-MathF.Sin(from), 0f, -MathF.Cos(from));
+                var edge = ring.MaxBy(p => Vector3.Dot(p, downwind));
+                static bool Shore(string id) => id.StartsWith("shore:", StringComparison.OrdinalIgnoreCase);
+                if (name == "open")
+                {
+                    var (feet, heading) = Beside(ring, 2f, 60f, floor, AlongOf(ring, edge));
+                    return new Walk(name, "albany_or", $"along the shore the wind blows onto of Albany's biggest pond ({ShoreSpec.AreaOf(ring.ToArray()):F0} m², {LengthOf(ring):F0} m round), 2 m back, 12 m/s",
+                                    feet, heading, Shore, WindMetresPerSecond: 12f);
+                }
+                var outFeet = new List<Vector3>();
+                for (float d = -10f; d <= 40f + 1e-3f; d += Step)
+                {
+                    var p = edge - downwind * d;
+                    outFeet.Add(p with { Y = floor(p with { Y = edge.Y + 1f }) });
+                }
+                float seconds = outFeet.Count * Step / 0.5f;
+                return new Walk(name, "albany_or", "from 10 m inland of that shore straight out over the water to 40 m, upwind, the wind rising from calm to 12 m/s and back",
+                                outFeet, -downwind, Shore, WindMetresPerSecond: 0f,
+                                WindAt: t => 12f * (1f - MathF.Abs(2f * (float)(t / seconds) - 1f)));
             }
             case "gutter":
             {
@@ -635,8 +668,16 @@ public static class ExtentWalkSpike
         Pump(6.0);
         double walkStart = clock.Elapsed.TotalSeconds;
         double stepSeconds = Step / speed;
+        int lastBroadcast = -1;
         Pump(walk.Feet.Count * stepSeconds, t =>
         {
+            // A wind that changes through the walk arrives as the server's broadcasts do, once a second, each ramped to.
+            if (walk.WindAt != null && (int)t != lastBroadcast)
+            {
+                lastBroadcast = (int)t;
+                var weather = rig.Facade.Weather;
+                weather.Wind = weather.Wind.Following(WindAir.FromCompass(walk.WindAt(t), WindWeather.PrevailingFromDegrees, 0.25f), weather.Now);
+            }
             double s = t / stepSeconds;
             int i = Math.Clamp((int)s, 0, walk.Feet.Count - 1), j = Math.Min(i + 1, walk.Feet.Count - 1);
             return Vector3.Lerp(walk.Feet[i], walk.Feet[j], (float)(s - i));
@@ -680,6 +721,8 @@ public static class ExtentWalkSpike
             Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
                 $"   level (dBFS): mean {10 * Math.Log10(levels.Average(v => Math.Pow(10, v / 10))):F1}, highest {levels.Max():F1}, lowest {levels.Min():F1}, swing {levels.Max() - levels.Min():F1} dB (1 s windows hold the water's own unevenness too)"));
         File.WriteAllText(Path.Combine(outDir, walk.Name + ".render.csv"), csv.ToString());
+        // Whether it steps: each octave's 2 ms frames over the 50 ms round them through the walk (BandSteps).
+        BandSteps.Print("steps through the walk", BandSteps.Measure(l, r, rate, walkStart, walkStart + walk.Feet.Count * stepSeconds));
         Console.WriteLine($"   wrote {capture}");
     }
 

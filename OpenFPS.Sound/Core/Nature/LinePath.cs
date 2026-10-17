@@ -19,13 +19,18 @@ public sealed class LinePath
     /// its near side nearer than its far.</summary>
     public readonly float Width;
 
+    /// <summary>A wide natural bed heard as its middle and its two banks, each its own flow (BedSection): five lines
+    /// across it, one down the middle of each fifth of its width, the outer two its banks. Otherwise a wide bed is three
+    /// lines a third of its width apart.</summary>
+    public readonly bool Banked;
+
     private readonly float[] _at;
 
     /// <summary>From this width a bed is heard as three lines across it, at its middle and a third of its width either
     /// side: under it the three are within a few per cent of one at any distance over the ear's height.</summary>
     public const float WideBedMetres = 1.5f;
 
-    public LinePath(ReadOnlySpan<Vector3> points, float width = 0f)
+    public LinePath(ReadOnlySpan<Vector3> points, float width = 0f, bool banked = false)
     {
         var kept = new List<Vector3>(points.Length);
         foreach (var p in points)
@@ -36,20 +41,32 @@ public sealed class LinePath
         _at = new float[Points.Length];
         for (int k = 1; k < Points.Length; k++) _at[k] = _at[k - 1] + Vector3.Distance(Points[k - 1], Points[k]);
         Width = MathF.Max(0f, width);
+        Banked = banked && Width >= WideBedMetres;
     }
 
     /// <summary>A straight line through <paramref name="middle"/> along <paramref name="axis"/> (a unit vector).</summary>
-    public static LinePath Straight(Vector3 middle, Vector3 axis, float length, float width = 0f)
-        => new(new[] { middle - axis * (0.5f * length), middle + axis * (0.5f * length) }, width);
+    public static LinePath Straight(Vector3 middle, Vector3 axis, float length, float width = 0f, bool banked = false)
+        => new(new[] { middle - axis * (0.5f * length), middle + axis * (0.5f * length) }, width, banked);
 
     /// <summary>A line given in an entity's own frame (SoundEmitterComponent.Line), placed by its transform.</summary>
-    public static LinePath Of(Vector3 position, Quaternion rotation, ReadOnlySpan<Vector3> local, float width = 0f)
+    public static LinePath Of(Vector3 position, Quaternion rotation, ReadOnlySpan<Vector3> local, float width = 0f, bool banked = false)
     {
         var world = new Vector3[local.Length];
         var turn = rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : rotation;
         for (int i = 0; i < local.Length; i++) world[i] = position + Vector3.Transform(local[i], turn);
-        return new LinePath(world, width);
+        return new LinePath(world, width, banked);
     }
+
+    /// <summary>How many lines a bed is heard as across itself: five banked, three wide, one narrow.</summary>
+    internal int LinesAcross => Banked ? 5 : Width >= WideBedMetres ? 3 : 1;
+
+    /// <summary>How far line <paramref name="j"/> of <see cref="LinesAcross"/> lies from the middle, m, along AcrossOf: the
+    /// middles of the fifths of a banked bed, a third of the width apart on a wide one.</summary>
+    internal float OffsetAcross(int j) => Banked ? (j - 2) * Width / 5f : LinesAcross == 3 ? (j - 1) * Width / 3f : 0f;
+
+    /// <summary>The lane of a banked bed line <paramref name="j"/> lies in (BedSection): the outer two its banks, the rest
+    /// its middle.</summary>
+    internal static int LaneOfLine(int j) => j == 4 ? BedSection.LeftBank : j == 0 ? BedSection.RightBank : BedSection.Middle;
 
     public float Length => _at[^1];
     public float HalfLength => 0.5f * _at[^1];

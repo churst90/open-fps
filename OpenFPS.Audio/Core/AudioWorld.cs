@@ -869,18 +869,29 @@ public partial class AudioWorld
     /// </summary>
     private string VoiceKey(in SourceSpec spec)
     {
-        // A whole shore's outline (its emitter's line, closed): one source as long as the outline (ShoreSpec.OutlineKey).
+        // A whole shore's outline (its emitter's line, closed): one source as long as the outline (ShoreSpec.OutlineKey). An
+        // open water's (its preset's face Open): the surface inside it, as big as its area (ShoreSpec.OpenKey).
         if (spec.Line is { Length: >= 3 } line && OpenFPS.Models.ModelKindTable.Is(spec.SoundId, OpenFPS.Models.ModelSynth.Shore))
         {
             if (_outlineKeys.TryGetValue(line, out var known)) return known;
+            if (_outlineKeys.Count > 4096) _outlineKeys.Clear();
+            if (IsOpenWaterPreset(spec.SoundId!))
+                return _outlineKeys[line] = OpenFPS.Sound.ShoreSpec.OpenKey(spec.SoundId!, OpenFPS.Sound.ShoreSpec.AreaOf(line));
             float perimeter = 0f;
             for (int i = 1; i < line.Length; i++) perimeter += Vector3.Distance(line[i - 1], line[i]);
-            if (_outlineKeys.Count > 4096) _outlineKeys.Clear();
             return _outlineKeys[line] = OpenFPS.Sound.ShoreSpec.OutlineKey(spec.SoundId!, perimeter);
         }
         return VoiceKey(spec.SoundId, spec.Shape, spec.Size);
     }
     private readonly Dictionary<Vector3[], string> _outlineKeys = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>Whether a shore's sound id names open water (its preset's face Open: ShoreSpec.OpenPond), heard from the
+    /// surface inside its line rather than along it.</summary>
+    private static bool IsOpenWaterPreset(string soundId)
+    {
+        try { return OpenFPS.Models.ModelLibrary.Presets.Shore(soundId).Face == OpenFPS.Sound.ShoreFace.Open; }
+        catch (Exception) { return false; }
+    }
 
     private string VoiceKey(string? soundId, OpenFPS.Geometry.ColliderShape shape, Vector3 size)
     {
@@ -1265,6 +1276,7 @@ public partial class AudioWorld
 
     private static string PhysicalKeyOf(Vector3 size, Quaternion rotation, string voiceKey)
         => OpenFPS.Models.ModelKindTable.KindOf(voiceKey)?.Synth == OpenFPS.Models.ModelSynth.Shore && !OpenFPS.Sound.ShoreSpec.TryOutline(voiceKey, out _, out _)
+           && !OpenFPS.Sound.ShoreSpec.TryOpen(voiceKey, out _, out _)
             ? OpenFPS.Sound.ShoreSpec.KeyFor(voiceKey, size, rotation)
             : voiceKey;
 
@@ -1881,7 +1893,10 @@ public partial class AudioWorld
             {
                 // A line: as many pieces as the angle it covers here asks for, the rest of it merged.
                 if (!_cutting.TryGetValue(id, out var c)) _cutting[id] = c = new Cutting();
-                c.Wanted = OpenFPS.Sound.Core.Nature.ExtendedSources.WantedPieces(path, eyePos, c.Wanted);
+                // An open water's surface: by the angle it covers, all round from over it.
+                c.Wanted = _audio.Options.WideSources.IsOpenWater(key)
+                    ? OpenFPS.Sound.Core.Nature.ExtendedSources.WantedAreaPieces(path, eyePos, c.Wanted)
+                    : OpenFPS.Sound.Core.Nature.ExtendedSources.WantedPieces(path, eyePos, c.Wanted);
                 c.Count = 1;
                 if (c.Wanted > 1) _placeCandidates.Add((-_heardInRanking.GetValueOrDefault(id), id, c.Wanted - 1));
                 continue;
@@ -1913,6 +1928,9 @@ public partial class AudioWorld
     {
         if (LinePathOf(src, key) is not { } path || distance > 2f * path.Length) return 1f;
         float point = MathF.Min(1f, MathF.Max(0.1f, reference) / MathF.Max(1e-3f, distance));
+        // An open water's surface by the law over its area.
+        if (_audio.Options.WideSources.IsOpenWater(key))
+            return MathF.Sqrt(OpenFPS.Sound.Core.Nature.ExtendedSources.AreaMeanLawPower(path, eyePos, reference)) / point;
         return MathF.Sqrt(OpenFPS.Sound.Core.Nature.ExtendedSources.MeanLawPower(path, eyePos, reference)) / point;
     }
 
@@ -1929,14 +1947,15 @@ public partial class AudioWorld
         float length = _audio.Options.WideSources.LineLength(key, ModelLibrary.Presets);
         var line = src.Spec.Line;
         // Running water along a line (its own, or straight along its x), or a shore's whole outline.
-        if (length <= 0f && !(line is { Length: >= 3 } && _audio.Options.WideSources.IsOutline(key))) return null;
+        if (length <= 0f && !(line is { Length: >= 3 } && (_audio.Options.WideSources.IsOutline(key) || _audio.Options.WideSources.IsOpenWater(key)))) return null;
         var at = src.Emission;
         var turn = src.State.Rotation;
         if (_linePaths.TryGetValue(src.Id, out var known) && known.Position == at && known.Rotation == turn
             && ReferenceEquals(known.Line, line) && known.Length == length)
             return known.Path;
         var path = OpenFPS.Sound.Core.Nature.WideSources.PathOf(at, turn, line, length,
-                                                                             _audio.Options.WideSources.LineWidth(key, ModelLibrary.Presets));
+                                                                             _audio.Options.WideSources.LineWidth(key, ModelLibrary.Presets),
+                                                                             _audio.Options.WideSources.LineBanked(key, ModelLibrary.Presets));
         _linePaths[src.Id] = new LinePathEntry(at, turn, line, length, path);
         return path;
     }
@@ -1945,8 +1964,13 @@ public partial class AudioWorld
     /// beside its near part, whatever its middle is behind), anything else its emission point.</summary>
     private Vector3 HeardPoint(AudioSource src, Vector3 ear, out bool alongLine)
     {
-        var path = src.Spec.IsSynth ? LinePathOf(src, VoiceKey(src.Spec)) : null;
+        string? key = src.Spec.IsSynth ? VoiceKey(src.Spec) : null;
+        var path = key != null ? LinePathOf(src, key) : null;
         alongLine = path != null;
+        // Over an open water, the water is under you.
+        if (path != null && _audio.Options.WideSources.IsOpenWater(key)
+            && OpenFPS.Sound.Core.Nature.ExtendedSources.Inside(path, new Vector2(ear.X, ear.Z)))
+            return ear with { Y = path.Points[0].Y };
         return path != null ? path.Nearest(ear, out _) : src.Emission;
     }
     private readonly List<int> _spreadingGone = new();
@@ -2079,10 +2103,15 @@ public partial class AudioWorld
         c.Frame = _spreadFrame;
         c.Base = e;
         int n = Math.Max(1, c.Count);
+        // A banked bed's whole line is cut again as the ear moves too: its lanes are heard from where it was cut. An open
+        // water's surface is cut by the bearings it covers, its places worked out with the cut (ExtendedSources.CutArea).
+        bool area = _audio.Options.WideSources.IsOpenWater(e.PhysicalKey);
         if (c.Cut == null || c.Cut.Count != n || !ReferenceEquals(c.Path, path)
-            || n > 1 && Vector3.Distance(eyePos, c.CutAt) > 0.25f * c.Cut.Shortest)
+            || (n > 1 || path.Banked || area) && Vector3.Distance(eyePos, c.CutAt) > c.Cut.RecutMetres)
         {
-            c.Cut = n == 1 ? OpenFPS.Sound.Core.Nature.ExtendedSources.Whole(path) : OpenFPS.Sound.Core.Nature.ExtendedSources.Cut(path, eyePos, n);
+            c.Cut = area ? OpenFPS.Sound.Core.Nature.ExtendedSources.CutArea(path, eyePos, n, e.MinDistance)
+                  : n == 1 && !path.Banked ? OpenFPS.Sound.Core.Nature.ExtendedSources.Whole(path)
+                  : OpenFPS.Sound.Core.Nature.ExtendedSources.Cut(path, eyePos, n, e.MinDistance);
             c.CutAt = eyePos;
             _audio.PlanPieces(e.EntityId, c.Cut);
         }
@@ -2098,7 +2127,9 @@ public partial class AudioWorld
     {
         var cut = c.Cut!;
         int i = cut.PieceOfPlace(place);
-        var p = OpenFPS.Sound.Core.Nature.ExtendedSources.Place(c.Path!, eyePos, cut.Edges[i], cut.Edges[i + 1], c.Base.MinDistance);
+        // An open water's piece: its bearings from the cut, integrated from where the ear is now, so it glides between cuts.
+        var p = cut.Area != null ? OpenFPS.Sound.Core.Nature.ExtendedSources.PlaceArea(cut, eyePos, i, c.Base.MinDistance)
+              : OpenFPS.Sound.Core.Nature.ExtendedSources.Place(c.Path!, eyePos, cut.Edges[i], cut.Edges[i + 1], c.Base.MinDistance);
         var offset = p.At - c.Base.Position;
         e.Position = p.At;
         e.ApparentPosition = c.Base.ApparentPosition + offset;
@@ -2179,7 +2210,7 @@ public partial class AudioWorld
         var middle = e;
         if (e.PlaceOfEntity != 0 && !latest.TryGetValue(e.PlaceOfEntity, out middle)) return 0f;
         if (pieces.TryGetValue(middle.EntityId, out var cut)) return cut.ShareOfPlace(e.Place);
-        if (wide.LineLength(middle.PhysicalKey, ModelLibrary.Presets) > 0f || wide.IsOutline(middle.PhysicalKey))
+        if (wide.LineLength(middle.PhysicalKey, ModelLibrary.Presets) > 0f || wide.IsOutline(middle.PhysicalKey) || wide.IsOpenWater(middle.PhysicalKey))
             return e.Place == 0 ? 1f : 0f;
         var layout = wide.Layout(middle.PhysicalKey, ModelLibrary.Presets);
         if (layout == null) return 1f;

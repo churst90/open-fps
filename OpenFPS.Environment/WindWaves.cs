@@ -112,6 +112,38 @@ public static class WindWaves
         return eps <= 0.055f ? 0f : MathF.Min(0.5f, 22f * MathF.Pow(eps - 0.055f, 2.01f));
     }
 
+    /// <summary>Under this wind (m/s at 10 m) open water has no whitecaps: Monahan and Ó Muircheartaigh (1980) find none
+    /// under about 3 m/s, Beaufort 2.</summary>
+    public const float WhitecapOnsetWind = 3f;
+
+    /// <summary>The wind's drift at the water's surface as a share of the ten-metre wind: about 3 per cent (Wu 1975, "Wind-
+    /// induced drift currents", J. Fluid Mech. 68, 49-70; recalled, the figure every drift study since quotes).</summary>
+    public const float DriftShare = 0.03f;
+
+    /// <summary>
+    /// The share of the dominant waves breaking where the wind at the water is <paramref name="uHere"/> m/s now and its
+    /// mean, which raised the sea, <paramref name="uMean"/>: <see cref="BreakingProbability"/> on the sea's own steepness,
+    /// that steepness taken as the gust or the lull makes it count. A wind drift q at the surface lowers the highest crest
+    /// a wave can carry before it breaks to (c − q)² / 2g, c its phase speed (Banner and Phillips 1974, "On the incipient
+    /// breaking of small scale waves", J. Fluid Mech. 65, 647-656), so a crest breaks as one ((c − q̄) / (c − q))² as
+    /// steep would in the mean wind whose drift q̄ Banner, Babanin and Young's fit already holds. The drift follows the
+    /// wind at <see cref="DriftShare"/>: a gust crossing the water breaks more of the crests it finds; a lull fewer. Under
+    /// <see cref="WhitecapOnsetWind"/> here, none, and over the metre a second above it they come in smoothly (Monahan
+    /// and Ó Muircheartaigh's coverage is a few millionths there): nothing switches on at a wind.
+    /// </summary>
+    public static float GustBreaking(float hs, float tp, float uMean, float uHere)
+    {
+        if (hs <= 0f || tp <= 0f || uHere <= WhitecapOnsetWind) return 0f;
+        float x = MathF.Min(1f, uHere - WhitecapOnsetWind), onset = x * x * (3f - 2f * x);
+        float c = Gravity * tp / (2f * MathF.PI);
+        float qMean = MathF.Min(0.8f * c, DriftShare * MathF.Max(0f, uMean));
+        float qHere = MathF.Min(0.8f * c, DriftShare * MathF.Max(0f, uHere));
+        float k = (c - qMean) / (c - qHere);
+        float kp = 2f * MathF.PI / DeepWavelength(tp);
+        float eps = 0.87f * hs * kp / 2f * k * k;
+        return eps <= 0.055f ? 0f : onset * MathF.Min(0.5f, 22f * MathF.Pow(eps - 0.055f, 2.01f));
+    }
+
     /// <summary>
     /// What a belt of reeds leaves of a wave, H / H0, after <paramref name="beltMetres"/>: Dalrymple et
     /// al.'s (1984) vegetation decay H/H0 = 1 / (1 + β̃ x), its coefficient β̃ going with the wave height

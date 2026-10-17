@@ -1226,6 +1226,180 @@ octaves within 1.7 dB of before (250 and 500 Hz up 1.6 and 1.7 dB, 1 kHz down 1.
 ### 15.9 What is left
 
 5 to 8 as in 15.5 (fire and woods on the cut, crowds, far traffic, a path per near piece), and from these steps: a far
-piece of a line is a few loud events, not a texture; whitecaps over a lake; river banks heard on a map with a river;
-mapped waterways in the one world's tiles keep their dry placeholder (the world builds its drainage per frame, and
-`VoiceWaterways` runs at a map's load only); a shore partly of reeds takes the preset of most of it.
+piece of a line is a few loud events, not a texture; river banks heard on a map with a river; mapped waterways in the
+one world's tiles keep their dry placeholder (the world builds its drainage per frame, and `VoiceWaterways` runs at a
+map's load only); a shore partly of reeds takes the preset of most of it. The banks as their own flow and the
+whitecaps over open water are built (15.10, 15.11).
+
+### 15.10 A wide bed's banks as their own flow (2026-10-17)
+
+From Resonance's 2.2 (the idea only; Cody approved it 2026-10-17). Until now a bed 1.5 m wide or more was heard across
+itself as three lines of the same water: the running-water model takes a channel as a rectangle at its mean depth and
+speed, so its edge was its middle moved sideways. A natural channel is deepest in its middle and shoals to its banks,
+where the water is shallower, slower and carries less, over smaller stones.
+
+**The section** (`BedSection`). Depth across a natural section as a power law, h(x) = H (1 - |2x/W|^r), r = 2, a
+parabola (Dingman 2007, "Analytical derivation of at-a-station hydraulic-geometry relations", J. Hydrol. 334, 17-27,
+writes natural sections so and finds r of about 1 to 4). The speed down each vertical is Manning's law on its own
+depth, u = h^(2/3) S^(1/2) / n, so the flow across the bed goes as h^(5/3): the lateral distribution of depth-averaged
+velocity without its lateral shear term, which Shiono and Knight (1991, J. Fluid Mech. 222, 617-646) add and which
+slows the edges further. A bank is rougher by its vegetation: Cowan's (1956) adjustment for a small degree of it,
+0.002 to 0.010 added to n (Arcement and Schneider 1989, USGS Water-Supply Paper 2339, table 3), its middle, 0.006.
+Each bank is the outer fifth of the width, as Resonance has it; there the water is under half the mean depth.
+
+With a cobble bed's n of 0.045 each bank carries 6.3 % of the flow (Resonance takes a tenth) at 0.52 of the mean depth
+and 0.60 of the mean speed; the middle three fifths carry 87.4 % at 1.32 times the mean depth and 1.10 times the mean
+speed. The strips add up to the channel: widths and flows to one, each strip's flow its width times its depth times
+its speed.
+
+**The stones.** The largest stone a flow moves goes as its bed shear, ρ g h S (Shields 1936), so at one slope a strip's
+stones go as its depth, the share of the depth a bed's stones stand kept (`GroundChannels.ObstacleShareOfDepth`): the
+middle's 1.32 times the bed's, a bank's 0.52. They lie as densely as the bed's do by the cover they make (a metre of a
+strip holds as many as its width over their size, the rule `GroundChannels.SpecFor` already sizes a bed's stones by),
+the bed's count shared out so the whole bed keeps the stones it had: of Oak Creek's 0.90 a metre, 0.34 in its middle
+and 0.28 on each bank.
+
+**In the bed and the synth** (`StreamBed`, `RunningWaterSynth.Allot`). A banked bed lays its stones in three lanes, its
+middle and its two banks, each lane along the bed's riffles and pools as the bed's stones are (the riffles hold
+four-fifths of each lane's). Each site has its lane's water: its share of the flow, its depth and speed against the
+channel's mean, its stones' size. A near piece is listed stone by stone in every lane; a far one is stood in for in its
+middle as before, and in its two banks together by one more site (far off they are not heard apart). A bed is banked
+when it is a natural stream bed 1.5 m wide or more whose sites come from its bed (a mapped creek, a long drainage line;
+`BedSection.Banked`): the approved 16 m creek preset spreads its sites along itself and is not.
+
+**Heard across itself** (`ExtendedSources.Place`, `LineCut.LaneGain`). A banked bed is five lines across, one down the
+middle of each fifth, the outer two its banks, so a piece's voice stands where its whole width's sound arrives from.
+The three lanes play in the piece's one voice; each lane's events are scaled by how much louder the law makes that
+lane than the piece's mean from where the piece was cut, √(L_lane / L̄). So the piece is heard as loud as each lane
+is from where it is, whatever the lanes carry: beside the creek, 1.5 m out from its edge, its near bank's events are
+1.30 times the piece's mean, its middle's 0.96, its far bank's 0.72 (`TheNearBankIsHeardNearer`). Far off they are
+alike.
+
+**Measured** (AudioLab `--running-water banks`, Oak Creek's bed: 3 m wide, 0.5 %, 300 m, made for 943 L/s; mono, the
+mixer's law, no HRTF). After an hour of heavy rain, 92 L/s: the middle 12.8 cm deep at 0.35 m/s, a bank 5.0 cm at
+0.19 m/s. The banks alone are 12 to 16 dB under the middle alone and brighter: against the middle they are -21 dB at
+250 Hz, -17 at 1 kHz, -12 at 4 kHz and -10 at 16 kHz. Heard 1.5 m out from the edge the whole creek is 1.6 dB quieter
+than before (its middle deeper over bigger stones: 1 to 4 kHz -1.6 to -2.4 dB, 125 to 250 Hz +0.7 to +2.1 dB), the
+banks 12 dB under the middle there; at 10 and 30 m within 0.3 dB of before. At bankfull, 943 L/s, 4 dB quieter beside
+it (the middle's 55 cm drowns more of its stones); in dry weather, 10 L/s, the banks' few stones stand out of 1.3 cm
+of water and are 0.4 dB of it beside the creek.
+
+Rendered through FMOD and Steam Audio (`--extent-walk oak,oak-out render`, an hour of heavy rain; the oak walk by both
+builds back to back on a quiet machine), the mean over the walk, dBFS:
+
+| Walk | | Level | 125 | 250 | 500 | 1k | 2k | 4k | 8k | IACC 500, 1k, 2k |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| oak, 1.5 m out from its edge | before | -40.2 | -77.3 | -63.8 | -51.6 | -46.0 | -45.4 | -50.2 | -60.8 | 0.69, 0.44, 0.34 |
+| | after | -41.2 | -78.6 | -65.3 | -52.7 | -47.1 | -46.7 | -50.0 | -60.5 | 0.71, 0.48, 0.37 |
+| oak-out, to 60 m | before | -47.9 | -84.5 | -71.2 | -58.5 | -53.5 | -53.3 | -57.9 | -68.7 | 0.70, 0.39, 0.24 |
+| | after | -48.8 | -85.5 | -72.4 | -59.7 | -54.5 | -54.5 | -57.9 | -68.2 | 0.68, 0.39, 0.25 |
+
+So 1 dB quieter beside it and a little brighter at its top, as wide; 42 voices at most beside it and 38 out from it, as
+before, every one with HRTF. The swing of 1 s windows along it 7.9 dB (8.2 before). Its 2 ms frames over the 50 ms round
+them (`--band-steps`): worst 20 to 24 dB an octave, the 99.9th percentile 12 to 17 (before 17 to 28 and 11 to 16), more
+frames 10 dB over at 125 Hz to 1 kHz (the middle's bigger stones gulp more); no step of the cut's. Two renders made
+under other agents' load had the whole mixer drop out for up to 0.4 s; one by the old build did the same back to back,
+so those are the machine's, not the banks'.
+
+Nothing steps: walking beside 40 m of a banked creek and out to 200 m in 5 cm steps, its pieces merging from twelve to
+five, cut again as the client cuts it, the line heard whole moves at most 0.07 dB a step and the lane beside you 0.23 dB
+at a cut (`WalkingBesideTheBanksNothingSteps`). Rendering costs what it did: a 300 m line of Oak Creek's bed at 92 L/s,
+16.0 % of a core cut beside it and 28.7 % walked along it, against 16.2 % and 29.6 % as one strip (`--water-cost line
+reference=943 flow=92`, `banks=0` for before; four cores). A first try, which listed a near piece lane by lane, cost
+twice as much: a lane's few stones were each listed where one lane's many had been stood in for. Placing:
+`ClientAudioSystem.Update` a median 0.17 ms and 0.25 ms at the 99th percentile beside Oak Creek.
+
+### 15.11 Whitecaps over open water (2026-10-17)
+
+Cody asked for them ("especially yes"). A pond's or a lake's shore laps where the wind blows onto it (15.7); out on the
+water the wind's sea breaks too, in whitecaps, and until now that was heard only over a 10 m strip in front of a
+stretch of shore, and from an outline's shore not at all past its edge.
+
+**The source.** `tools/gen_osm.py` lays, beside each pond's shore outline, its open water: one source
+(`open_water_pond`, "shore:open_pond") whose line is the same outline at the water's surface (the lowest ground along
+its edge), laid after the shores so no other id moves. The client keys it "shore:open_pond/open/<area m²>"
+(`ShoreSpec.OpenKey`), as loud as its area against the round hectare its level was declared over
+(`ShoreSpec.AcrossArea`), and hears the surface inside the line: it is cut at the ear by bearings into pieces of equal
+angle (`ExtendedSources.CutArea`, the line's 7 and 4 degree rules), all round from over the water, across the bearings
+it covers from its shore. Each piece is placed by the mixer's law as a piece of a line is, at the centroid of what each
+part brings and at the gain that makes the law there its mean over the piece, the law along each bearing in closed
+form (rays one every two degrees); its place is worked out afresh from the ear each frame (`PlaceArea`), and the cut
+again when the ear has moved a quarter of its distance from the water's edge. The pieces together are the surface
+heard whole within 0.01 dB from its shore, over it and far off (`AnAreasPiecesCoverItOnceAndTogetherAreTheWholeSurface`).
+An outline's shore no longer counts the whitecaps in front of it; a stretch of shore, with no open water beside it,
+still does.
+
+**What breaks** (`ShoreSynth`'s open water, `WindWaves.GustBreaking`). Each piece reads the water at points through it,
+a few along each bearing with the area each stands for. At each point: the fetch, how far the water reaches upwind of
+it (to the outline); the fetch-limited sea there (JONSWAP, as an edge's, 1.1); and the share of its dominant crests
+breaking, from the sea's steepness (Banner, Babanin and Young 2000), more in a gust and fewer in a lull: a wind drift q
+at the surface lowers the highest crest a wave carries before it breaks to (c - q)² / 2g (Banner and Phillips 1974,
+"On the incipient breaking of small scale waves", J. Fluid Mech. 65, 647-656), so a crest breaks as one
+((c - q̄)/(c - q))² as steep would in the mean wind, the drift 3 % of the wind (Wu 1975, J. Fluid Mech. 68, 49-70;
+recalled). The wind at each point is the world's wind field (`WindField.SpeedAt`, gusts carried downwind), read every
+quarter second and glided to, so a gust crosses the water and the crests under it break more. None under 3 m/s
+(Monahan and Ó Muircheartaigh 1980), rising from nothing over the next metre a second. A young sea is short-crested:
+about one crest a wavelength across and a wavelength apart passes a point each period, so b / (L² T) break a second
+on each square metre. A crest too slow to fold air under (its phase speed under 0.8 m/s, a plunging jet's onset)
+breaks without a sound, microbreaking (Banner and Phillips 1974; Jessup, Zappa and Yeh 1997, recalled); the air of the
+rest grows from nothing with its speed, a spilling crest's share of a plunger's along a third of its wavelength, as
+the edge's whitecaps always had (`SpillingAirShare`, `AirPerBreak`, `Entrains`). The sea itself follows the mean wind
+over the time a sea takes to grow (a third of the CEM's duration for the water's mean fetch, never under ten seconds).
+
+So the onset is the fetch's and the wind's: Albany's biggest pond is narrow (a mean fetch of 24 to 33 m upwind of a
+point) and its crests first fold air under at about 8 to 9 m/s; Magnolia's (54 m) begins, unheard, at 4 m/s and is
+plain at 8.
+
+**Nothing steps** (Cody, 2026-10-17: "make sure the sound doesn't step/cut on/cut off"). The breaking law has no
+switch (the share breaking never changes by more than 0.004 between winds a centimetre a second apart); each point's
+wind glides over a quarter second, each piece's breaking over half a second, and the sea over minutes. Each break is a
+cloud of the plume's bubbles heard as the crowd it is, band noise rising over the first sixth of its half period and
+falling to nothing over the rest, never single bubbles starting at once (`StartCloud(hiss:)`; one heard alone in a calm
+started with an edge: with it off the wind's ramp stood 24 dB out of the 50 ms round it); a piece breaking more than
+16 times a second is a crowd, one cloud of its breaks' air each quarter second, each lasting a crest's half period
+longer, so they overlap. Pieces placed afresh each frame glide as the ear moves.
+
+**Measured** (AudioLab `--waves open`, the biggest pond on Albany: 18,446 m², 1,221 m round, wind from 250 degrees,
+turbulence 0.25; mono at the ear through the cut and the mixer's law, no HRTF). From its downwind shore 2 m back
+(/tp -729.8 631.3 -7.4) and from a boat at the point of it furthest from any edge (/tp -945.5 592.5 -7.6), dB:
+
+| Wind | Where | 125 | 250 | 500 | 1k | 2k | 4k | 8k | total | breaking |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| 0, 4 m/s | both | | | | | | | | silent | none (calm; crests too slow) |
+| 8 m/s | shore | -16 | 1 | 17 | 32 | 29 | 25 | 18 | 34.6 | 11 % of it, 5,000 a second, Hs to 4.7 cm |
+| 8 m/s | boat | -18 | -2 | 18 | 34 | 30 | 25 | 18 | 35.8 | 10 % |
+| 12 m/s | shore | 2 | 22 | 37 | 38 | 35 | 29 | 22 | 41.7 | 22 %, 11,000 a second, Hs to 6.5 cm |
+| 12 m/s | boat | 2 | 21 | 36 | 39 | 36 | 33 | 25 | 42.8 | 19 % |
+| 8 m/s | its bank lapping, at the shore spot | -35 | -21 | -1 | 17 | 22 | 24 | 15 | 26.8 | |
+| 12 m/s | the same | -24 | -7 | 14 | 16 | 26 | 24 | 15 | 28.6 | |
+
+The whitecaps peak at 500 Hz to 1 kHz and are 8 to 13 dB over the bank's own lapping at the shore spot. A piece's air
+while a gust crosses it is 1.03 to 1.19 times its mean and in a lull 0.85 to 0.96: the gusts show more on a sea not
+already breaking at the half the law holds to (a 3 km lake at 8 m/s: 10.8 % breaking, 12.8 % in a 10 m/s gust, 9.1 % in
+a 6 m/s lull). The preset's level, the round hectare at 8 m/s as one point at a metre: 67.9 dB, its 10 ms peaks
+18.4 dB over (`--waves open level`). No recording of small-lake whitecaps in air was found; the band balance is the
+edge's whitecap model's, not refitted.
+
+The wind from calm to 12 m/s and back over five minutes, broadcast once a second as the server does, at the shore
+spot (`--waves open ramp run=300`): first heard at 9 m/s; its 2 ms frames over the 50 ms round them (held to -30 dB
+under the band's mean over the second round, so a sound rising out of silence is judged against itself) worst 10.8 to
+12.8 dB in the octaves 125 Hz to 1 kHz and 5.8 to 9.3 above, against 10.5 to 12.7 and 4.7 to 8.8 for a steady 12 m/s;
+none worse than the water's own (`WhitecapsFadeOutAndBackWithoutAStep` holds it).
+
+Magnolia's pond (17,723 m², a mean fetch of 54 m; shore /tp 563.4 -999.7 0.2, boat /tp 394.2 -972.2 -0.1, both checked standable; wind from 250): at
+4 m/s a trace at the shore, 11 dB under the threshold of hearing at its loudest band; at 8 m/s 35.9 dB at the shore and
+45.6 on the boat; at 12 m/s 43.8 and 53.1, the boat 10 dB over its bank's lapping (42.9).
+
+Rendered through FMOD and Steam Audio (`--extent-walk open,open-ramp render`, Albany's biggest pond): along its downwind
+shore 2 m back in 12 m/s, the shore's lapping and the open water together -58.1 dBFS on the mean, swinging 7.9 dB in
+1 s windows, loudest at 1 kHz, as wide as 143 to 173 degrees (headless), IACC 0.73, 0.47 and 0.45 at 500 Hz, 1 and
+2 kHz; its 2 ms frames over the 50 ms round them worst 9 to 19 dB an octave. From 10 m inland out over the water to
+40 m, the wind from calm to 12 m/s and back over the 100 s walk (so the sea never grows past a few metres a second's):
+silent until it is, then single whitecaps far under -60 dBFS; its worst 2 ms frames, the rises of single whitecaps out
+of silence (each over 50 ms), 25 dB in the 4 kHz octave and under 20 elsewhere, none an edge. Below -90 dBFS a band
+(under 4 dB SPL at game level) nothing is judged a step.
+
+Voices and cost: the shore and its open water at most 24 voices together (twelve pieces each), every one with HRTF;
+`ClientAudioSystem.Update` a median 0.25 ms and 0.40 ms at the 99th percentile along the shore (each open water's
+pieces placed afresh each frame, a few hundred ray crossings). An open water's synth renders in 3 to 7 % of a core
+(`--waves open`).

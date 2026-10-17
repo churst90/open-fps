@@ -63,6 +63,7 @@ public sealed class WideSources
         _layouts.Clear();
         _lines.Clear();
         _widths.Clear();
+        _banked.Clear();
     }
 
     /// <summary>
@@ -118,19 +119,38 @@ public sealed class WideSources
     }
     private readonly ConcurrentDictionary<string, float> _widths = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>Whether a line's bed is heard as its middle and its two banks, each its own flow (BedSection.Banked).
+    /// False for anything that is not a line this world cuts.</summary>
+    public bool LineBanked(string? physicalKey, IPresets presets)
+    {
+        if (LineWidth(physicalKey, presets) < LinePath.WideBedMetres) return false;
+        return _banked.GetOrAdd(physicalKey!, static (key, presets) =>
+        {
+            try { return BedSection.Banked(presets.Flow(key[5..])); }
+            catch (Exception) { return false; }
+        }, presets);
+    }
+    private readonly ConcurrentDictionary<string, bool> _banked = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>
     /// The path a line source is heard along: the line its emitter carries (SoundEmitterComponent.Line, in its own
     /// frame), or a straight line of <paramref name="length"/> along its own x through <paramref name="position"/>.
     /// </summary>
-    public static LinePath PathOf(Vector3 position, Quaternion rotation, Vector3[]? line, float length, float width)
+    public static LinePath PathOf(Vector3 position, Quaternion rotation, Vector3[]? line, float length, float width, bool banked = false)
         => line is { Length: >= 2 }
-            ? LinePath.Of(position, rotation, line, width)
-            : LinePath.Straight(position, Vector3.Transform(Vector3.UnitX, rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : rotation), length, width);
+            ? LinePath.Of(position, rotation, line, width, banked)
+            : LinePath.Straight(position, Vector3.Transform(Vector3.UnitX, rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : rotation), length, width, banked);
 
     /// <summary>A whole shore's outline heard as one source (ShoreSpec.OutlineKey), cut along itself at the ear under
     /// <see cref="ExtendedSources.PlaceRule.Pieces"/>. False for everything when this world does not spread its sources.</summary>
     public bool IsOutline(string? physicalKey)
         => _enabled && _rule == ExtendedSources.PlaceRule.Pieces && ShoreSpec.TryOutline(physicalKey, out _, out _);
+
+    /// <summary>An open water's surface heard from the whole of itself (ShoreSpec.OpenKey), the area inside its outline cut at
+    /// the ear (ExtendedSources.CutArea) under <see cref="ExtendedSources.PlaceRule.Pieces"/>. False for everything when this
+    /// world does not spread its sources.</summary>
+    public bool IsOpenWater(string? physicalKey)
+        => _enabled && _rule == ExtendedSources.PlaceRule.Pieces && ShoreSpec.TryOpen(physicalKey, out _, out _);
 
     /// <summary>How many streams a running-water synth renders: one for each piece a line can be cut into, or
     /// its own places.</summary>

@@ -71,10 +71,14 @@ public class StreamBedTests
     {
         var bed = new StreamBed(Creek(0.005f, 200f), 3);
         var whole = new List<StreamBed.Stone>();
-        bed.StonesBetween(40f, 90f, whole);
         var parts = new List<StreamBed.Stone>();
-        bed.StonesBetween(40f, 61.3f, parts);
-        bed.StonesBetween(61.3f, 90f, parts);
+        // Every lane of it: a 3 m creek's middle and its two banks (BedSection).
+        for (int lane = 0; lane < bed.Lanes; lane++)
+        {
+            bed.StonesBetween(40f, 90f, whole, lane);
+            bed.StonesBetween(40f, 61.3f, parts, lane);
+            bed.StonesBetween(61.3f, 90f, parts, lane);
+        }
         Assert.Equal(whole.Select(s => s.Id).OrderBy(i => i), parts.Select(s => s.Id).OrderBy(i => i));
         double mean = bed.CountBetween(40f, 90f);
         _o.WriteLine($"{whole.Count} stones listed, {mean:F1} on the mean");
@@ -197,5 +201,188 @@ public class StreamBedTests
                 Assert.True(all.Max() - all.Min() < 6.0, $"an even bed's pieces from {all.Min():F1} to {all.Max():F1} dB a metre");
             }
         }
+    }
+
+    // ── A wide bed's banks as their own flow (BedSection, docs/RUNNING_WATER.md 15.10) ──────────────────────────────
+
+    /// <summary>
+    /// A parabolic section with Manning's law down each vertical: each bank, the outer fifth, carries a few per cent of
+    /// the flow in water about half the mean depth and well under the mean speed, over stones as much smaller; the middle
+    /// the rest, deeper and faster than the mean. The strips' water adds up to the channel's: their widths to one, their
+    /// flows to one, and each strip's flow is its width times its depth times its speed.
+    /// </summary>
+    [Fact]
+    public void ABanksWaterIsShallowerSlowerAndLess()
+    {
+        foreach (float n in new[] { 0.03f, 0.045f, 0.07f })
+        {
+            var (mid, bank) = BedSection.Strips(n);
+            _o.WriteLine($"n {n:F3}: a bank {bank.FlowShare:P1} of the flow, depth x{bank.DepthRatio:F2}, speed x{bank.SpeedRatio:F2}; the middle {mid.FlowShare:P1}, x{mid.DepthRatio:F2}, x{mid.SpeedRatio:F2}");
+            Assert.Equal(1.0, mid.WidthShare + 2.0 * bank.WidthShare, 4);
+            Assert.Equal(1.0, mid.FlowShare + 2.0 * bank.FlowShare, 3);
+            foreach (var s in new[] { mid, bank })
+                Assert.Equal(s.FlowShare, s.WidthShare * s.DepthRatio * s.SpeedRatio, 3);
+            Assert.InRange(bank.FlowShare, 0.03f, 0.10f);
+            Assert.InRange(bank.DepthRatio, 0.4f, 0.65f);
+            Assert.InRange(bank.SpeedRatio, 0.45f, 0.75f);
+            Assert.True(mid.DepthRatio > 1.2f && mid.SpeedRatio > 1.05f, "the middle is deeper and faster than the mean");
+            Assert.True(bank.SizeRatio < 0.5f * mid.SizeRatio, "a bank's stones are under half the middle's");
+        }
+    }
+
+    /// <summary>
+    /// A wide creek's bed lies in three lanes, its middle and its two banks, each with stones of its own: together as many
+    /// as the bed had in one, each bank's under a third of them, the riffles holding most of each lane's, and no stone in
+    /// two lanes. A bed under 1.5 m, or a short even one, keeps one lane and its stones as they were.
+    /// </summary>
+    [Fact]
+    public void AWideCreeksBanksHaveTheirOwnStones()
+    {
+        var spec = Creek(0.005f, 400f, width: 3f);
+        var bed = new StreamBed(spec, 11);
+        var flat = new StreamBed(spec, 11, banksApart: false);
+        Assert.Equal(3, bed.Lanes);
+        Assert.Equal(1, flat.Lanes);
+        double all = flat.CountBetween(0f, bed.Length);
+        double mid = bed.CountBetween(0f, bed.Length, BedSection.Middle), left = bed.CountBetween(0f, bed.Length, BedSection.LeftBank);
+        double right = bed.CountBetween(0f, bed.Length, BedSection.RightBank);
+        _o.WriteLine($"{all:F0} stones in one lane; {mid:F0} in the middle, {left:F0} and {right:F0} on the banks");
+        Assert.Equal(all, mid + left + right, 3);
+        Assert.InRange(left / all, 0.15, 0.33);
+        Assert.Equal(left, right, 6);
+        var ids = new HashSet<long>();
+        for (int lane = 0; lane < 3; lane++)
+        {
+            var stones = new List<StreamBed.Stone>();
+            bed.StonesBetween(0f, bed.Length, stones, lane);
+            Assert.All(stones, s => Assert.Equal(lane, s.Lane));
+            Assert.All(stones, s => Assert.True(ids.Add(s.Id), $"stone {s.Id} in two lanes"));
+            double inRough = stones.Count(s => bed.RoughAt(s.At));
+            Assert.True(inRough / stones.Count > 0.7, $"lane {lane}: the riffles hold {inRough / stones.Count:P0} of its stones");
+        }
+        // Narrow, or a short even stretch fed at its head (its sites spread along it, not taken from its bed): one lane.
+        Assert.Equal(1, new StreamBed(Creek(0.005f, 400f, width: 1.4f), 11).Lanes);
+        Assert.False(BedSection.Banked(Creek(0.025f, 20f, width: 3f)));
+        Assert.False(BedSection.Banked(RunningWaterSpec.Creek));
+    }
+
+    /// <summary>
+    /// Heard from beside the creek, the near bank is near and the far bank far: in the piece beside you the near bank's
+    /// lane is louder than the piece's mean and the far bank's quieter, the other way round from the other side, and all
+    /// three alike from far off. Their mean over the bed's fifths is the piece's own, so the piece's voice keeps its level.
+    /// </summary>
+    [Fact]
+    public void TheNearBankIsHeardNearer()
+    {
+        var path = LinePath.Straight(Vector3.Zero, Vector3.UnitX, 100f, 3f, banked: true);
+        foreach (var (ear, near, far) in new[] { (new Vector3(0f, 1.7f, 3f), BedSection.LeftBank, BedSection.RightBank),
+                                                 (new Vector3(0f, 1.7f, -3f), BedSection.RightBank, BedSection.LeftBank) })
+        {
+            var cut = ExtendedSources.Cut(path, ear, ExtendedSources.MaxPlaces);
+            path.Nearest(ear, out float along);
+            int i = cut.PieceAt(along);
+            float gNear = cut.LaneGain(i, near), gMid = cut.LaneGain(i, BedSection.Middle), gFar = cut.LaneGain(i, far);
+            _o.WriteLine($"ear at {ear}: near bank x{gNear:F2}, middle x{gMid:F2}, far bank x{gFar:F2}");
+            Assert.True(gNear > 1.15f && gFar < 0.85f, $"near x{gNear:F2}, far x{gFar:F2}");
+            for (int p = 0; p < cut.Count; p++)
+            {
+                float m = cut.LaneGain(p, 0), l = cut.LaneGain(p, 1), r = cut.LaneGain(p, 2);
+                Assert.Equal(1f, 0.6f * m * m + 0.2f * l * l + 0.2f * r * r, 3);
+            }
+        }
+        var distant = ExtendedSources.Cut(path, new Vector3(0f, 1.7f, 300f), 4);
+        for (int p = 0; p < distant.Count; p++)
+            for (int lane = 0; lane < 3; lane++) Assert.InRange(distant.LaneGain(p, lane), 0.97f, 1.03f);
+        Assert.Null(ExtendedSources.Cut(LinePath.Straight(Vector3.Zero, Vector3.UnitX, 100f, 3f), Vector3.UnitZ * 3f, 6).LaneGains);
+    }
+
+    /// <summary>
+    /// Walking beside 40 m of a banked creek and away from it to 200 m in 5 cm steps, its pieces merging as it narrows at
+    /// the ear, cut again as the client cuts it: the line heard whole never steps (under 0.3 dB a step), and when it is cut
+    /// again no lane of the piece beside you jumps (each lane's gain within 1 dB of what it was), so neither bank cuts in
+    /// or out, nor changes sides.
+    /// </summary>
+    [Fact]
+    public void WalkingBesideTheBanksNothingSteps()
+    {
+        var path = LinePath.Straight(Vector3.Zero, Vector3.UnitX, 40f, 3f, banked: true);
+        ExtendedSources.LineCut? cut = null;
+        Vector3 cutAt = default;
+        int wanted = 0, cuts = 0;
+        var counts = new SortedSet<int>();
+        double lastTotal = double.NaN, worstTotal = 0, worstLane = 0;
+        var walk = new List<Vector3>();
+        for (float x = -15f; x <= 15f; x += 0.05f) walk.Add(new Vector3(x, 1.7f, 3f));
+        for (float z = 3f; z <= 200f; z += 0.05f) walk.Add(new Vector3(15f, 1.7f, z));
+        foreach (var ear in walk)
+        {
+            wanted = ExtendedSources.WantedPieces(path, ear, wanted);
+            counts.Add(wanted);
+            if (cut == null || cut.Count != wanted || Vector3.Distance(ear, cutAt) > cut.RecutMetres)
+            {
+                var next = ExtendedSources.Cut(path, ear, wanted, 2f);
+                if (cut != null)
+                {
+                    path.Nearest(ear, out float along);
+                    int a = cut.PieceAt(along), b = next.PieceAt(along);
+                    for (int lane = 0; lane < 3; lane++)
+                        worstLane = Math.Max(worstLane, Math.Abs(20 * Math.Log10(next.LaneGain(b, lane) / cut.LaneGain(a, lane))));
+                }
+                cut = next;
+                cutAt = ear;
+                cuts++;
+            }
+            double total = 0;
+            for (int i = 0; i < cut.Count; i++)
+            {
+                var p = ExtendedSources.Place(path, ear, cut.Edges[i], cut.Edges[i + 1], 2f);
+                float g = p.Gain * MathF.Min(1f, 2f / Vector3.Distance(ear, p.At));
+                total += cut.ShareOfPlace(cut.PlaceOfPiece(i)) * (double)g * g;
+            }
+            if (!double.IsNaN(lastTotal)) worstTotal = Math.Max(worstTotal, Math.Abs(10 * Math.Log10(total / lastTotal)));
+            lastTotal = total;
+        }
+        _o.WriteLine($"{cuts} cuts, {counts.Count} counts of pieces ({string.Join(",", counts)}); the line's largest step {worstTotal:F3} dB; a lane beside you at a cut {worstLane:F2} dB");
+        Assert.True(cuts > 20 && counts.Count > 2, "the walk never merged pieces");
+        Assert.True(worstTotal < 0.3, $"the line stepped {worstTotal:F2} dB");
+        Assert.True(worstLane < 1.0, $"a lane jumped {worstLane:F2} dB at a cut");
+    }
+
+    /// <summary>
+    /// The banks sound unlike the middle: their shallow water breaks over small stones into small bubbles, so the banks
+    /// alone are brighter than the middle alone (their top octaves, 4 to 16 kHz, stand higher over their 125 to 500 Hz
+    /// by 6 dB and more) and quieter (a fraction of the water). Oak Creek's bed after an hour of heavy rain, 92 L/s.
+    /// </summary>
+    [Fact]
+    public void TheBanksAreBrighterAndQuieterThanTheMiddle()
+    {
+        var spec = GroundChannels.SpecFor(GroundChannelKind.Creek, 3f, 0.005f, 300f, 943f, new GroundCatchment(new float[GroundHydrology.Surfaces], 600f));
+        float[] Bands(float middle, float bank)
+        {
+            var synth = new RunningWaterSynth(spec, Rate, 7, ExtendedSources.MaxPlaces) { Flow = 92f, MiddlePart = middle, BankPart = bank };
+            var buf = new float[synth.Places];
+            var mono = new float[Rate * 6];
+            for (int i = 0; i < Rate * 8; i++)
+            {
+                if (i % 256 == 0) synth.Control(256f / Rate);
+                synth.NextPlaces(buf);
+                if (i >= Rate * 2) mono[i - Rate * 2] = buf.Sum();
+            }
+            var e = new float[Spectrum.BandCount];
+            for (int s = 0; s + 4096 <= mono.Length; s += 4096)
+            {
+                var b = Spectrum.BandEnergy(mono.AsSpan(s, 4096), Rate);
+                for (int k = 0; k < e.Length; k++) e[k] += b[k];
+            }
+            return e;
+        }
+        var mid = Bands(1f, 0f);
+        var banks = Bands(0f, 1f);
+        // Bands: 125-250, 250-500 against 4-8k, 8-16k.
+        double Tilt(float[] e) => 10 * Math.Log10((e[7] + e[8]) / (e[2] + e[3]));
+        double tilt = Tilt(banks) - Tilt(mid), level = 10 * Math.Log10(banks.Sum() / mid.Sum());
+        _o.WriteLine($"the banks' top octaves {tilt:+0.0;-0.0} dB more over their low ones than the middle's; the banks {level:+0.0;-0.0} dB on the middle");
+        Assert.True(tilt > 6.0, $"the banks only {tilt:F1} dB brighter");
+        Assert.InRange(level, -25.0, -4.0);
     }
 }

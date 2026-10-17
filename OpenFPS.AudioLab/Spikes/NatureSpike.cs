@@ -48,7 +48,7 @@ public static class NatureSpike
     private static readonly OpenFPS.Sound.Hearing.HearingSettings LabHearing = OpenFPS.Sound.Hearing.HearingSettings.FromEnvironment();
 
     private const int Rate = 48000;
-    private static readonly float[] Centres = { 31.5f, 63f, 125f, 250f, 500f, 1000f, 2000f, 4000f, 8000f, 16000f };
+    internal static readonly float[] Centres = { 31.5f, 63f, 125f, 250f, 500f, 1000f, 2000f, 4000f, 8000f, 16000f };
 
     /// <summary>−20 dBFS rms in the file is 94 dB SPL: a pascal is 0.1 of full scale.</summary>
     private const float PascalsToFull = 0.1f;
@@ -388,7 +388,7 @@ public static class NatureSpike
     }
 
     /// <summary>Octave-band energies (Welch, Hann, 8192) and the A-weighted total, mean square.</summary>
-    private static (double[] Bands, double AWeighted) Octaves(float[] x, int sr)
+    internal static (double[] Bands, double AWeighted) Octaves(float[] x, int sr)
     {
         const int n = 8192;
         var bands = new double[Centres.Length];

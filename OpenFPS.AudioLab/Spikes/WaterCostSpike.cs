@@ -27,7 +27,7 @@ namespace OpenFPS.AudioLab.Spikes;
 ///   --water-cost rain out=DIR
 ///        the render fingerprint's three rain renders (RenderFingerprintTests: 2 s at 8 mm/h on asphalt,
 ///        steel and a puddle, seed 9) as DIR/rain_SURFACE.f32, for a null test of a change that moves them.
-///   --water-cost line [length=300] [width=3] [slope=0.005] [reference=1000] [flow=60] [head=1] [sec=] [reps=]
+///   --water-cost line [length=300] [width=3] [slope=0.005] [reference=1000] [flow=60] [head=1] [banks=0] [sec=] [reps=]
 ///        a whole line of creek as one source (docs/RUNNING_WATER.md 15.6), cut 1.5 m off it, then walked along at
 ///        1.4 m/s and cut again as the client cuts it.
 ///   --water-cost bubbles
@@ -79,11 +79,13 @@ public static class WaterCostSpike
             float reference = Arg(args, "reference=", 1000f), q = Arg(args, "flow=", 60f);
             var spec = GroundChannels.SpecFor(GroundChannelKind.Creek, width, slope, length, reference,
                                               new GroundCatchment(new float[GroundHydrology.Surfaces], 600f), Arg(args, "head=", 1f));
-            var path = LinePath.Straight(Vector3.Zero, Vector3.UnitX, spec.LengthMetres, spec.WidthMetres);
+            // banks=0: the bed as one strip, as before its banks were heard apart (BedSection).
+            bool banks = !args.Contains("banks=0");
+            var path = LinePath.Straight(Vector3.Zero, Vector3.UnitX, spec.LengthMetres, spec.WidthMetres, banked: banks && BedSection.Banked(spec));
             foreach (bool walk in new[] { false, true })
                 Measure($"line_{length:F0}m_{(walk ? "walked" : "beside")}", $"{q:0.##} L/s", ExtendedSources.MaxPlaces, 2f, sec, reps, dir, () =>
                 {
-                    var s = new RunningWaterSynth(spec, Rate, 7, ExtendedSources.MaxPlaces) { Flow = q };
+                    var s = new RunningWaterSynth(spec, Rate, 7, ExtendedSources.MaxPlaces, banksApart: banks) { Flow = q };
                     var ear = new Vector3(-0.25f * length, 1.7f, 1.5f);
                     var cutAt = ear;
                     s.Cut = ExtendedSources.Cut(path, ear, ExtendedSources.MaxPlaces);

@@ -87,11 +87,13 @@ fingerprint changed too, so the door renders are made again once.
    - 7: far traffic along the roads;
    - 8: a path per near piece (today every piece is heard through its source's middle's path).
    With them:
-   - A river's banks as their own flow (Resonance's 2.2, the idea only): each bank a strip of the same water,
-     shallower and slower, over smaller stones, folded into `StreamBed`. Why: a river's edge sounds unlike its
-     middle. Size: one session. With the next extended-sources work.
-   - Whitecaps over open water (Cody: "especially yes"): wind-driven breaking over a lake or the sea, not only
-     at its shore. One to two sessions. After items 2 to 4, or with the extended sources.
+   - A river's banks as their own flow (Resonance's 2.2): DONE 2026-10-17, unheard (docs/RUNNING_WATER.md 15.10).
+     Each bank the outer fifth, 6 % of the flow at half the depth over stones half the size; on Oak Creek 12 to 16
+     dB under the middle and brighter. Listen: "Listen in the game" below.
+   - Whitecaps over open water (Cody: "especially yes"): DONE 2026-10-17, unheard (docs/RUNNING_WATER.md 15.11).
+     Each pond's open water a source over its whole surface, its crests breaking by fetch, wind and gust; none under
+     3 m/s, Albany's ponds whitening from about 8 m/s. Listen: "Listen in the game" below. Left: the sea's whitecaps
+     on a map with a coast; a lake's depth from data (every pond is 1.5 m deep).
 10. Speakers sharing a program keep one track clock (Resonance's 3.3): DONE 2026-10-17 (changes.md; docs/CLIENT_NOTES.md
     "Speakers sharing a program"). The world's clock is the program's; the speedway's four horns say one line, and a
     speaker coming back joins its program where it is, heard at its own flight time. Waiting on the ear ("Listen in
@@ -378,6 +380,20 @@ here are checked to stand on (docs/LISTENING_SPOTS.md).
   (none on a map: place two Space Megaphones about 40 m apart with the editor, F12): both say the same moment of
   it, the far one later only by its distance, and walking between them never starts either from its top; one coming
   back fades in rather than clicking. Lab: AudioLab `--resonance-maybes track`, `old` for before.
+- Whitecaps over open water (2026-10-17, docs/RUNNING_WATER.md 15.11). On Albany (`/join albany_or`), its biggest pond:
+  `/weather wind 12 west` (or a stormy front), stand on its downwind shore, the east one, 2 m back
+  (`/tp -729.4 613.6 -7.3`), and walk west out over the water (solid underfoot) to the point furthest from any edge
+  (`/tp -945.5 592.5 -7.6`). A soft hiss of small breaking crests over the pond, more of it out on the water and
+  downwind, swelling where a gust crosses; nothing at all in a light wind, and no point where it switches on: as the
+  wind rises from calm it fades in from nothing, and out as it drops (`/weather wind 4 west`, then 8, then 12). Say
+  whether it should be louder or brighter, and whether the onset (about 8 m/s on these narrow ponds) is right. On
+  Magnolia, its pond from `/tp 563.4 -999.7 0.2` and out at `/tp 394.2 -972.2 -0.1`: plainer, with more water upwind.
+  Lab: AudioLab `--waves open ramp`, `--extent-walk open,open-ramp render`.
+- A wide creek's banks (2026-10-17, docs/RUNNING_WATER.md 15.10). On Albany after heavy rain (`/weather rain heavy`
+  for half an hour or more), beside Oak Creek 1.5 m out from its edge (`/tp 689.4 1142.1 -6.3`), walking east along it
+  to `/tp 748.6 1147.3 -6.5`: the near edge a finer, brighter babble close to you, the middle's deeper gurgle a little
+  further off, the far bank fainter; the whole about 1 dB quieter than before. Lab: AudioLab `--running-water banks`,
+  `--extent-walk oak,oak-out render`.
 - A moving one-off's echoes move with it (2026-10-17, docs/CLIENT_NOTES.md "One-off sounds: why the echoes are as
   they are"). In 1 Elm Street's living room (`/tp -414.2 -108.0 0.2`), slide the patio door (the back door, 2.9 m
   south-west) open and shut a few times, facing north: its answer off the west wall, on your left, should go with

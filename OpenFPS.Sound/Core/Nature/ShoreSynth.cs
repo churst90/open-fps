@@ -33,7 +33,7 @@ namespace OpenFPS.Sound.Core.Nature;
 /// <see cref="Flicker"/> and the other FITTED knobs below. A bubble's loudness, the splash's efficiency
 /// and the breaking front's air are the fountain's and the creek's, not refitted here.
 /// </summary>
-public sealed class ShoreSynth
+public sealed partial class ShoreSynth
 {
     // ── The fitted constants ─────────────────────────────────────────────────────────────────────
 
@@ -233,8 +233,9 @@ public sealed class ShoreSynth
         _flickDrive = MathF.Sqrt(1f - _flickPole * _flickPole);
         float rho2 = _flickPole * _flickPole;
         _flickA2B = MathF.Sqrt((1f - rho2) * (1f - rho2) * (1f - rho2) / (1f + rho2)) / _flickDrive;
-        _outline = outlinePlaces > 0;
-        _along = _outline ? outlinePlaces : Math.Max(1, spec.Places);
+        _area = outlinePlaces > 0 && spec.Face == ShoreFace.Open;
+        _outline = outlinePlaces > 0 && !_area;
+        _along = _outline || _area ? outlinePlaces : Math.Max(1, spec.Places);
         _rows = !_outline && spec.BreakRowMetres > 0f ? 2 : 1;
         _places = new EventSum[_along * _rows];
         for (int k = 0; k < _places.Length; k++) _places[k] = new EventSum(sampleRate, seed * 7919 + 5 + k * 15485863);
@@ -339,6 +340,7 @@ public sealed class ShoreSynth
     /// <summary>The sea following the wind, and the places' shares.</summary>
     public void Control(float dt)
     {
+        if (_area) { AreaControl(dt); return; }
         if (_outline) { OutlineControl(dt); return; }
         var (hs, tp, onshore) = Spec.WindSea(Geometry, float.IsFinite(WindSpeed) ? WindSpeed : 0f, WindFromDegrees);
         _windSeaTarget = hs;
@@ -363,7 +365,7 @@ public sealed class ShoreSynth
     /// its piece. Set by the voice; null until the client's first cut, and silent until then.</summary>
     public ExtendedSources.LineCut? Cut;
     private ExtendedSources.LineCut? _cutBy;
-    private readonly bool _outline;
+    private readonly bool _outline, _area;
 
     /// <summary>A piece is read where its water lies at most this often along it, m, and at most
     /// <see cref="OutlineSamples"/> times.</summary>
@@ -508,7 +510,7 @@ public sealed class ShoreSynth
         float dt = Block / _rate;
         _time += dt;
         _hull?.BeginBlock();
-        Seas(dt);
+        if (_area) OpenWater(dt); else Seas(dt);
         RunProcs(dt);
         // Power to amplitude: what the noise is driven with this block.
         for (int i = 0; i < _power.Length; i++)
@@ -599,6 +601,7 @@ public sealed class ShoreSynth
     private void SeaUnderWay()
     {
         _underWay = true;
+        if (_area) return;   // open water: its whitecaps start where its sea is, with no wave to wait for
         float period = 0f;
         if (_hs > 0f && _tp > 0f) period = _tp;
         if (_swell != null) period = MathF.Max(period, Spec.SwellPeriodSeconds);
@@ -834,7 +837,7 @@ public sealed class ShoreSynth
         // young sea is short-crested: about one crest a wavelength across and a wavelength apart, each
         // breaking along a third of its length.
         float seaHs = _outline ? c.Hs : _hs, seaTp = _outline ? c.Tp : _tp;
-        if (!eddy && seaHs > 0f && WhitecapPart > 0f)
+        if (!eddy && !_outline && seaHs > 0f && WhitecapPart > 0f)
         {
             float b = WindWaves.BreakingProbability(seaHs, seaTp, WindSpeed);
             float l = MathF.Max(0.2f, WindWaves.DeepWavelength(period));
@@ -852,6 +855,7 @@ public sealed class ShoreSynth
         switch (Spec.Face)
         {
             case ShoreFace.Beach: Beach(c, h0, period, at, eddy); break;
+            case ShoreFace.Open: break;   // no edge: only its whitecaps
             default: Face(c, h0, period, at); break;
         }
     }
@@ -1145,8 +1149,11 @@ public sealed class ShoreSynth
     private Proc _dropped;
 
     /// <summary>A cloud of bubbles: <paramref name="air"/> m³ of air broken into the Deane-Stokes sizes up
-    /// to <paramref name="maxMm"/>, of which <paramref name="heard"/> is heard.</summary>
-    private void StartCloud(int place, int delay, float seconds, float air, float maxMm, float heard, float noteMm = 0f)
+    /// to <paramref name="maxMm"/>, of which <paramref name="heard"/> is heard. <paramref name="hiss"/>: heard as the crowd it
+    /// is however thinly its share is heard, band noise rising and falling over the cloud's own envelope, never single
+    /// bubbles starting at once (open water's whitecaps: a plume is millions of bubbles, and one heard alone in a calm
+    /// would start with an edge).</summary>
+    private void StartCloud(int place, int delay, float seconds, float air, float maxMm, float heard, float noteMm = 0f, bool hiss = false)
     {
         if (air <= 0f || heard <= 0f) return;
         ref var p = ref NewProc(Kind.Cloud, place, delay, seconds);
@@ -1158,6 +1165,7 @@ public sealed class ShoreSynth
         p.Total = air / meanVolume;
         p.Weight = heard;
         p.A = maxMm;
+        p.D = hiss ? 1f : 0f;
         p.BinShare0 = share[0]; p.BinShare1 = share[1]; p.BinShare2 = share[2]; p.BinShare3 = share[3];
         p.BinShare4 = share[4]; p.BinShare5 = share[5]; p.BinShare6 = share[6];
     }
@@ -1293,7 +1301,7 @@ public sealed class ShoreSynth
             if (mm > p.A * 1.42f) continue;
             float count = n * share[b] * p.Weight * FlickerAt(slot, b, FlickerBandSigma);
             if (count <= 0f) continue;
-            if (count > SparseLimit)
+            if (count > SparseLimit || p.D > 0f)
                 AddPower(p.Place, b, count * BubbleEnergy(mm) / BlockSeconds);
             else
             {

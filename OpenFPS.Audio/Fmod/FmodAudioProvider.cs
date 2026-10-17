@@ -2694,8 +2694,9 @@ public partial class FmodAudioProvider : IAudioProvider
     /// <summary>Waves at an edge: its preset and its own geometry from the key (ShoreSpec.KeyFor).</summary>
     private PlacedNatureVoice ShoreVoice(in SpatialEmitter emitter, int rate)
     {
-        // A whole outline: cut along itself at the ear, every piece a column of its own water (ShoreSynth.Cut).
-        if (Options.WideSources.IsOutline(emitter.PhysicalKey))
+        // A whole outline: cut along itself at the ear, every piece a column of its own water (ShoreSynth.Cut). An open
+        // water's surface: cut by the bearings it covers, every piece the crests breaking in it (ShoreSynth's open water).
+        if (Options.WideSources.IsOutline(emitter.PhysicalKey) || Options.WideSources.IsOpenWater(emitter.PhysicalKey))
             return new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Models.ModelLibrary.Presets.Shore(emitter.PhysicalKey), null, rate,
                                          emitter.Seed * 53 + 23, emitter.Position, Weather, ExtendedSources.MaxPlaces)
                    { TargetCut = PiecesOf(emitter.EntityId) };

@@ -162,6 +162,9 @@ public class ExtentWalkTests
         yield return new LinePath(Arc(20f, 120f, 25), width: 6f);
         // A dog-leg with a climb in it, as a drainage line's cells run.
         yield return new LinePath(new[] { new Vector3(-30f, 1f, 0f), new Vector3(-5f, 0.5f, 0f), new Vector3(0f, 0.4f, 6f), new Vector3(25f, 0f, 8f) }, width: 2f);
+        // A wide natural bed heard as its middle and its two banks (BedSection): five lines across it.
+        yield return new LinePath(Arc(20f, 120f, 25), width: 6f, banked: true);
+        yield return new LinePath(new[] { new Vector3(-30f, 1f, 0f), new Vector3(-5f, 0.5f, 0f), new Vector3(0f, 0.4f, 6f), new Vector3(25f, 0f, 8f) }, width: 3f, banked: true);
     }
 
     /// <summary>A straight path is cut and placed as the straight line always was (ExtendedSources.View), to a

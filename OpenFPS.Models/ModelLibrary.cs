@@ -472,10 +472,12 @@ public sealed partial class Catalogue : IPresets
         => GroundChannels.TryParse(key, out var ground) ? ground : Flow(key);
 
     // A map's key with its geometry ("shore:lake_sand/300/90/20") names its preset; a whole outline's
-    // ("shore:pond_bank/outline/410") is as loud as its stretches together.
+    // ("shore:pond_bank/outline/410") is as loud as its stretches together; an open water's ("shore:open_pond/open/9000") as
+    // its area.
     ShoreSpec IPresets.Shore(string key)
     {
         if (ShoreSpec.TryOutline(key, out string outlined, out float perimeter)) return Shore(outlined).AlongOutline(perimeter);
+        if (ShoreSpec.TryOpen(key, out string open, out float area)) return Shore(open).AcrossArea(area);
         ShoreSpec.ParseKey(key, out string preset, out _);
         return Shore(preset);
     }

@@ -454,6 +454,9 @@ public sealed class PlacedNatureVoice
             Shore.Cut = TargetCut;
             Shore.WindSpeed = Running ? air.Speed : 0f;
             Shore.WindFromDegrees = air.FromDegrees;
+            // Open water's whitecaps break more where a gust is crossing it now (WindWaves.GustBreaking).
+            Shore.Gusts = Weather.Wind;
+            Shore.Now = now;
             Shore.Control(dt);
         }
     }

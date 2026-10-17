@@ -24,6 +24,9 @@ public enum ShoreFace
     Wall,
     /// <summary>A boat's side: a wall that rings (<see cref="HullSpec"/>).</summary>
     Hull,
+    /// <summary>No edge: the open water itself, heard from its whole surface where the wind's sea breaks in whitecaps
+    /// (docs/RUNNING_WATER.md 15.11).</summary>
+    Open,
 }
 
 /// <summary>What a beach is made of.</summary>
@@ -167,6 +170,9 @@ public sealed record ShoreSpec
     public float BreakRowMetres { get; init; }
     [Tunable("m", 0.2, 50, "How big it is. Inside it the sound is flat.", Step = 0.5)]
     public float ExtentMetres { get; init; } = 4f;
+    /// <summary>For open water (<see cref="ShoreFace.Open"/>): the area its level is declared over.</summary>
+    [Tunable("m²", 100, 10000000, "For open water: the area of the round pond the source level was measured over at the reference wind. Change it only with a new measurement.", Label = "reference area", Step = 100)]
+    public float AreaSquareMetres { get; init; } = 10000f;
 
     /// <summary>Every place: along the edge, and as many again on the break line if it has one.</summary>
     [JsonIgnore]
@@ -231,6 +237,45 @@ public sealed record ShoreSpec
         return preset.Length > 0;
     }
 
+    /// <summary>
+    /// The key of an open water's surface heard from the whole of itself (docs/RUNNING_WATER.md 15.11, 2026-10-17):
+    /// "shore:&lt;preset&gt;/open/&lt;its area, m²&gt;". Its outline is its emitter's line (SoundEmitterComponent.Line); the
+    /// surface inside it is cut at the ear (ExtendedSources.CutArea) and each piece plays the whitecaps breaking in it.
+    /// </summary>
+    public static string OpenKey(string soundId, float areaSquareMetres)
+    {
+        string bare = soundId.Split('/')[0];
+        return string.Create(CultureInfo.InvariantCulture, $"{bare}/open/{MathF.Round(MathF.Max(1f, areaSquareMetres))}");
+    }
+
+    /// <summary>Whether a key is an open water's (<see cref="OpenKey"/>), and its preset and area.</summary>
+    public static bool TryOpen(string? key, out string preset, out float areaSquareMetres)
+    {
+        preset = "";
+        areaSquareMetres = 0f;
+        if (string.IsNullOrEmpty(key)) return false;
+        string rest = key.StartsWith("shore:", StringComparison.OrdinalIgnoreCase) ? key[6..] : key;
+        var parts = rest.Split('/');
+        if (parts.Length != 3 || parts[1] != "open"
+            || !float.TryParse(parts[2], NumberStyles.Float, CultureInfo.InvariantCulture, out areaSquareMetres)) return false;
+        preset = parts[0];
+        return preset.Length > 0;
+    }
+
+    /// <summary>The area of an outline given as points (x and z), m²: the shoelace formula.</summary>
+    public static float AreaOf(ReadOnlySpan<Vector3> outline)
+    {
+        double twice = 0;
+        for (int i = 0, j = outline.Length - 1; i < outline.Length; j = i++)
+            twice += (double)outline[j].X * outline[i].Z - (double)outline[i].X * outline[j].Z;
+        return (float)Math.Abs(0.5 * twice);
+    }
+
+    /// <summary>The spec of an open water this big: as loud as its area against the area its level was declared over
+    /// (<see cref="AreaSquareMetres"/>).</summary>
+    public ShoreSpec AcrossArea(float areaSquareMetres)
+        => this with { SourceLevelDb = SourceLevelDb + 10f * MathF.Log10(MathF.Max(1f, areaSquareMetres) / MathF.Max(1f, AreaSquareMetres)) };
+
     /// <summary>The spec of a whole outline this long: as loud as its stretches together (its level declared over
     /// <see cref="LengthMetres"/> of edge), its length the outline's.</summary>
     public ShoreSpec AlongOutline(float perimeterMetres)
@@ -273,8 +318,11 @@ public sealed record ShoreSpec
         return (hs, tp, cos);
     }
 
-    /// <summary>Calm water: no wind to raise waves, no swell and no current. Gives no voice.</summary>
-    public bool CalmAt(float windSpeed) => windSpeed <= WindWaves.OnsetWind && SwellHeightMetres <= 0f && CurrentMetresPerSecond <= 0.05f;
+    /// <summary>Calm water: no wind to raise waves, no swell and no current; open water, no wind to break its sea
+    /// (<see cref="WindWaves.WhitecapOnsetWind"/>). Gives no voice.</summary>
+    public bool CalmAt(float windSpeed)
+        => Face == ShoreFace.Open ? windSpeed < WindWaves.WhitecapOnsetWind
+         : windSpeed <= WindWaves.OnsetWind && SwellHeightMetres <= 0f && CurrentMetresPerSecond <= 0.05f;
 
     // ── The presets ─────────────────────────────────────────────────────────────────────────────
 
@@ -516,6 +564,29 @@ public sealed record ShoreSpec
         PeakHeadroomDb = 23f,
     };
 
+    /// <summary>
+    /// A pond's open water, away from its edge: a metre and a half deep, round. Silent under a breeze; in a stiff one its
+    /// short steep sea breaks in small whitecaps over its surface where the fetch is long enough for a crest to fold air
+    /// under, more to leeward and in the gusts (ShoreSynth's open water). Its level is declared over a hectare, a pond
+    /// 113 m across, at 8 m/s.
+    /// </summary>
+    public static ShoreSpec OpenPond => new()
+    {
+        Name = "Pond, open water",
+        Body = WaterBody.Round,
+        FetchMetres = 113f,
+        DepthMetres = 1.5f,
+        Face = ShoreFace.Open,
+        ReferenceWind = 8f,
+        // MEASURED with `--waves open level sec=30`, 2026-10-17: Leq 67.9 dB at a metre at 8 m/s over a round hectare; 10 ms peaks' 99.9th percentile 18.4 dB over.
+        SourceLevelDb = 68f,
+        PeakHeadroomDb = 18.5f,
+        AreaSquareMetres = 10000f,
+        LengthMetres = 20f,
+        Places = 1,
+        ExtentMetres = 4f,
+    };
+
     public static IReadOnlyDictionary<string, Func<ShoreSpec>> Presets { get; } =
         new Dictionary<string, Func<ShoreSpec>>(StringComparer.OrdinalIgnoreCase)
         {
@@ -529,5 +600,6 @@ public sealed record ShoreSpec
             ["harbour_wall"] = () => HarbourWall,
             ["hull_wood"] = () => HullWood,
             ["hull_aluminium"] = () => HullAluminium,
+            ["open_pond"] = () => OpenPond,
         };
 }

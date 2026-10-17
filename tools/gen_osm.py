@@ -3856,6 +3856,8 @@ def lay_waterways():
         lay_waterway(wf)
     for ring, nm, preset in SHORE_RINGS:
         lay_shore(ring + [ring[0]], nm, preset)
+    for ring, nm, preset in SHORE_RINGS:
+        lay_open_water(ring + [ring[0]], nm.replace(" shore", "") + " open water")
     for wf in WATER:
         if wf["kind"] != "area" and (wf["class"] in RIVER_CLASSES or waterway_width(wf) >= RIVER_WIDTH):
             lay_river_banks(wf)
@@ -3881,6 +3883,28 @@ def lay_shore(points, nm, preset):
     _finish(e, nm, "water")
     e["_pin"] = 0.0
     n_shores += 1
+
+
+# A pond's or a lake's open water, heard from its whole surface (ShoreSpec.OpenPond, ShoreSynth's open water; docs/
+# RUNNING_WATER.md 15.11): whitecaps where the wind's sea breaks over it. Its Line is the same outline as its shore's, the
+# surface inside it what is heard, cut at the ear; laid after every shore so no other id moves but the ground's.
+n_open_waters = 0
+
+
+def lay_open_water(points, nm):
+    """One source over the water inside an outline (open_water_pond), its line the outline at the water's surface: the
+    lowest ground along the edge, as a pond's surface boxes lie on the lowest ground under them. Its box is the outline's
+    bounds, so it is sent with every tile the water reaches into."""
+    global n_open_waters
+    xs, zs = [p[0] for p in points], [p[1] for p in points]
+    cx, cz = (min(xs) + max(xs)) / 2, (min(zs) + max(zs)) / 2
+    y = min(ground(x, z) for x, z in points) + Y_ROAD + 0.01
+    e = {"EntityId": new_id(), "PrefabId": "open_water_pond", "Position": v3(cx, y, cz),
+         "Scale": v3(round(max(1.0, max(xs) - min(xs)), 2), 1, round(max(1.0, max(zs) - min(zs)), 2)),
+         "Line": [v3(x - cx, 0.0, z - cz) for x, z in points]}
+    _finish(e, nm, "water")
+    e["_pin"] = 0.0
+    n_open_waters += 1
 
 
 def lay_river_banks(wf):
@@ -4306,7 +4330,7 @@ print(f"  area {XMAX - XMIN:.0f} x {ZMAX - ZMIN:.0f} m; {len(ROADS)} roads, {len
       f"({INTERPOLATED} interpolated from Census ranges), {len(LOTS)} lots, {len(BLD)} buildings")
 print("  buildings: " + ", ".join(f"{k} {STATS[k]}" for k in ("house", "mobile_home", "premises", "church", "building", "garage", "workshop", "barn", "outbuilding", "shed")))
 print(f"  {regions} zones and rooms, {by_prefab['named_place']} named places, {STATS['doors']} outside doors, "
-      f"{n_canopy} canopy volumes, {n_trunks} trunks, {n_crowns} crowns, {n_shores} shores and banks heard whole, {n_waterways} waterways heard, {len(VEHICLES)} vehicles")
+      f"{n_canopy} canopy volumes, {n_trunks} trunks, {n_crowns} crowns, {n_shores} shores and banks heard whole, {n_open_waters} open waters, {n_waterways} waterways heard, {len(VEHICLES)} vehicles")
 print("  by layer: " + ", ".join(f"{k} {v}" for k, v in sorted(COUNT.items())))
 if STATS["kitchens with a corner counter"]:
     print(f"  {STATS['kitchens with a corner counter']} kitchens with no clear stretch of back wall have a short counter in a corner")

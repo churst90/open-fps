@@ -38,7 +38,7 @@ namespace OpenFPS.AudioLab.Spikes;
 ///        foot; captured from the master in float (DIR/capture.post.wav) with DIR/segments.csv. No map:
 ///        no walls, echoes or reverb, flat asphalt. The wind at the ears off.
 /// </summary>
-public static class RunningWaterSpike
+public static partial class RunningWaterSpike
 {
     /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
     /// the mixers it makes.</summary>
@@ -57,6 +57,7 @@ public static class RunningWaterSpike
         if (args.Contains("game")) return Game(args);
         if (args.Contains("runoff")) return RunoffTable();
         if (args.Contains("cycle")) return TapCycle(args);
+        if (args.Contains("banks")) return Banks(args);
         float sec = Arg(args, "sec=", 30f);
         float rain = Arg(args, "rain=", float.NaN);
         float flow = Arg(args, "flow=", float.NaN);

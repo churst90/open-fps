@@ -198,7 +198,9 @@ wind, so a big river's bank slaps and gurgles in a calm while a still pond is si
   in a figure legend not read].
 - No whitecaps under 3 m/s (Monahan and Ó Muircheartaigh 1980 [ft]: W = 3.84e-6 U10^3.41 above it).
 - The model counts whitecaps over a ten-metre strip of water in front of the edge [estimate: what a
-  listener at the edge hears of the open water], each breaking along a third of a wavelength.
+  listener at the edge hears of the open water], each breaking along a third of a wavelength. Since
+  2026-10-17 only a stretch of shore does: a whole outline leaves them to its pond's open water, heard from
+  its whole surface (docs/RUNNING_WATER.md 15.11), with the drift of a gust (Banner and Phillips 1974).
 
 ## 3. How loud
 

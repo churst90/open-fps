@@ -63,6 +63,30 @@ Recent work, newest first. `git log` has the rest.
   moving copies, and a ring cut while it can be heard still does. No sound changes. Found on the way and not
   changed, the models being approved: the knob, glass and push bar doors' renders stop while they still ring, a
   knob door's close up to 26 dB under its peak (todo, "Door renders that end while they ring").
+- Whitecaps over open water (todo item 9; docs/RUNNING_WATER.md 15.11). Each pond and lake on the real places' maps has
+  its open water beside its shore (`open_water_pond`, laid by tools/gen_osm.py; Albany 9, Magnolia 1, every other id as
+  it was). The client cuts the surface inside its outline at the ear by bearings, all round from over it, and each
+  piece plays the crests breaking in it: at points through it, the fetch upwind, the sea the wind raises there, and the
+  share of its crests breaking by the sea's steepness (Banner, Babanin and Young 2000), more in a gust and fewer in a
+  lull as the wind drift lowers the crest a wave can carry (Banner and Phillips 1974), from the world's wind field at
+  each point. None under 3 m/s, and a crest too slow to fold air under breaks silently, so Albany's narrow ponds first
+  whiten at about 8 to 9 m/s. Nothing steps: the law has no switch, the wind, the breaking and the sea glide, and each
+  break is a cloud of hiss that rises and falls. AudioLab `--waves open`: the biggest pond on Albany from its downwind
+  shore, silent at 0 and 4 m/s, 34.6 dB at 8 m/s, 41.7 dB at 12, peaking at 500 Hz to 1 kHz and 8 to 13 dB over its
+  bank's lapping; a wind ramped from calm to 12 m/s and back steps no more than a steady wind's own crests. An
+  outline's shore no longer counts the whitecaps in front of it. Unheard: see "Listen in the game". The maps changed;
+  the wire hash does not.
+- A wide creek's banks heard as their own flow (Resonance's 2.2, the idea; todo item 9; docs/RUNNING_WATER.md 15.10).
+  A natural bed 1.5 m wide or more whose sites come from its bed (Oak Creek, a long drainage line) is its middle and two
+  banks, each the outer fifth: by a parabolic section (Dingman 2007) with Manning's law down each vertical and the
+  bank's vegetation (Cowan 1956), each bank carries 6 % of the flow at half the mean depth and 0.6 of its speed, over
+  stones half the middle's size (Shields), folded into `StreamBed` so the riffles and pools apply. The banks play in each
+  piece's voice as loud as each is from where you stand: beside the creek its near bank 1.3 times the piece's mean, its
+  far bank 0.72. On Oak Creek after an hour of heavy rain the banks are 12 to 16 dB under the middle and brighter (-21
+  dB at 250 Hz, -10 at 16 kHz against it); rendered beside it the creek is 1 dB quieter than before and a little
+  brighter at its top, as wide, with the same voices.
+  Rendering costs what it did. Unheard: see "Listen in the game".
+
 - A one-off sound that moves as it plays has its echoes found and moved with it (Resonance's 2.6; todo item 3;
   docs/CLIENT_NOTES.md "One-off sounds: why the echoes are as they are"). A sliding or lift door's run is sent
   moving (`MovesTo`) and a part of the thunder is kept in its direction while you walk, but their copies off the

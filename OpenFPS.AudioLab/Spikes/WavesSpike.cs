@@ -36,7 +36,7 @@ namespace OpenFPS.AudioLab.Spikes;
 ///        captured from the master in float (DIR/capture.post.wav) with DIR/segments.csv. No map round
 ///        it: flat asphalt, no walls, echoes or reverb. The wind at the ears off.
 /// </summary>
-public static class WavesSpike
+public static partial class WavesSpike
 {
     /// <summary>This instrument's hearing, from the environment as the game's mixer starts with, shared with
     /// the mixers it makes.</summary>
@@ -66,6 +66,7 @@ public static class WavesSpike
         AcousticRegistry.Initialize();
         if (args.Contains("game")) return Game(args);
         if (args.Contains("sea")) return SeaTable();
+        if (args.Contains("open")) return Open(args);
         float sec = Arg(args, "sec=", 30f);
         float wind = Arg(args, "wind=", float.NaN);
         float fetch = Arg(args, "fetch=", float.NaN);
