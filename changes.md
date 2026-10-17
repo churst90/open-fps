@@ -4,6 +4,20 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-17
 
+- A machine's front outlet or cabin path stopped and started again under its id no longer leaves the engine's own
+  voice carrying its share beside the new one (Resonance's 3.2; todo item 1; docs/CLIENT_NOTES.md "A voice that
+  reads another's"). The old tap gave its share back when it was let go and again when it was released, up to
+  250 ms after the new one took it, and the hand-back cleared a flag: the front and the cabin path were heard twice
+  from two places, 4.3 dB up at 20 m/s. The engine now counts its taps, and each tap takes its share once and gives
+  it back once (EngineTapState.Take and HandBack). A tap faded out and wanted back before its fade ended takes its
+  share again; it used to play nothing for the rest of its life. A voice that reads another's synth (a front outlet,
+  a cabin path, an engine's echo or borrowed voice, a fire's or a wood's outer place) follows the live voice of the
+  id it names: with the engine restarted under its id the front outlet went on reading the released one, and with a
+  fire's middle restarted its outer places burnt on after the fire was put out. AudioLab `--resonance-maybes outlet`:
+  every restart delay was undone up to 200 ms after the stop, now none; the engine's own voice after the swap
+  -40.7 dBFS against -40.5 for the control (it was -36.2). Running water's outer places already read one synth per
+  feature and needed nothing. Heard only in the quarter second after a restart; nothing else changes. The wire hash
+  does not change.
 - The sound library's first version, tag `library/v0.1.0` (docs/LIBRARY_CHANGES.md, docs/SOUND_LIBRARY_BOUNDARY.md
   section 22): what the stack holds, what a host gives it, the native libraries, and for a host moving from a copy
   of the code the old to new namespaces and the traps. Nothing heard changes.

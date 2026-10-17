@@ -27,6 +27,11 @@ namespace OpenFPS.AudioLab.Spikes;
 ///   taps muted. The engine's own voice restarted in one tick leaves the front tap reading the released engine, whose
 ///   play position has stopped. A fire's middle restarted in one tick leaves its outer places on the old synth, which
 ///   burns on when the fire is put out.
+///   FIXED the same day: the taps are counted and each hands back once (EngineTapState.Take and HandBack), and a
+///   reader follows the live voice of the id it names (FmodAudioProvider.FollowLiveSource). Every restart delay in
+///   both rows is "ok"; the engine's own voice after the swap -40.7 dBFS against -40.5 for the control (it was
+///   -36.2); the front tap reads the live engine, and the fire's outer place the live middle's synth, which stops
+///   when the fire is put out.
 /// - overdue: does not reproduce: 1,470 one-offs in 120 s, every one playing, none held past its latest end.
 /// - close: does not reproduce: 40 devices closed with 3,120 sounds still opening, no crash.
 /// </summary>
@@ -80,10 +85,7 @@ public static class ResonanceMaybesSpike
     private static FmodAudioProvider.ActiveSound? Active(FmodAudioProvider p, int id)
         => (FmodAudioProvider.ActiveSound?)FindActiveMethod.Invoke(p, new object[] { id });
 
-    private static readonly FieldInfo CabinLiveField =
-        typeof(EngineVoiceState).GetField("_cabinTapLive", BindingFlags.NonPublic | BindingFlags.Instance)!;
-
-    private static bool CabinLive(EngineVoiceState e, int path) => ((int[])CabinLiveField.GetValue(e)!)[path] != 0;
+    private static bool CabinLive(EngineVoiceState e, int path) => e.CabinTapped(path);
 
     // ── 3.2: a voice on a shared outlet swapped in one tick ──────────────────────────────────────
 
@@ -178,6 +180,15 @@ public static class ResonanceMaybesSpike
                 Console.WriteLine(line.ToString());
             }
             p.Lab.HardStops = false;
+            Console.WriteLine($"  after the windows: front taps holding the engine {engine.FrontTaps} (one tap playing: 1)");
+
+            // A tap let go by the registry's fade and wanted back before the fade ended (VoiceRegistry.Unretire).
+            p.FadeOutEngine(Front);
+            Pump(p, clock, 0.03, Each);
+            p.ReviveEngine(Front);
+            Pump(p, clock, 0.5, Each);
+            Console.WriteLine($"  front tap faded and wanted back mid-fade:  front split {engine.SplitVoices} ({engine.FrontTaps} tap), "
+                            + $"the tap heading for {Active(p, Front)?.TapState?.TargetGain:F0}");
 
             // The other way round: the engine's own voice swapped in one tick under the taps. Now the engine is muted and
             // the front outlet heard, so the capture is what the tap reads.
@@ -191,7 +202,8 @@ public static class ResonanceMaybesSpike
             Pump(p, clock, 1.0, Each);
             marks.Add(("front tap, engine swapped", t4, t4 + 1.0));
             Console.WriteLine($"  the engine's voice swapped in one tick: the front tap reads the live engine {ReferenceEquals(Active(p, Front)?.TapState?.Source, Active(p, Car)?.EngineState)}, "
-                            + $"the old engine's play position frozen at {engine.Played} (the live one's {Active(p, Car)?.EngineState?.Played})");
+                            + $"the old engine's play position frozen at {engine.Played} (the live one's {Active(p, Car)?.EngineState?.Played}); "
+                            + $"front taps holding the old engine {engine.FrontTaps}, the live one {Active(p, Car)?.EngineState?.FrontTaps}");
             loud = false;
 
             // A wood's outer place reads the synth of its middle's live voice; the middle swapped in one tick.

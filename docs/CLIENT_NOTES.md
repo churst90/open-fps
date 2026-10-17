@@ -668,6 +668,30 @@ bake), and by then they are at the floor, 80 dB down, rather than cut off ringin
 guidance tones) already fade over 20 ms by fade points (FadeOutAndStop). The diagnostic burst source (`--audio-test`)
 is noise gated on and off, steps on purpose, and is stopped outright.
 
+## A voice that reads another's
+
+Some voices have no synth of their own and read another voice's: a machine's front outlet and the paths into the cabin
+you sit in read their engine's rings (EngineTapState), an engine's echoes and the borrowed voices of distant cars read
+its ring at a delay (EngineEchoState), and a fire's or a wood's outer places read its middle's synth (NaturePlaceState).
+Two rules keep them right when a voice is let go and started again under its id, as the budget and the registry do.
+
+A tap's share is counted. While a front outlet or a cabin path plays, the engine's own voice leaves that part out, so
+the two sum to the one engine. The tap takes its share once when it is made, or when it is wanted back mid-fade
+(the registry's Unretire), and gives it back once, as its fade begins or when it is released, whichever comes first
+(EngineTapState.Take and HandBack exchange the voice they hold). The engine carries a part only while no tap holds it
+(EngineVoiceState.FrontTaps, CabinTapped). Until 2026-10-17 the hand-back cleared a flag: an old tap let go up to
+250 ms after a new one had started under its id (its fade, then two blocks, then the reaper) gave the new one's share
+back too, and the front was heard twice from two places, 4.3 dB up at 20 m/s (Resonance's 3.2, AudioLab
+`--resonance-maybes outlet`).
+
+A reader follows the live voice of the id it names (FmodAudioProvider.FollowLiveSource, on each update). A start
+under an id already playing only updates the voice, so nothing else would move it: a front outlet went on reading an
+engine that had been released, its play position stopped, and a fire's outer places went on reading an old synth that
+burnt on after the fire was put out, since only the middle carries whether it is lit. A tap or an echo moves over
+through silence (out of the old voice over its 60 ms fade, in again on the new), and a nature place crossfades the two
+synths over 1,024 samples; the tap's share moves with it. Running water's places need neither: its synth is kept per
+feature, not per voice.
+
 ## Why an echo is smeared
 
 A reflection read straight out of the source's ring is the source's own waveform, sample for sample,

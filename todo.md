@@ -30,18 +30,12 @@ was 3fc38430512b on 2026-10-08. The wire hash has changed many times since (6357
 server from either side refuse each other at login: restart the server and update the clients first. The door
 fingerprint changed too, so the door renders are made again once.
 
-1. A voice swap leaves an engine carrying its tap's share (Resonance's 3.2, reproduced 2026-10-17). FIRST, now.
-   - What: a machine's front outlet or cabin path stopped and started again under its id (in the same tick,
-     or within about 250 ms) is undone when the old voice is released, because the tap's hand-back
-     (`EngineTapState.HandBack`, OpenFPS.Audio/Fmod/EngineProcessor.cs) clears a flag rather than counting the
-     taps. The engine's own voice then carries the front and cabin share again beside the new tap: 4.3 dB
-     doubled. The 80 ms faded stop widened the window about three times. Two orphans as well: a tap left
-     following a released engine (it stops following the car), and a fire's outer places left on an old synth
-     (it burns on after the fire is put out).
-   - Why: a doubled engine for a quarter second after any restart, and a sound that keeps playing with nothing
-     there.
-   - Fix: count the taps, each handed back once (Interlocked); re-bind an orphaned tap to the live voice.
-   - Check: AudioLab `--resonance-maybes outlet`, before and after. Size: half a session to one.
+1. A voice swap leaves an engine carrying its tap's share (Resonance's 3.2): DONE 2026-10-17 (changes.md). The
+   engine counts its taps and each takes and gives back its share once; a tap revived mid-fade takes it again; a
+   voice reading another's synth (front outlet, cabin path, echo, borrowed voice, a fire's or wood's outer place)
+   follows the live voice of its id. AudioLab `--resonance-maybes outlet`: no restart delay undone (up to 200 ms
+   before), the engine's own voice -40.7 dBFS after the swap against -40.5 for the control (-36.2 before), no
+   orphan. Unheard: see "Listen in the game".
 2. A shut door's gaps and undercut (Resonance's 1.1). Now.
    - What: a shut leaf passes only what its mass allows (a hollow-core door 35 dB down at 1.25 kHz). Real doors
      pass most through their gaps. Add a shut leaf's gaps to its opening: 3 mm all round and a 10 mm undercut
@@ -360,6 +354,12 @@ The rest were fixed and merged (246a4e1c, 7a9b6c85).
 ### Listen in the game (Cody)
 Built and measured, not heard in the game. Restart the server and update the client first. The /tp spots
 here are checked to stand on (docs/LISTENING_SPOTS.md).
+- A restarted outlet no longer doubles its engine (2026-10-17, docs/CLIENT_NOTES.md "A voice that reads another's").
+  On Main Street in traffic (`/tp 7.0 121.0 0.2`): as cars pass close and their fronts split off and merge again, no
+  quarter-second swell or brightening of a car's engine as it does. In the parking garage (`/tp -66.0 62.0 0.3`), get
+  into a parked car, out, and into another: the cabin sounds the same each time, with nothing of the first car left.
+  By the fire at 58 Alder Street (`/tp -325.0 141.0 0.2`): the fire as before, and when it goes out all of it goes
+  out. Lab: AudioLab `--resonance-maybes outlet`.
 - Your own room's reverb stays binaural (2026-10-17, the fault Cody found 2026-10-17 00:40). On Main Street in
   traffic, `/weather rain heavy` (`/tp 7.0 121.0 0.2`), then walk into Selby House's lobby (`/tp 15.2 157.1 0.1`)
   and clap (T), and shut a door: the lobby's reflections and tail are wide round you, not the same in both

@@ -3123,8 +3123,9 @@ public partial class FmodAudioProvider : IAudioProvider
             }
             channel.setMode(MODE._3D | Rolloff.Mode);
             tapState = tap;
-            // The engine's own voice stops carrying the front, slewed (EngineVoiceState.SplitVoices).
-            src.SplitVoices = true;
+            // The engine's own voice stops carrying the front, slewed (EngineVoiceState.SplitVoices), while
+            // this tap holds it: counted, so a tap let go later than this one started cannot give it back.
+            tap.Take();
         }
         else if (emitter.IsSynth && emitter.CabinOfEntity != 0)
         {
@@ -3145,7 +3146,7 @@ public partial class FmodAudioProvider : IAudioProvider
             channel.setMode(MODE._3D | Rolloff.Mode);
             tapState = tap;
             // The engine's own voice stops carrying the path, slewed as the tap fades in.
-            src.SetCabinTapLive(emitter.CabinPath, true);
+            tap.Take();
         }
         else if (emitter.IsSynth && emitter.EchoOfEntity != 0)
         {
@@ -3797,6 +3798,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 }
                 active.TakeGround(emitter, ground != null || (!active.IsReflection && active.SaState?.Ground != null), now: false);
                 active.TakeBendGround(emitter);
+                if (emitter.IsSynth) FollowLiveSource(active, emitter);
                 active.MinDistance = emitter.MinDistance;
                 // No 3D calls on a 2D (binaural) voice: run every frame, this was most of the 113,228
                 // refused calls (see PlaySpatialSound).
@@ -5158,7 +5160,7 @@ public partial class FmodAudioProvider : IAudioProvider
 
     // Every change to _activeSounds goes through these, so the index and the list cannot drift apart.
     // All assume _lock is held.
-    private void AddActive(ActiveSound sound)
+    internal void AddActive(ActiveSound sound)
     {
         _activeSounds.Add(sound);
         if (!_activeById.TryGetValue(sound.EntityId, out var voices))
@@ -5257,6 +5259,35 @@ public partial class FmodAudioProvider : IAudioProvider
         }
     }
 
+    /// <summary>
+    /// A voice that reads another voice's synth (a machine's front outlet or cabin path, an engine's echo or borrowed
+    /// voice, a wood's or a fire's outer place) follows the live voice of the id it names. Stopped and started again
+    /// under its id, that voice is a new one, and here a start under an id already playing only updates it, so nothing
+    /// else moved the reader: a front outlet went on reading a released engine whose play position had stopped, and a
+    /// fire's outer places an old synth that burnt on after the fire was put out (AudioLab --resonance-maybes outlet).
+    /// Under the lock; a dictionary lookup a voice.
+    /// </summary>
+    internal void FollowLiveSource(ActiveSound active, in SpatialEmitter emitter)
+    {
+        if (active.TapState is { } tap)
+        {
+            int owner = tap.CabinPath > 0 ? emitter.CabinOfEntity : emitter.IntakeOfEntity;
+            if (owner == 0 || FindActive(owner)?.EngineState is not { } engine) return;
+            // A cabin path the live voice does not have: left where it is, to be let go by the client.
+            if (tap.CabinPath > 0 && (engine.CabinLayout == null || tap.CabinPath >= engine.CabinLayout.Count)) return;
+            tap.Rebind(engine);
+        }
+        else if (active.EchoState is { } echo)
+        {
+            if (emitter.EchoOfEntity != 0 && FindActive(emitter.EchoOfEntity)?.EngineState is { } engine) echo.Rebind(engine);
+        }
+        else if (active.MachineState is NaturePlaceState { Place: > 0 } place)
+        {
+            if (emitter.PlaceOfEntity != 0 && FindActive(emitter.PlaceOfEntity)?.MachineState is NaturePlaceState { Place: 0 } middle)
+                place.Rebind(middle.Shared);
+        }
+    }
+
     /// <summary>Brings an engine or machine voice back to full after a fade-out was started. Idempotent.</summary>
     public void ReviveEngine(int entityId)
     {
@@ -5266,6 +5297,7 @@ public partial class FmodAudioProvider : IAudioProvider
             // A standing machine fades and revives by the same rules: one question, one answer.
             active?.EngineState?.Revive();
             active?.MachineState?.Revive();
+            active?.TapState?.Revive();
         }
     }
 

@@ -247,8 +247,8 @@ public class DspCallbackTests
         };
         car.PlaceAtSpeed(car.TargetSpeed);
         Assert.NotNull(car.CabinLayout);
-        car.SetCabinTapLive(1, true);
         var tap = new EngineTapState(car, 1) { ChannelClockOffset = 239 + Block };
+        tap.Take();
         using var carDsp = new FakeDsp(car);
         using var tapDsp = new FakeDsp(tap);
         using var o1 = new Pinned(Block);

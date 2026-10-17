@@ -119,7 +119,7 @@ public class CabinPathsTests
         var buf = new float[1024];
         for (int i = 0; i < Rate / 1024; i++) voice.Render(buf);
         var lay = voice.CabinLayout!;
-        for (int p = 1; p < lay.Count; p++) voice.SetCabinTapLive(p, true);
+        for (int p = 1; p < lay.Count; p++) new EngineTapState(voice, p).Take();
         // A tenth of a second for the hand-over's slew, then one block.
         for (int i = 0; i < Rate / 10 / 1024 + 1; i++) voice.Render(buf);
         long at = voice.Played;

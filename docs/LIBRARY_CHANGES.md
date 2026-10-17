@@ -4,6 +4,16 @@ What each tagged version of open-fps's sound library holds, and what a host usin
 library is a set of projects inside this repository; a host takes the repository as a git submodule pinned to a
 tag (docs/SOUND_LIBRARY_BOUNDARY.md, stage 8 and decision 8) and references the projects it needs.
 
+## Unreleased
+
+- A machine's front outlet or cabin path restarted under its id no longer leaves the engine carrying its share
+  beside the new one, and a voice reading another's synth follows the live voice of its id (Resonance's 3.2;
+  changes.md, 2026-10-17). A host that drives `EngineVoiceState` itself: `SetCabinTapLive` is gone, and setting
+  `SplitVoices` no longer stands for a tap. Make the tap (`new EngineTapState(engine)` or `(engine, path)`) and call
+  its `Take()` and `HandBack()`; `SplitVoices = true` is left for an offline render that plays the front itself.
+  `EngineTapState.Source` and `EngineEchoState.Source` are properties now (`Rebind` moves them). A host using
+  `AudioWorld` and the mixer has nothing to do.
+
 ## library/v0.1.0 (2026-10-17)
 
 The first version. Below 1.0 because the host interfaces may still change between versions; each change will be

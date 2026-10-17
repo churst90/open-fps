@@ -462,22 +462,50 @@ public sealed class PlacedNatureVoice
 /// <summary>One place of a <see cref="PlacedNatureVoice"/>, as a voice.</summary>
 public sealed class NaturePlaceState : NatureVoiceState
 {
-    public readonly PlacedNatureVoice Shared;
+    /// <summary>The source's one synth: for the middle its own, for an outer place its middle's live voice's
+    /// (<see cref="Rebind"/>).</summary>
+    public PlacedNatureVoice Shared => Volatile.Read(ref _shared);
+    private PlacedNatureVoice _shared;
     public readonly int Place;
     private long _cursor;
+
+    /// <summary>The synth read now, and the one read before a rebind, crossfaded out over
+    /// <see cref="RebindSamples"/>, with where in it. Render thread only.</summary>
+    private PlacedNatureVoice _reading;
+    private PlacedNatureVoice? _leaving;
+    private long _leavingCursor;
+    private int _leavingLeft;
+    private const int RebindSamples = 1024;
 
     /// <summary>Every place renders against the whole source's level and headroom, so the places'
     /// powers add up to the source's and the mixer places each by it.</summary>
     public NaturePlaceState(PlacedNatureVoice shared, int place, float sampleRate, Vector3 position)
         : base(shared.SourceLevelDb, shared.HeadroomDb, sampleRate, position, shared.WindHeight, shared.Weather)
     {
-        Shared = shared;
+        _shared = _reading = shared;
         Place = place;
         // Running water is a texture of events spread over its water: the ground hands back its power,
         // not a copy of it (GroundReflection.Texture).
         if (shared.Flow != null) Ground.Texture = true;
         _cursor = shared.Newest;
         Interlocked.Increment(ref shared.Voices);
+    }
+
+    /// <summary>
+    /// Moves an outer place to <paramref name="live"/>, the synth of its middle's live voice. A middle stopped and
+    /// started again under its id makes a new synth, and an outer place left on the old one burnt on after the fire
+    /// was put out: only the middle carries Running. False when the new synth has no such place. Game thread; the
+    /// place crossfades over (<see cref="StepSynth"/>).
+    /// </summary>
+    public bool Rebind(PlacedNatureVoice live)
+    {
+        var old = Shared;
+        if (ReferenceEquals(live, old)) return true;
+        if (Place <= 0 || Place >= live.Places) return false;
+        Interlocked.Increment(ref live.Voices);
+        Interlocked.Decrement(ref old.Voices);
+        Volatile.Write(ref _shared, live);
+        return true;
     }
 
     protected override void Control(float seconds, float dt)
@@ -487,10 +515,25 @@ public sealed class NaturePlaceState : NatureVoiceState
 
     protected override float StepSynth()
     {
+        var shared = Volatile.Read(ref _shared);
+        if (!ReferenceEquals(shared, _reading))
+        {
+            // Rebound: the old synth fades out as the new one fades in, two unrelated noises, so by power.
+            _leaving = _reading;
+            _leavingCursor = _cursor;
+            _leavingLeft = RebindSamples;
+            _reading = shared;
+            _cursor = shared.Newest;
+        }
         // A voice that fell further behind than the rings hold catches up rather than reading what has
         // been written over.
-        long newest = Shared.Newest;
+        long newest = shared.Newest;
         if (newest - _cursor > PlacedNatureVoice.RingLength - 4096) _cursor = newest;
-        return Shared.Sample(Place, _cursor++);
+        float x = shared.Sample(Place, _cursor++);
+        if (_leaving == null) return x;
+        float t = 1f - _leavingLeft / (float)RebindSamples;
+        float y = _leaving.Sample(Place, _leavingCursor++);
+        if (--_leavingLeft <= 0) _leaving = null;
+        return x * MathF.Sqrt(t) + y * MathF.Sqrt(1f - t);
     }
 }

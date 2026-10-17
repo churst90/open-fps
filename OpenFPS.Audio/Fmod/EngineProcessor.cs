@@ -137,11 +137,43 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     }
 
     /// <summary>
-    /// True when the front outlet has a voice of its own and this one is the back alone, set by the game
-    /// when the car's ends can be told apart (Localisation.Resolvable). The front slews across over about
-    /// sixty milliseconds: a running waveform has no zero-crossing to switch at.
+    /// True when the front outlet has a voice of its own and this one is the back alone: while a front tap
+    /// holds it (<see cref="EngineTapState"/>), or when an offline render that plays the front itself sets it.
+    /// The front slews across over about sixty milliseconds: a running waveform has no zero-crossing to
+    /// switch at.
     /// </summary>
-    public volatile bool SplitVoices;
+    public bool SplitVoices
+    {
+        get => _splitForRender || Volatile.Read(ref _frontTaps) > 0;
+        set => _splitForRender = value;
+    }
+    private volatile bool _splitForRender;
+
+    /// <summary>
+    /// How many front taps hold this voice's front. A count, not a flag: a tap stopped and started again under
+    /// its id lets the old one go up to 250 ms after the new one took the front, and the old one's hand-back
+    /// cleared a flag the new one had set, so this voice carried the front again beside the new tap (4.3 dB,
+    /// AudioLab --resonance-maybes outlet). Each tap adds and takes away exactly once (EngineTapState.Take).
+    /// </summary>
+    private int _frontTaps;
+
+    /// <summary>Front taps holding this voice now. For the instruments and the tests.</summary>
+    public int FrontTaps => Volatile.Read(ref _frontTaps);
+
+    /// <summary>A tap takes the front (path -1) or a cabin path from this voice, or gives it back. Only
+    /// EngineTapState calls these, once each way.</summary>
+    internal void AddTap(int cabinPath)
+    {
+        if (cabinPath <= 0) Interlocked.Increment(ref _frontTaps);
+        else if (cabinPath < _cabinTaps.Length) Interlocked.Increment(ref _cabinTaps[cabinPath]);
+    }
+
+    /// <inheritdoc cref="AddTap"/>
+    internal void RemoveTap(int cabinPath)
+    {
+        if (cabinPath <= 0) Interlocked.Decrement(ref _frontTaps);
+        else if (cabinPath < _cabinTaps.Length) Interlocked.Decrement(ref _cabinTaps[cabinPath]);
+    }
 
     /// <summary>
     /// How much of the engine to integrate (EngineDetail), from how loud this voice is against the loudest
@@ -600,7 +632,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
         _cabinLayout = cabinPaths ? CabinPaths.For(v, ModelLibrary.Presets) : null;
         if (_cabinLayout is { } cl && cl.PathOfWheel.Length == nw)
         {
-            _cabinTapLive = new int[cl.Count];
+            _cabinTaps = new int[cl.Count];
             _cabinShare = new float[cl.Count];
             Array.Fill(_cabinShare, 1f);
             _pathLp = new float[cl.Count];
@@ -727,8 +759,9 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     /// listener sits in this vehicle; the producer writes them, the mixer and the taps read.</summary>
     private float[][]? _cabinRings;
     private const int CabinRingBits = 16;                  // 1.4 s at 48 kHz: past the deepest lead
-    /// <summary>Per path, whether a tap is playing it (game thread writes, mixer reads).</summary>
-    private readonly int[] _cabinTapLive = Array.Empty<int>();
+    /// <summary>Per path, how many taps are playing it (counted as the front outlet is: <see cref="FrontTaps"/>).
+    /// The taps write, the mixer reads.</summary>
+    private readonly int[] _cabinTaps = Array.Empty<int>();
     /// <summary>Per path, how much of it this voice is still carrying, 0..1. Mixer thread only.</summary>
     private readonly float[] _cabinShare = Array.Empty<float>();
     /// <summary>Per wheel, its own tyre: the rolling noise, squeal and slide of that wheel alone.</summary>
@@ -763,11 +796,8 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
         Volatile.Write(ref _cabinRings, rings);
     }
 
-    /// <summary>Whether path <paramref name="path"/> has a voice of its own playing it. Game thread.</summary>
-    public void SetCabinTapLive(int path, bool live)
-    {
-        if (path > 0 && path < _cabinTapLive.Length) Volatile.Write(ref _cabinTapLive[path], live ? 1 : 0);
-    }
+    /// <summary>Whether path <paramref name="path"/> has a voice of its own playing it, so this one leaves it out.</summary>
+    public bool CabinTapped(int path) => path > 0 && path < _cabinTaps.Length && Volatile.Read(ref _cabinTaps[path]) > 0;
 
     /// <summary>One sample of cabin path <paramref name="path"/> (1 and up), absolute, interpolated:
     /// what a cabin tap reads, on the cursor rules of <see cref="EngineTapState"/>.</summary>
@@ -839,7 +869,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
         float sum = 0f;
         for (int p = 1; p < _cabinShare.Length && p - 1 < rings.Length; p++)
         {
-            float target = Volatile.Read(ref _cabinTapLive[p]) != 0 ? 0f : 1f;
+            float target = Volatile.Read(ref _cabinTaps[p]) > 0 ? 0f : 1f;
             _cabinShare[p] += Math.Clamp(target - _cabinShare[p], -step, step);
             if (_cabinShare[p] <= 0f) continue;
             var r = rings[p - 1];
@@ -1751,7 +1781,16 @@ public sealed class EngineEchoState : IGuardedUnit
     /// <summary>The mixer callback's mono buffer, made with the voice so the callback never allocates.</summary>
     internal readonly float[] MixScratch = new float[DspCallback.MaxBlock];
 
-    public readonly EngineVoiceState Source;
+    /// <summary>The engine voice this reads: the live voice of its source's id (<see cref="Rebind"/>).</summary>
+    public EngineVoiceState Source => Volatile.Read(ref _source);
+    private EngineVoiceState _source;
+    /// <summary>The voice the mixer is reading now; it moves over through silence. Mixer thread only.</summary>
+    private EngineVoiceState _reading;
+
+    /// <summary>Moves this voice to <paramref name="live"/>, the voice its source's id plays now, as
+    /// EngineTapState.Rebind does a tap. Game thread.</summary>
+    public void Rebind(EngineVoiceState live) => Volatile.Write(ref _source, live);
+
     public volatile float TargetDelaySeconds;
     public volatile float TargetGain;
     private double _delay = -1;
@@ -1789,7 +1828,7 @@ public sealed class EngineEchoState : IGuardedUnit
     /// </summary>
     public const double MaxRateCorrection = 0.01;
 
-    public EngineEchoState(EngineVoiceState source) { Source = source; SampleRate = source.SampleRate; }
+    public EngineEchoState(EngineVoiceState source) { _source = _reading = source; SampleRate = source.SampleRate; }
 
     /// <summary>
     /// How rough the surface was, 0..1, or below zero for a borrowed voice (not an echo). Set once,
@@ -1830,15 +1869,27 @@ public sealed class EngineEchoState : IGuardedUnit
         double floorSamples = Math.Max(MinDelaySeconds * SampleRate, _blockSlack);
         double target = Math.Max(floorSamples, TargetDelaySeconds * SampleRate);
         if (_delay < 0) _delay = target;
-        float gTarget = TargetGain;
+        // Rebound: out of the old voice to silence, then over with a fresh cursor, and in again.
+        bool moving = !ReferenceEquals(_reading, Volatile.Read(ref _source));
+        if (moving && MathF.Abs(_gain) <= 1e-4f)
+        {
+            _reading = Volatile.Read(ref _source);
+            _clock = SourceClock.Unset;
+            _cursor = -1;
+            _gain = 0f;
+            moving = false;
+        }
+        var source = _reading;
+        float gTarget = moving ? 0f : TargetGain;
 
-        if (OwnCursor) { RenderOwnCursor(mono, floorSamples, target, gTarget); return; }
+        if (OwnCursor) { RenderOwnCursor(mono, source, floorSamples, target, gTarget); return; }
         if (Scattering >= 0f && _diffuser == null) _diffuser = new EchoDiffuser(Scattering, Seed, SampleRate);
-        float slew = GainSlew;
+        // Out of a voice it is leaving at a borrowed voice's pace (gone in about 0.15 s), not a reflection's swell.
+        float slew = moving ? MathF.Max(GainSlew, _k.Gain) : GainSlew;
         // The source's play position as a continuous clock, not Played itself: Played moves in whole
         // blocks when the source's channel is pitched (EngineVoiceState.ConsumeRate), and an echo read
         // a fixed distance behind it skipped or repeated 23 ms of the car at every extra call.
-        double rate = _clock.Begin(Source.Played, Source.ConsumeRate, mono.Length, SampleRate);
+        double rate = _clock.Begin(source.Played, source.ConsumeRate, mono.Length, SampleRate);
         // Slew: up to 12% per sample of drift, which covers the Doppler of a fast pass.
         for (int i = 0; i < mono.Length; i++)
         {
@@ -1848,7 +1899,7 @@ public sealed class EngineEchoState : IGuardedUnit
             // Held to the floor as well, so a delay slewing down never reads into a block the source
             // may not have written yet.
             double back = Math.Max(_delay, floorSamples) + mono.Length;
-            float y = Source.ReadAt(_clock.Position - back) * _gain;
+            float y = source.ReadAt(_clock.Position - back) * _gain;
             _clock.Position += rate;
             mono[i] = _diffuser != null ? _diffuser.Process(y) : y;
         }
@@ -1861,23 +1912,23 @@ public sealed class EngineEchoState : IGuardedUnit
     /// never jumped, toward its place behind the source, so the source's consumption never reaches this
     /// pitch. It resyncs outright only after falling off the ring (the source stopped or restarted).
     /// </summary>
-    private void RenderOwnCursor(Span<float> mono, double floorSamples, double target, float gTarget)
+    private void RenderOwnCursor(Span<float> mono, EngineVoiceState source, double floorSamples, double target, float gTarget)
     {
-        long played = Source.Played;
+        long played = source.Played;
         // Aimed at a continuous clock (SourceClock), not Played, which moves in whole blocks: aimed at
         // Played the cursor jumped whenever the source missed a call. A block further back than the
         // floor, so the saw's dips do not reach the ceiling below.
-        double rate = _clock.Begin(played, Source.ConsumeRate, mono.Length, SampleRate);
+        double rate = _clock.Begin(played, source.ConsumeRate, mono.Length, SampleRate);
         double where = _clock.Position;
         double back = target + mono.Length;
         // Off the ring, or ahead of what the source has played: nothing to be continuous with.
-        if (_cursor < 0 || _cursor > played || played - _cursor > Source.RingLength - 4 * mono.Length)
+        if (_cursor < 0 || _cursor > played || played - _cursor > source.RingLength - 4 * mono.Length)
             _cursor = where - back;
 
         for (int i = 0; i < mono.Length; i++)
         {
             _gain += (gTarget - _gain) * _k.Gain;
-            mono[i] = Source.ReadAt(_cursor) * _gain;
+            mono[i] = source.ReadAt(_cursor) * _gain;
             double drift = (where - back) - _cursor;
             _cursor += 1.0 + Math.Clamp(drift * _k.Pull, -MaxRateCorrection, MaxRateCorrection);
             where += rate;
@@ -1906,7 +1957,13 @@ public sealed class EngineTapState : IGuardedUnit
     /// <summary>The mixer callback's mono buffer, made with the voice so the callback never allocates.</summary>
     internal readonly float[] MixScratch = new float[DspCallback.MaxBlock];
 
-    public readonly EngineVoiceState Source;
+    /// <summary>The engine voice this tap reads: the live voice of its machine's id. Game thread writes
+    /// (<see cref="Rebind"/>); the mixer moves over to it through silence (<see cref="Render(Span{float}, long)"/>).</summary>
+    public EngineVoiceState Source => Volatile.Read(ref _source);
+    private EngineVoiceState _source;
+
+    /// <summary>The voice the mixer is reading now. Mixer thread only.</summary>
+    private EngineVoiceState _reading;
 
     /// <summary>Where this voice is heading, 0 or 1. Zero retires it; see <see cref="FadedOut"/>.</summary>
     public volatile float TargetGain = 1f;
@@ -1916,14 +1973,19 @@ public sealed class EngineTapState : IGuardedUnit
 
     private float _gain;
 
-    public EngineTapState(EngineVoiceState source) { Source = source; Ground = new(source.SampleRate); source._frontGround = Ground; }
+    public EngineTapState(EngineVoiceState source)
+    {
+        _source = _reading = source;
+        Ground = new(source.SampleRate);
+        source._frontGround = Ground;
+    }
 
     /// <summary>A path into the cabin of the vehicle the listener is sitting in (CabinPaths), read from
     /// its own ring: the same cursor, fade and hand-over as the front outlet. No ground: from inside
     /// there is no road to hear.</summary>
     public EngineTapState(EngineVoiceState source, int cabinPath)
     {
-        Source = source;
+        _source = _reading = source;
         Ground = new(source.SampleRate);
         CabinPath = cabinPath;
     }
@@ -1939,12 +2001,51 @@ public sealed class EngineTapState : IGuardedUnit
     /// <summary>The cabin path this tap plays (1 and up), or -1 for the machine's front outlet.</summary>
     public readonly int CabinPath = -1;
 
-    /// <summary>Hands what this tap plays back to the voice it came from (slewed there): the front
-    /// outlet, or its cabin path.</summary>
-    public void HandBack()
+    /// <summary>The engine voice this tap has taken its share from, or null while it holds none. Taking and
+    /// handing back exchange it, so each take is handed back exactly once whoever asks and however often:
+    /// a voice let go is handed back as its fade begins (FmodAudioProvider.Leave) and again when it is
+    /// released, and the second must not take the share from a tap started since under the same id.</summary>
+    private EngineVoiceState? _heldFrom;
+
+    /// <summary>Takes what this tap plays from its engine's voice (slewed there): the front outlet, or its
+    /// cabin path. Once, until it is handed back.</summary>
+    public void Take()
     {
-        if (CabinPath > 0) Source.SetCabinTapLive(CabinPath, false);
-        else Source.SplitVoices = false;
+        var source = Source;
+        if (Interlocked.CompareExchange(ref _heldFrom, source, null) == null) source.AddTap(CabinPath);
+    }
+
+    /// <summary>Hands what this tap plays back to the voice it took it from (slewed there). Once per take.</summary>
+    public void HandBack() => Interlocked.Exchange(ref _heldFrom, null)?.RemoveTap(CabinPath);
+
+    /// <summary>Whether this tap holds its share now.</summary>
+    public bool Holding => Volatile.Read(ref _heldFrom) != null;
+
+    /// <summary>
+    /// Brings a tap that was fading out back to full, as EngineVoiceState.Revive does an engine: wanted again
+    /// before its fade ended (the registry's Unretire). It takes its share again; left handed back, it played
+    /// nothing for the rest of its life while the engine's voice carried its part from the wrong place.
+    /// </summary>
+    public void Revive()
+    {
+        TargetGain = 1f;
+        FadedOut = false;
+        Take();
+    }
+
+    /// <summary>
+    /// Moves this tap to <paramref name="live"/>, the voice its machine's id plays now: an engine stopped and
+    /// started again under its id leaves its taps reading the one let go, whose play position has stopped.
+    /// The share moves with it; the mixer fades out of the old voice and into the new. Game thread.
+    /// </summary>
+    public void Rebind(EngineVoiceState live)
+    {
+        if (ReferenceEquals(live, Source)) return;
+        bool held = Holding;
+        HandBack();
+        if (CabinPath <= 0) live._frontGround = Ground;
+        Volatile.Write(ref _source, live);
+        if (held) Take();
     }
 
     /// <summary>The ground between the front of the machine and the listener.</summary>
@@ -1957,23 +2058,37 @@ public sealed class EngineTapState : IGuardedUnit
     /// <see cref="ChannelClockOffset"/>), or long.MinValue if not known.</param>
     public void Render(Span<float> mono, long parentTime)
     {
+        // Rebound to another voice: out of this one to silence, then over (the clock starts again on the new
+        // one), and in again. Either way at once would be a step the size of the voice.
+        var source = _reading;
+        bool moving = !ReferenceEquals(source, Volatile.Read(ref _source));
+        // An old voice not yet primed was playing silence: nothing to fade out of.
+        if (moving && (_gain <= 1e-4f || !source.Primed))
+        {
+            _reading = source = Volatile.Read(ref _source);
+            _clock = SourceClock.Unset;
+            _gain = 0f;
+            moving = false;
+        }
+        float wanted = TargetGain;
+        float gTarget = moving ? 0f : wanted;
+
         // Silence until primed: synthesizing on demand would be on the mixer thread.
-        if (!Source.Primed) { mono.Clear(); return; }
+        if (!source.Primed) { mono.Clear(); return; }
 
         // A cabin path: exactly the samples the engine's voice plays at this moment. Rider and vehicle
         // move together, so neither channel is pitched.
-        if (CabinPath > 0 && parentTime != long.MinValue && Source.BlockAt(parentTime, out long from))
+        if (CabinPath > 0 && parentTime != long.MinValue && source.BlockAt(parentTime, out long from))
         {
             Interlocked.Increment(ref AlignedBlocks);
-            float gStep = 1f / (0.06f * MathF.Max(1f, Source.SampleRate));
-            float gTo = TargetGain;
+            float gStep = 1f / (0.06f * MathF.Max(1f, source.SampleRate));
             for (int i = 0; i < mono.Length; i++)
             {
-                _gain += Math.Clamp(gTo - _gain, -gStep, gStep);
-                mono[i] = Source.ReadCabinAt(CabinPath, from + i) * _gain;
+                _gain += Math.Clamp(gTarget - _gain, -gStep, gStep);
+                mono[i] = source.ReadCabinAt(CabinPath, from + i) * _gain;
             }
             _clock.Position = from + mono.Length;
-            if (gTo <= 0f && _gain <= 1e-4f) FadedOut = true;
+            if (wanted <= 0f && _gain <= 1e-4f) FadedOut = true;
             return;
         }
 
@@ -1982,19 +2097,18 @@ public sealed class EngineTapState : IGuardedUnit
         // Played). Stepping toward Played, which moves in whole blocks, made a passing car's front
         // voice jump 4-8 times a second, measured (--quality echo, "front").
         float own = ChannelRate;
-        double rate = _clock.Begin(Source.Played, Source.ConsumeRate / (own > 0.05f ? own : 1f), mono.Length, Source.SampleRate);
+        double rate = _clock.Begin(source.Played, source.ConsumeRate / (own > 0.05f ? own : 1f), mono.Length, source.SampleRate);
 
-        float gTarget = TargetGain;
-        float step = 1f / (0.06f * MathF.Max(1f, Source.SampleRate));
+        float step = 1f / (0.06f * MathF.Max(1f, source.SampleRate));
         for (int i = 0; i < mono.Length; i++)
         {
             _gain += Math.Clamp(gTarget - _gain, -step, step);
-            float x = CabinPath > 0 ? Source.ReadCabinAt(CabinPath, _clock.Position) : Ground.Process(Source.ReadFrontAt(_clock.Position));
+            float x = CabinPath > 0 ? source.ReadCabinAt(CabinPath, _clock.Position) : Ground.Process(source.ReadFrontAt(_clock.Position));
             mono[i] = x * _gain;
             _clock.Position += rate;
         }
 
-        if (gTarget <= 0f && _gain <= 1e-4f) FadedOut = true;
+        if (wanted <= 0f && _gain <= 1e-4f) FadedOut = true;
     }
 
     /// <summary>This voice's own channel pitch (its Doppler), set by the provider with the pitch.</summary>
