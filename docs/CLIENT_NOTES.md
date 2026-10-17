@@ -803,6 +803,42 @@ through silence (out of the old voice over its 60 ms fade, in again on the new),
 synths over 1,024 samples; the tap's share moves with it. Running water's places need neither: its synth is kept per
 feature, not per voice.
 
+## Speakers sharing a program
+
+A PA system feeds every horn the same line, and a shop's speakers play one track. So a loudspeaker's program is its
+recording and how often it repeats (`SharedPrograms.Key`), not the speaker, and its time is the world's
+(`IWorldClock.WorldTime`, UTC seconds since 2026-01-01, which the server and every client agree on; the gusts and a
+fire's age are told on it too). Nothing comes down the wire for it.
+
+A repeating line leaves every speaker of its program at the same moments: once an interval, at a phase that is a hash
+of the program, so two programs on one map do not start together and talk over each other for ever
+(`SharedPrograms.Phase`). AudioWorld hands a line over a tenth of a second before it leaves (`SharedPrograms.Lead`),
+and the mixer holds it for the rest of that and its flight, so it starts on its first sample. A loop's top falls at
+its phase too, once a loop's length.
+
+A voice of a program, whenever it starts (the first time, or back from the budget or the binaural pool), starts where
+what reaches the ear now left the speaker: the clock's place in the program, less the flight from the speaker to the
+ear (`SharedPrograms.Join`, in the mixer's start, from `SpatialEmitter.ProgramStart`). A far speaker is heard later
+than a near one by exactly the sound's travel, and a voice that keeps playing stays right as you walk, its Doppler
+moving it by as much as its flight changes. A line not yet arrived waits its flight from its top; one already over
+where you stand is not started; a voice with less than a quarter second of its line left to be heard is not begun
+again (`SharedPrograms.JoinMargin`: one that has just ended is seen a frame or two late). A start mid-sound fades in
+over the budget's 80 ms, as a voice winning its slot back does, or over what it skipped when that is shorter, never
+under the one-shot's 6 ms onset (`SharedPrograms.JoinFade`): a join mid-word is a step otherwise. Leaving is the
+budget's fade, as for every voice.
+
+Until 2026-10-17 each horn was its own announcer, its first firing staggered by its id, (id % 7) x 0.9 s, to keep
+two announcers apart: the speedway's four horns on one pole said the line 0.9 s apart on every repeat, 2.7 s from the
+first to the last. And every start was from the top: a loop came back from its beginning each time a speaker came
+back. Measured through the mixer (AudioLab `--resonance-maybes track`, `old` for before): the four horns' lines left
+them 2709 ms apart, now 1 ms; a 2.48 s loop at two speakers 40 m apart, the ear jogging between them and the nearer
+voiced, each start against the first on the world's clock 655 ms apart on the middle reading and 1049 at nine in ten,
+now 5.9 and 14.0 (a position is read to the last mixed block, 21 ms).
+
+Only loudspeakers share a clock: a repeating sound that is not one (a foghorn, a station bell) keeps its stagger by id.
+A program named by a category (a folder picked at random) would give each speaker its own pick; none does yet, and one
+that did would want its pick keyed to the firing.
+
 ## Why an echo is smeared
 
 A reflection read straight out of the source's ring is the source's own waveform, sample for sample,

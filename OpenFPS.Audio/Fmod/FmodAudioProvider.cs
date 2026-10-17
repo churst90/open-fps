@@ -3078,6 +3078,8 @@ public partial class FmodAudioProvider : IAudioProvider
         EngineTapState? tapState = null;
         PhysicalVoiceState? machineState = null;
         OwnVoiceTap? ownVoice = null;
+        // A shared program joined mid-sound fades in over this (SharedPrograms.JoinFade); 0 from its top.
+        double joinFadeSeconds = 0.0;
 
         if (emitter.IsGranular)
         {
@@ -3384,6 +3386,25 @@ public partial class FmodAudioProvider : IAudioProvider
                 channel.setMode(MODE.LOOP_NORMAL);
                 channel.setLoopCount(-1);
             }
+            // A loudspeaker sharing a program joins it where the world's clock has it (SharedPrograms.Join): from
+            // where what reaches the ear now left the speaker, or its top once its flight is out. Its delay is
+            // that wait, not the whole flight: a join is already in the air.
+            if (emitter.ProgramStart != 0.0 && !emitter.IsReflection
+                && sound.getLength(out uint frames, TIMEUNIT.PCM) == RESULT.OK && frames > 0
+                && sound.getDefaults(out float soundRate, out _) == RESULT.OK && soundRate > 0f)
+            {
+                var (from, wait) = OpenFPS.Audio.Core.SharedPrograms.Join(emitter.ProgramStart, Clock.WorldTime,
+                    emitter.DelayMs / 1000.0, frames / (double)soundRate, loopNative);
+                if (double.IsNaN(from))
+                {
+                    // Its line is over here.
+                    channel.stop();
+                    return;
+                }
+                if (from > 0.0) channel.setPosition(Math.Min(frames - 1, (uint)(from * soundRate)), TIMEUNIT.PCM);
+                emitter.DelayMs = (float)(wait * 1000.0);
+                joinFadeSeconds = OpenFPS.Audio.Core.SharedPrograms.JoinFade(from);
+            }
         }
 
         if (_audioDebug && emitter.Mode == PlaybackMode.LoopOne)
@@ -3549,8 +3570,8 @@ public partial class FmodAudioProvider : IAudioProvider
                 EffectiveDistance = emitter.EffectiveDistance, Velocity = emitter.Velocity, Direction = emitter.Direction, 
                 Range = emitter.Range, MinDistance = emitter.MinDistance, BaseVolume = emitter.Volume * TakeGain(emitter), Pitch = emitter.Pitch,
                 // The onset ramp below, so a fade begun inside it starts from where it is.
-                FadeFromClock = voiceStartClock, FadeToClock = voiceStartClock + (emitter.IsEvent || emitter.IsReflection ? OnsetRampFrames : 0UL),
-                FadeFromGain = emitter.IsEvent || emitter.IsReflection ? 0f : 1f,
+                FadeFromClock = voiceStartClock, FadeToClock = voiceStartClock + OnsetFrames(emitter, joinFadeSeconds),
+                FadeFromGain = OnsetFrames(emitter, joinFadeSeconds) > 0UL ? 0f : 1f,
                 TargetOcclusion = emitter.Occlusion, 
                 CurrentOcclusion = emitter.Occlusion,
                 TargetAperture = emitter.ApertureFactor, CurrentAperture = emitter.ApertureFactor,
@@ -3646,14 +3667,21 @@ public partial class FmodAudioProvider : IAudioProvider
         // A 6 ms fade-in on one-shots (an abrupt onset on a recycled HRTF voice clicks) and on
         // reflections (joined mid-file, a step from silence each time a wall starts answering). It
         // begins at the voice's scheduled start; fade points multiply with setVolume.
-        if ((emitter.IsEvent || emitter.IsReflection) && channel.hasHandle())
+        // A shared program joined mid-sound comes in over the budget's 80 ms, as a voice coming back does.
+        if (OnsetFrames(emitter, joinFadeSeconds) is > 0UL and var onset && channel.hasHandle())
         {
             channel.addFadePoint(voiceStartClock, 0.0f);
-            channel.addFadePoint(voiceStartClock + OnsetRampFrames, 1.0f);
+            channel.addFadePoint(voiceStartClock + onset, 1.0f);
         }
 
         channel.setPaused(false);
     }
+
+    /// <summary>How long a voice's start is faded in over, samples: a one-shot's or a reflection's onset ramp, a
+    /// shared program's join (<paramref name="joinSeconds"/>), or none.</summary>
+    private ulong OnsetFrames(in SpatialEmitter emitter, double joinSeconds)
+        => emitter.IsEvent || emitter.IsReflection ? OnsetRampFrames
+         : joinSeconds > 0.0 ? (ulong)(MixerRate * joinSeconds) : 0UL;
 
     /// <summary>A one-shot's or a reflection's onset ramp, samples: 6 ms.</summary>
     private ulong OnsetRampFrames => (ulong)(MixerRate * 0.006f);

@@ -6,6 +6,15 @@ tag (docs/SOUND_LIBRARY_BOUNDARY.md, stage 8 and decision 8) and references the 
 
 ## Unreleased
 
+- Speakers sharing a program keep one track clock (Resonance's 3.3; changes.md, 2026-10-17). A loudspeaker's program
+  (its recording and repeat interval) is timed on the audio clock's world time (`IWorldClock.WorldTime`), so every
+  speaker of it is where that clock has it, each heard after its own flight; a repeating line leaves every horn at
+  once, and a voice coming back joins mid-line or mid-loop, faded in over 80 ms. `SpatialEmitter` gains
+  `ProgramStart` at its end (the world time its program's top left the speaker; 0 for every other voice). A host
+  using `AudioWorld` and the FMOD mixer need do nothing, as long as its `IAudioClock.WorldTime` is one its clients
+  share (`StopwatchAudioClock`'s is: UTC). A host with its own `IAudioProvider` starts a voice with a `ProgramStart`
+  where `SharedPrograms.Join` says, with that delay in place of `DelayMs`, or every speaker of a program starts from
+  its top as before. A repeating sound that is not a loudspeaker is staggered by its id as before.
 - A door with open air on either side takes the outdoor seal (0.3 mm) by default, the open air being the outdoors or
   any place whose `Room.IsIndoor` is false, whatever surfaces it has (`OpeningRoutes.IsOpenAir`, new). A host that
   sets `IsIndoor` on its rooms need do nothing. A host that leaves it false on rooms with surfaces (it is false

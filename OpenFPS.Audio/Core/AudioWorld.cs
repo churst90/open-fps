@@ -3091,7 +3091,29 @@ public partial class AudioWorld
         // A repeating one-shot (RepeatIntervalSeconds: a PA, a foghorn, a station bell) is built as
         // normal and handed over only when its interval comes round.
         float repeat = spec.RepeatIntervalSeconds;
-        if (repeat > 0f)
+        // A loudspeaker's program is the world's, not the horn's (SharedPrograms): every speaker playing it is
+        // where the world's clock has it, each heard after its own flight, so a PA's horns say one announcement and
+        // a loop comes back where it is, not from its top.
+        if (speaker != null && (repeat > 0f ? spec.Mode == PlaybackMode.Single : spec.Mode == PlaybackMode.LoopOne))
+        {
+            string program = SharedPrograms.Key(spec.SoundId!, repeat);
+            double length = speaker.Pcm.Length / (double)speaker.Rate;
+            if (repeat > 0f)
+            {
+                float flight = Vector3.Distance(eyePos, emitter.Position) / _audio.Atmosphere.SpeedOfSound;
+                double top = SharedPrograms.Firing(program, repeat, _audio.Clock.WorldTime, flight, length);
+                // Carried on a refresh too: the budget brings a voice back with the emitter it holds.
+                if (!double.IsNaN(top)) emitter.ProgramStart = top;
+                // Between its lines, or saying one: placed from where it is now, never started over itself.
+                if (double.IsNaN(top) || _audio.IsPlaying(emitter.EntityId))
+                {
+                    _voices.Refresh(emitter);
+                    return;
+                }
+            }
+            else emitter.ProgramStart = SharedPrograms.Phase(program, length);
+        }
+        else if (repeat > 0f)
         {
             double due = _repeatDue.GetValueOrDefault(src.Id, double.NegativeInfinity);
             if (double.IsNegativeInfinity(due))

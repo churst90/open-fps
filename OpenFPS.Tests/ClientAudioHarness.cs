@@ -33,10 +33,13 @@ internal sealed class ClientAudioHarness
     /// <param name="soundsPath">A sound bank to resolve recorded sounds from, such as footsteps. None by
     /// default: the synthesised voices need no files.</param>
     /// <param name="options">The world's options; none: the shipped world.</param>
-    public ClientAudioHarness(string? soundsPath = null, AudioWorldOptions? options = null)
+    /// <param name="worldTimeAt">The world time (IWorldClock.WorldTime) at <see cref="Now"/> zero, for a test of
+    /// what is timed on the world's clock (a shared program): the facade's clock is then this harness's, turned
+    /// with it. None: the facade keeps a clock of its own and the calendar's world time.</param>
+    public ClientAudioHarness(string? soundsPath = null, AudioWorldOptions? options = null, double? worldTimeAt = null)
     {
         World.Clear(new Vector3(4000, 400, 4000));
-        Facade = new AudioEngineFacade(Mixer, options: options);
+        Facade = new AudioEngineFacade(Mixer, worldTimeAt is { } at ? new TurnedClock(() => Now, at) : null, options: options);
         Facade.InitializeForTest(soundsPath);
         // The hand-rolled tracer, as on every runner without phonon, even in a run that has loaded Steam Audio
         // (the opt-in Steam Audio tests): what the harness's tests hold must not depend on the machine.
@@ -50,6 +53,16 @@ internal sealed class ClientAudioHarness
         // whole city's doors and starved the tests' own threads.
         Audio = new ClientAudioSystem(Facade, sounds, Player, () => Now, prewarm: false);
         Mixer.KindOf = id => Audio.World.Voices.TryGet(id, out var e) ? e.Kind : null;
+    }
+
+    /// <summary>The world time now, s, on a harness made with a world time.</summary>
+    public double WorldTime => Facade.Clock.WorldTime;
+
+    /// <summary>The harness's clock, with the world time it was given.</summary>
+    private sealed class TurnedClock(Func<double> now, double worldAt) : IAudioClock
+    {
+        public double Now => now();
+        public double WorldTime => worldAt + now();
     }
 
     /// <summary>Stands the listener here, feet on the ground (the ear is EyeHeight above).</summary>
@@ -243,7 +256,20 @@ internal sealed class RecordingMixer : IAudioProvider
     }
     public Vector3 GetSoundPosition(int id) => Latest.TryGetValue(id, out var e) ? e.Position : Vector3.Zero;
     public void Preload(string id) { }
-    public bool RegisterSynthesisedSound(string soundId, byte[] pcm16Mono, int sampleRate) => true;
+    /// <summary>Recordings to decode, by sound id (a loudspeaker's program); nothing else decodes.</summary>
+    public readonly Dictionary<string, (float[] Pcm, int Rate)> Recordings = new(StringComparer.OrdinalIgnoreCase);
+    public bool TryDecode(string soundId, out float[] pcm, out int channels, out int sampleRate)
+    {
+        (pcm, channels, sampleRate) = Recordings.TryGetValue(soundId, out var r) ? (r.Pcm, 1, r.Rate) : (Array.Empty<float>(), 0, 0);
+        return channels > 0;
+    }
+    /// <summary>Every synthesised sound registered, its length in seconds.</summary>
+    public readonly Dictionary<string, double> Registered = new(StringComparer.OrdinalIgnoreCase);
+    public bool RegisterSynthesisedSound(string soundId, byte[] pcm16Mono, int sampleRate)
+    {
+        Registered[soundId] = pcm16Mono.Length / 2 / (double)sampleRate;
+        return true;
+    }
     public void PlayUiSound(string id, Func<float[]> render, int sampleRate, float volume) { }
     public IReadOnlyList<VoiceLevel> LoudestVoices(int count) => Array.Empty<VoiceLevel>();
     public IReadOnlyList<string> OutputDevices() => new[] { "Test output" };

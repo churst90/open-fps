@@ -100,3 +100,77 @@ internal sealed class LoudspeakerVoices
         }
     }
 }
+
+/// <summary>
+/// One track clock for every loudspeaker playing one program: a PA's horns say one announcement together, and a
+/// looping program is where the clock has it whichever speaker you come into range of, however often. The clock is
+/// the world time (IWorldClock.WorldTime), the one every client and the server agree on, so nothing comes down the
+/// wire. Each speaker is heard after its own flight to the ear: a far horn later than a near one by exactly the
+/// sound's travel. A program is its recording and how often it repeats (a PA system feeds every horn the same
+/// line); before, each horn was its own announcer, its first firing staggered by its id, so the four horns on the
+/// speedway's pole said the line 0.9 s apart for ever, and a loop started from its top at every return.
+/// </summary>
+public static class SharedPrograms
+{
+    /// <summary>How far ahead of its top leaving the speaker a firing is handed over, s: started with the rest of its
+    /// wait as a delay, it begins on its first sample rather than joined a frame or two in.</summary>
+    public const double Lead = 0.1;
+
+    /// <summary>A line with less than this left to be heard here is not joined, s: a voice that has just ended
+    /// (seen a frame or two late, its flight a little changed since it began) is not begun again on its last
+    /// syllable.</summary>
+    public const double JoinMargin = 0.25;
+
+    /// <summary>The program <paramref name="recording"/> played every <paramref name="repeatSeconds"/> (0: looped).</summary>
+    public static string Key(string recording, float repeatSeconds)
+        => recording.ToLowerInvariant() + "|" + repeatSeconds.ToString("R", System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>Where on the world clock a program's tops fall, s into each <paramref name="period"/>, never 0 nor the
+    /// whole period: a hash of the program, the same on every machine, so two programs on one map do not start
+    /// together and talk over each other for ever.</summary>
+    public static double Phase(string key, double period)
+    {
+        uint h = 2166136261;
+        foreach (char c in key) { h ^= c; h *= 16777619; }
+        return (h % 10007u + 1u) / 10008.0 * period;
+    }
+
+    /// <summary>
+    /// The top of the firing to hand over now, world time, for a program said every <paramref name="period"/> s, a
+    /// line <paramref name="lineSeconds"/> long heard <paramref name="flight"/> s after it leaves the speaker: the
+    /// next when it leaves within <see cref="Lead"/>, else the one being heard here or still on its way; NaN when
+    /// none is (between lines).
+    /// </summary>
+    public static double Firing(string key, double period, double world, double flight, double lineSeconds)
+    {
+        double since = Mod(world - Phase(key, period), period);
+        double latest = world - since;
+        if (period - since <= Lead) return latest + period;
+        // A far ear still hearing the one before.
+        double earlier = world - (latest - period) - flight;
+        if (earlier >= 0.0 && earlier < lineSeconds - JoinMargin) return latest - period;
+        return world - latest - flight < lineSeconds - JoinMargin ? latest : double.NaN;
+    }
+
+    /// <summary>
+    /// Where a voice of a program whose top left its speaker at <paramref name="programStart"/> (world time) starts
+    /// in its sound, s, and after how long: what reaches the ear now left the speaker <paramref name="flight"/> s ago.
+    /// A loop joins where it is; a line not yet arrived waits out the rest of its flight from its top; one already
+    /// over here is not started (From NaN).
+    /// </summary>
+    public static (double From, double Delay) Join(double programStart, double world, double flight, double length, bool loop)
+    {
+        double heard = world - programStart - flight;
+        if (loop) return (length > 0.0 ? Mod(heard, length) : 0.0, 0.0);
+        if (heard < 0.0) return (0.0, -heard);
+        return heard < length ? (heard, 0.0) : (double.NaN, 0.0);
+    }
+
+    /// <summary>The fade a voice joined <paramref name="from"/> s into its sound comes in over, s: the budget's 80 ms
+    /// (a join mid-word is a step otherwise), or as long as what it skipped when that is shorter, at least the
+    /// one-shot's 6 ms onset; none from its top.</summary>
+    public static double JoinFade(double from)
+        => from <= 0.0 ? 0.0 : Math.Clamp(from, 0.006, OpenFPS.Audio.Fmod.FmodAudioProvider.VoiceFadeSeconds);
+
+    private static double Mod(double x, double period) => x - period * Math.Floor(x / period);
+}

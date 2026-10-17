@@ -92,11 +92,10 @@ fingerprint changed too, so the door renders are made again once.
      middle. Size: one session. With the next extended-sources work.
    - Whitecaps over open water (Cody: "especially yes"): wind-driven breaking over a lake or the sea, not only
      at its shore. One to two sessions. After items 2 to 4, or with the extended sources.
-10. Speakers sharing a program keep one track clock (Resonance's 3.3, reproduced 2026-10-17). Medium.
-    - What: each speaker plays its program from its own start. The speedway's PA horns are 0.9 s apart, and a
-      looping program restarts from the top each time you come back into range.
-    - Fix: one clock per program; a speaker coming back into range joins it where it is, heard at its own flight
-      time. Size: one to two sessions.
+10. Speakers sharing a program keep one track clock (Resonance's 3.3): DONE 2026-10-17 (changes.md; docs/CLIENT_NOTES.md
+    "Speakers sharing a program"). The world's clock is the program's; the speedway's four horns say one line, and a
+    speaker coming back joins its program where it is, heard at its own flight time. Waiting on the ear ("Listen in
+    the game").
 11. Smaller, when a session is free:
     - Stored traffic and rail tracks list movers by ordinal, not entity id, so a map edit does not churn them
       (the fountain's taps moved every id by 5 on 2026-10-17): DONE 2026-10-17 (changes.md). The tracks were
@@ -370,6 +369,15 @@ The rest were fixed and merged (246a4e1c, 7a9b6c85).
 ### Listen in the game (Cody)
 Built and measured, not heard in the game. Restart the server and update the client first. The /tp spots
 here are checked to stand on (docs/LISTENING_SPOTS.md).
+- Speakers sharing a program keep one track clock (2026-10-17, docs/CLIENT_NOTES.md "Speakers sharing a program").
+  On the speedway, in the infield 5 m east of the PA pole (`/tp 5.0 0.0 0.2`): the announcement is one voice from
+  the pole, every 20 s, where it was four of the same line 0.9 s apart (a chant, 2.7 s from first to last). The
+  first line after you arrive can take up to 20 s now (its turn is on the world's clock, the same for everyone).
+  Then 60 m east (`/tp 60.0 0.0 0.2`): one line still, the horn facing you plainest, about 0.18 s after it leaves
+  the pole. Two players together hear it at the same moment, each by their distance. Two speakers playing one loop
+  (none on a map: place two Space Megaphones about 40 m apart with the editor, F12): both say the same moment of
+  it, the far one later only by its distance, and walking between them never starts either from its top; one coming
+  back fades in rather than clicking. Lab: AudioLab `--resonance-maybes track`, `old` for before.
 - A moving one-off's echoes move with it (2026-10-17, docs/CLIENT_NOTES.md "One-off sounds: why the echoes are as
   they are"). In 1 Elm Street's living room (`/tp -414.2 -108.0 0.2`), slide the patio door (the back door, 2.9 m
   south-west) open and shut a few times, facing north: its answer off the west wall, on your left, should go with

@@ -9,7 +9,7 @@ using OpenFPS.Materials;
 namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
-/// --resonance-maybes outlet|overdue|close [out=DIR]: three faults Resonance found in its copy of the sound code
+/// --resonance-maybes outlet|overdue|close|track [old] [out=DIR]: faults Resonance found in its copy of the sound code
 /// (inbox/2026-10-17-resonance-audio-open-fps-lacks), tried on open-fps's own mixer through FMOD.
 /// - outlet (3.2): a voice reading another's synth (a machine's front outlet, a cabin path, a wood's or a fire's outer
 ///   place) stopped and started again under its id in one tick, as a budget or a registry does. Whether the source goes
@@ -18,6 +18,8 @@ namespace OpenFPS.AudioLab.Spikes;
 ///   watched for any still playing past the latest it could end (at its lowest pitch, after its delay) plus 2 s.
 /// - close (3.4): sounds opened in the background (MODE.NONBLOCKING, every recording's first play) and the device closed
 ///   before they finish, many times over: FMOD's loader read a file after Resonance's tests closed the device.
+/// - track (3.3): the PA's four horns and a loop at two speakers walked between, each voice's place in its sound read
+///   off its channel against the world's clock (Track). A tone made in memory; no recording needed.
 /// The recordings are read from ASSETS/SOUNDS beside the lab's binary (a link to the checkout's will do).
 ///
 /// Measured 2026-10-17 on main 54d5dcdd:
@@ -34,6 +36,14 @@ namespace OpenFPS.AudioLab.Spikes;
 ///   when the fire is put out.
 /// - overdue: does not reproduce: 1,470 one-offs in 120 s, every one playing, none held past its latest end.
 /// - close: does not reproduce: 40 devices closed with 3,120 sounds still opening, no crash.
+///
+/// track (3.3, measured 2026-10-17 on main 36033ec6): speakers sharing a program. "old" plays it as before the shared
+/// clock (each horn its own announcer, staggered by id; every start from the top). The PA's four horns: their lines
+/// left the horns 2709 ms apart old, 1 ms apart now, each heard after its own flight (88.0 to 94.7 ms). A 2.48 s loop
+/// at two speakers 40 m apart, the ear jogging between them for 36 s and the nearer one voiced: each start against the
+/// first on the world's clock, flight added, 655 ms apart on the middle reading and 1049 at nine in ten old; 5.9 and
+/// 14.0 now (21.7 at worst; a position is read to the last mixed block, 21 ms), every return joined mid-loop and faded
+/// in over 80 ms.
 /// </summary>
 public static class ResonanceMaybesSpike
 {
@@ -48,7 +58,8 @@ public static class ResonanceMaybesSpike
         if (args.Contains("outlet")) return Outlet(outDir);
         if (args.Contains("overdue")) return Overdue(outDir, args);
         if (args.Contains("close")) return Close(args);
-        Console.WriteLine("--resonance-maybes outlet|overdue|close [out=DIR]");
+        if (args.Contains("track")) return Track(outDir, args);
+        Console.WriteLine("--resonance-maybes outlet|overdue|close|track [old] [out=DIR]");
         return 2;
     }
 
@@ -388,6 +399,127 @@ public static class ResonanceMaybesSpike
             Console.Write(round % 10 == 9 ? $"{round + 1}\n" : ".");
         }
         Console.WriteLine($"  {rounds} devices closed, {loading} sounds still opening in the background as each was: no crash");
+        return 0;
+    }
+
+    // ── 3.3: speakers sharing a program ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// The PA's four horns and a loop walked between two speakers, through this mixer, with the shared clock
+    /// (SpatialEmitter.ProgramStart) and without it ("old": each horn its own announcer, staggered by id, and every
+    /// start from the top, as before 2026-10-17). Each voice's place in its sound is read off its channel; with its
+    /// flight to the ear added, that is where the program was where the speaker made what is heard. Every voice of
+    /// one program should agree on it.
+    /// </summary>
+    private static int Track(string outDir, string[] args)
+    {
+        bool old = args.Contains("old");
+        const int Rate = 48000;
+        const double Length = 2.48;
+        // A 300 Hz tone, so a join without its fade would be a step.
+        // In float, as a loudspeaker's render is registered: only that path loops a sound made in memory.
+        var pcm = new float[(int)(Length * Rate)];
+        for (int i = 0; i < pcm.Length; i++) pcm[i] = 0.25f * MathF.Sin(2f * MathF.PI * 300f * i / Rate);
+        var p = Provider(outDir, old ? "track-old" : "track");
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        int voiced = 0;
+        try
+        {
+            if (!p.RegisterSynthesisedSoundFloat("lab-program", pcm, Rate)) throw new InvalidOperationException("could not register the program");
+            float c = p.Atmosphere.SpeedOfSound;
+            Vector3 ear = new(30f, 1.7f, 8f);
+            double Flight(Vector3 at) => Vector3.Distance(at, ear) / c;
+            SpatialEmitter Speaker(int id, Vector3 at, PlaybackMode mode, double programStart) => new()
+            {
+                EntityId = id, SoundId = "lab-program", Type = EmitterType.EntityAttached, Mode = mode,
+                Position = at, ApparentPosition = at, Direction = Vector3.UnitX, Velocity = Vector3.Zero,
+                Volume = 0.05f, MinDistance = 1f, Range = 400f, Pitch = 1f, TargetRegionId = -1,
+                EqLow = 1f, EqMid = 1f, EqHigh = 1f, ApertureFactor = 1f,
+                DelayMs = (float)(Flight(at) * 1000.0), ProgramStart = programStart,
+            };
+            double Position(int id)
+                => Active(p, id) is { } a && a.Channel.getPosition(out uint at, FMOD.TIMEUNIT.PCM) == FMOD.RESULT.OK ? at / (double)Rate : double.NaN;
+
+            // The PA: four horns on one pole, one line. With the clock each is handed the top a tenth of a second
+            // ahead (SharedPrograms.Lead); without, each fires at its own stagger, (id % 7) x 0.9 s.
+            p.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, -1);
+            var horns = new (int Id, Vector3 At)[] { (1122, new(0f, 6f, 1.2f)), (1123, new(1.2f, 6f, 0f)), (1124, new(0f, 6f, -1.2f)), (1125, new(-1.2f, 6f, 0f)) };
+            double world0 = p.Clock.WorldTime, top = world0 + OpenFPS.Audio.Core.SharedPrograms.Lead;
+            var heardTop = new Dictionary<int, double>();
+            var started = new HashSet<int>();
+            Pump(p, clock, 6.0, _ =>
+            {
+                double w = p.Clock.WorldTime;
+                foreach (var (id, at) in horns)
+                {
+                    if (!started.Contains(id) && (!old || w >= world0 + (id % 7) * 0.9))
+                    {
+                        p.PlaySpatialSound(Speaker(id, at, PlaybackMode.Single, old ? 0.0 : top));
+                        started.Add(id);
+                    }
+                    // The moment its first sample was heard: now, less how far into the sound it is.
+                    double pos = Position(id);
+                    if (!heardTop.ContainsKey(id) && pos > 0.05) heardTop[id] = w - pos;
+                }
+            });
+            foreach (var (id, at) in horns)
+                Console.WriteLine($"  horn {id}: its line heard from {heardTop.GetValueOrDefault(id, double.NaN) - world0:F3} s, "
+                                + $"left the horn at {heardTop.GetValueOrDefault(id, double.NaN) - Flight(at) - world0:F3} s ({Flight(at) * 1000:F1} ms of flight)");
+            var lefts = horns.Where(x => heardTop.ContainsKey(x.Id)).Select(x => heardTop[x.Id] - Flight(x.At)).ToList();
+            if (lefts.Count > 1) Console.WriteLine($"  the lines left their horns {(lefts.Max() - lefts.Min()) * 1000:F0} ms apart (read to the last mixed block)");
+            foreach (var (id, _) in horns) p.StopSound(id);
+            Pump(p, clock, 0.5);
+
+            // The loop: A and B 40 m apart, the ear jogging between them at 5 m/s, the nearer one voiced (as a budget
+            // of one would): each goes and comes back at every crossing.
+            const int A = 2001, B = 2002;
+            var atA = new Vector3(0f, 2f, 0f);
+            var atB = new Vector3(40f, 2f, 0f);
+            double programStart = OpenFPS.Audio.Core.SharedPrograms.Phase("lab-program|0", Length);
+            var apart = new List<double>();
+            var joins = new List<string>();
+            // The first reading's place against the world's clock: every later one, of either speaker, should be there.
+            double? reference = null;
+            double x = -10.0, way = 1.0, last = clock.Elapsed.TotalSeconds;
+            double seconds = double.Parse(args.FirstOrDefault(a => a.StartsWith("sec=", StringComparison.Ordinal))?[4..] ?? "36",
+                                          System.Globalization.CultureInfo.InvariantCulture);
+            Pump(p, clock, seconds, now =>
+            {
+                double dt = now - last;
+                last = now;
+                x += way * 5.0 * dt;
+                if (x > 50.0) way = -1.0;
+                else if (x < -10.0) way = 1.0;
+                ear = new Vector3((float)x, 1.7f, 3f);
+                p.UpdateListener(ear, Quaternion.Identity, new Vector3((float)(way * 5.0), 0f, 0f), -1);
+                int want = x < 20.0 ? A : B;
+                if (want != voiced)
+                {
+                    if (voiced != 0) p.StopSound(voiced);
+                    p.PlaySpatialSound(Speaker(want, want == A ? atA : atB, PlaybackMode.LoopOne, old ? 0.0 : programStart));
+                    var a = Active(p, want);
+                    joins.Add($"{(want == A ? "A" : "B")} at {now:F2} s: from {Position(want):F3} s, faded in over "
+                            + $"{(a == null ? double.NaN : (a.FadeToClock - a.FadeFromClock) * 1000.0 / p.MixerRate):F0} ms from {a?.FadeFromGain:F0}");
+                    voiced = want;
+                }
+                // Where the clock has the program where the voice was made, against where the voice is.
+                double pos = Position(voiced);
+                if (pos > 0.0)
+                {
+                    double made = pos + Flight(voiced == A ? atA : atB) - p.Clock.WorldTime;
+                    reference ??= made;
+                    apart.Add(Math.Abs(Math.IEEERemainder(made - reference.Value, Length)));
+                }
+            });
+            foreach (var j in joins) Console.WriteLine("  " + j);
+            apart.Sort();
+            if (apart.Count > 0)
+                Console.WriteLine($"  each start against the first, on the world's clock, its flight added: {apart[apart.Count / 2] * 1000:F1} ms on the middle "
+                                + $"reading, {apart[apart.Count * 9 / 10] * 1000:F1} at nine in ten, {apart[^1] * 1000:F1} at worst ({apart.Count} readings)");
+            if (voiced != 0) p.StopSound(voiced);
+            Pump(p, clock, 0.3);
+        }
+        finally { p.Dispose(); }
         return 0;
     }
 }

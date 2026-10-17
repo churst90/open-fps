@@ -253,6 +253,10 @@ public struct SpatialEmitter
     /// played that much up). It makes up for a quieter render and is no louder at the ear, so whoever ranks
     /// the voice divides it out (VoiceManager.Audibility). 0: none.</summary>
     public float HeadroomGain;
+    /// <summary>For a loudspeaker sharing a program with others (SharedPrograms): the world time
+    /// (IWorldClock.WorldTime) its program's top left the speaker, from which the mixer starts it where the world's
+    /// clock has it, heard after its flight. 0 for every other voice, which starts from its top.</summary>
+    public double ProgramStart;
 
     public SpatialEmitter()
     {

@@ -4,6 +4,24 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-17
 
+- Speakers sharing a program keep one track clock (Resonance's 3.3; docs/CLIENT_NOTES.md "Speakers sharing a
+  program"). A loudspeaker's program is its recording and how often it repeats, and its time is the world's
+  (`IWorldClock.WorldTime`, which every client and the server agree on): every speaker of it is where that clock has
+  it, heard after its own flight. A repeating line leaves every horn at the same moment on the world's clock (its
+  phase a hash of the program); a voice that starts mid-line or mid-loop starts where what reaches the ear now left
+  the speaker, and fades in over the budget's 80 ms (`SharedPrograms`, `SpatialEmitter.ProgramStart`, the mixer's
+  join). Before, each horn was its own announcer, its first firing staggered by its id, (id % 7) x 0.9 s, and every
+  start was from the top. The speedway PA's four horns (one pole, ids 1122 to 1125), measured through the mixer
+  (AudioLab `--resonance-maybes track`, `old` for before): their lines left the horns 2709 ms apart, now 1 ms (read to
+  the last mixed block), each heard 88.0 to 94.7 ms on by its flight. A 2.48 s loop at two speakers 40 m apart, the
+  ear jogging between them for 36 s and the nearer voiced: each start against the first on the world's clock, flight
+  added, 655 ms apart on the middle reading and 1049 at nine in ten; now 5.9 and 14.0, every return joined mid-loop.
+  Only loudspeakers share a clock; a foghorn or a station bell that repeats keeps its stagger by id. The first line
+  after load now comes at the program's turn on the world's clock, up to one interval later than the old 0 to 5.4 s.
+  Guards: `SharedProgramTests` (the PA's horns say one announcement; a loop at two speakers keeps one clock through
+  six handovers; a horn that loses its voice mid-line comes back 1.0 s into it; the clock's arithmetic), each failing
+  with the program keyed by its horn and with no join mid-line. No wire change. The stored streams change: every
+  voice gains `ProgramStart` (0 for every voice in them, none being a loudspeaker).
 - The stored traffic and train tracks name each mover by its ordinal among the movers, not its entity id
   (docs/PHYSICS_BOUNDARY.md 14.4). An entity id counts every entity made before it, so Elm Park's fountain taps
   moved every car's and train's id by five and rewrote both stores with nothing else changed (8e3bc00e). A mover
