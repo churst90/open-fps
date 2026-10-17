@@ -53,6 +53,7 @@ FILE_RULES = [
     ('OpenFPS.Audio/', 'a', 'Audio', 'the runtime: FMOD DSPs, voices, Steam Audio, the acoustic worker (stage 6)'),
     ('OpenFPS.Schema/', 'a', 'Schema', 'the editor attribute on a model property'),
     ('OpenFPS.Physics/', 'a', 'Physics', 'docs/PHYSICS_BOUNDARY.md'),
+    ('OpenFPS.Environment/', 'a', 'Environment', 'the weather, the water and fire: docs/ENGINE_PACKAGES.md, stage 3'),
     # Not the library's: how a player who cannot see is told the world (docs/ENGINE_PACKAGES.md, stage 7).
     ('OpenFPS.Accessibility/', 'b', '', 'docs/ENGINE_PACKAGES.md, stage 7'),
     ('OpenFPS.World/', 'b', '', 'maps and the one world: docs/ENGINE_PACKAGES.md, stage 4'),
@@ -130,20 +131,20 @@ TYPE_RULES = {
     'OpenFPS.Common.Networking.WheelState': ('c', 'Physics', 'a wheel\'s state, on the wire (physics stage 1)'),
     'OpenFPS.Common.Networking.WorldAudioEvent': ('b', '', 'network message carrying a TransientSound'),
     'OpenFPS.Common.Components.PlaybackMode': ('c', 'Sound', 'an enum the emitter component and the voices share'),
-    'OpenFPS.Common.Components.WeatherType': ('c', 'Sound', ''),
+    'OpenFPS.Common.Components.WeatherType': ('c', 'Environment', ''),
     'OpenFPS.Common.Components.ColliderShape': ('c', 'Geometry', ''),
     'OpenFPS.Common.TileKey': ('c', 'Geometry', 'a tile of the world; the tile scenes key on it'),
-    'OpenFPS.Common.Precipitation': ('c', 'Sound', 'weather value in the snapshot'),
-    'OpenFPS.Common.PrecipitationKind': ('c', 'Sound', ''),
+    'OpenFPS.Common.Precipitation': ('c', 'Environment', 'weather value in the snapshot'),
+    'OpenFPS.Common.PrecipitationKind': ('c', 'Environment', ''),
     'OpenFPS.Common.WindAir': ('c', 'Physics', 'the wind the server sends (physics stage 1)'),
-    'OpenFPS.Common.LightningStrike': ('c', 'Sound', 'the flash the server sends'),
-    'OpenFPS.Common.FlashKind': ('c', 'Sound', ''),
+    'OpenFPS.Common.LightningStrike': ('c', 'Environment', 'the flash the server sends'),
+    'OpenFPS.Common.FlashKind': ('c', 'Environment', ''),
     'OpenFPS.Common.DoorKind': ('c', 'Sound', 'stored in DoorComponent'),
     'OpenFPS.Common.AdminGunMode': ('c', 'Sound', ''),
     'OpenFPS.Common.CrowdApplause': ('c', 'Sound', ''),
     'OpenFPS.Common.Breath': ('c', 'Sound', ''),
-    'OpenFPS.Common.RoadWater': ('c', 'Sound', 'server-advanced store sent whole; the sound reads depths'),
-    'OpenFPS.Common.PuddleField': ('c', 'Sound', ''),
+    'OpenFPS.Common.RoadWater': ('c', 'Environment', 'server-advanced store sent whole; the sound reads depths'),
+    'OpenFPS.Common.PuddleField': ('c', 'Environment', ''),
     'OpenFPS.Common.WeaponRegistry': ('c', 'Sound', 'content registry both read'),
     'OpenFPS.Common.MathHelper': ('a', 'Geometry', ''),
     'OpenFPS.Client.Core.RainSurvey': ('a', 'Audio', 'reads entities to find roofs and gutters: becomes a reader of the world input'),
@@ -171,7 +172,7 @@ ALLOWED = {
 SCANNED = ('OpenFPS.Common', 'OpenFPS.Client.Core', 'OpenFPS.Geometry', 'OpenFPS.Materials', 'OpenFPS.Acoustics', 'OpenFPS.Sound',
            'OpenFPS.Models',
            'OpenFPS.Native', 'OpenFPS.Audio', 'OpenFPS.Schema', 'OpenFPS.Physics', 'OpenFPS.Accessibility',
-           'OpenFPS.World')
+           'OpenFPS.World', 'OpenFPS.Environment')
 
 
 def classify(t):

@@ -22,6 +22,7 @@ public class EnginePackagesTests
     internal static readonly string[] SortedProjects =
     {
         "OpenFPS.Words", "OpenFPS.Schema", "OpenFPS.Native", "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Astronomy", "OpenFPS.Physics",
+        "OpenFPS.Environment",
         "OpenFPS.Acoustics", "OpenFPS.Sound", "OpenFPS.Models", "OpenFPS.Audio", "OpenFPS.World", "OpenFPS.Common", "OpenFPS.Accessibility", "OpenFPS.Client.Core", "OpenFPS.Server",
     };
 
@@ -197,6 +198,7 @@ public class EnginePackagesTests
         new object[] { "Models", typeof(OpenFPS.Common.ModelLibrary).Assembly.GetName().Name! },
         new object[] { "World", typeof(OpenFPS.Server.OneWorld.WorldStore).Assembly.GetName().Name! },
         new object[] { "Audio", typeof(OpenFPS.Client.AudioEngine.Core.AudioEngineFacade).Assembly.GetName().Name! },
+        new object[] { "Environment", typeof(OpenFPS.Common.WorldWeather).Assembly.GetName().Name! },
     };
 
     [Theory]

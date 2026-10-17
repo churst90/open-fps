@@ -2,7 +2,7 @@
 
   <!-- The sound library's models (docs/SOUND_LIBRARY_BOUNDARY.md, stage 3): every sound source as physics
        and its presets (engines, vehicles, wheels and tyres, signals, trains, aircraft, machines, doors,
-       glass, weapons' acoustic numbers, bullets, footsteps, applause, fire, water, wind, rain, lightning),
+       glass, weapons' acoustic numbers, bullets, footsteps, applause, fire, water, wind, rain, thunder),
        the ear and the loudness law, and the synthesis that renders them (Core/, from Client.Core's
        AudioEngine/Core). It uses the geometry and the acoustics, and nothing of the game: the server
        simulates with it and never loads FMOD.
@@ -24,6 +24,9 @@
     <ProjectReference Include="..\OpenFPS.Physics\OpenFPS.Physics.csproj" />
     <!-- The editor's attribute on the models' properties (TunableAttribute). -->
     <ProjectReference Include="..\OpenFPS.Schema\OpenFPS.Schema.csproj" />
+    <!-- The weather, the water and fire the sounds are made from (docs/ENGINE_PACKAGES.md, stage 3): read, never
+         written back. -->
+    <ProjectReference Include="..\OpenFPS.Environment\OpenFPS.Environment.csproj" />
   </ItemGroup>
 
   <ItemGroup>

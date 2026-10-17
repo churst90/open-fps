@@ -189,6 +189,25 @@ OpenFPS.Common/Scopes.cs	game	the scope's maths and sway (what a scope is: OpenF
 OpenFPS.Common/StatePacking.cs	Common	wire
 OpenFPS.Common/UpdateThrottle.cs	Common	a fixed-rate gate
 OpenFPS.Common/WorldSnapshot.cs	Common	the client's world for one frame
+OpenFPS.Environment/AirLayers.cs	Environment	
+OpenFPS.Environment/Fire.cs	Environment	
+OpenFPS.Environment/FireShape.cs	Environment	
+OpenFPS.Environment/FireSpread.cs	Environment	
+OpenFPS.Environment/Fuel.cs	Environment	
+OpenFPS.Environment/GroundChannelBed.cs	Environment	
+OpenFPS.Environment/GroundWater.cs	Environment	
+OpenFPS.Environment/Lightning.cs	Environment	
+OpenFPS.Environment/Precipitation.cs	Environment	
+OpenFPS.Environment/Rain.cs	Environment	
+OpenFPS.Environment/RoadWater.cs	Environment	
+OpenFPS.Environment/Runoff.cs	Environment	
+OpenFPS.Environment/Water/Drainage.cs	Environment	
+OpenFPS.Environment/Water/DrainageNetwork.cs	Environment	
+OpenFPS.Environment/Water/GroundWaterSystem.cs	Environment	
+OpenFPS.Environment/WeatherType.cs	Environment	
+OpenFPS.Environment/WindWaves.cs	Environment	
+OpenFPS.Environment/WorldClock.cs	Environment	
+OpenFPS.Environment/WorldWeather.cs	Environment	
 OpenFPS.Geometry/BoxColumns.cs	Geometry	
 OpenFPS.Geometry/BoxContainment.cs	Geometry	
 OpenFPS.Geometry/ColliderShape.cs	Geometry	
@@ -366,7 +385,6 @@ OpenFPS.Server/Systems/DoorManners.cs	game	host: Agents once it reads a view
 OpenFPS.Server/Systems/DoorSystem.cs	game	
 OpenFPS.Server/Systems/DrivingSystem.cs	game	
 OpenFPS.Server/Systems/FireSystem.cs	game	host: steps Environment
-OpenFPS.Server/Systems/GroundWaterSystem.cs	Environment	the water on the ground, by map
 OpenFPS.Server/Systems/Haunts.cs	game	host: Agents once it reads a view
 OpenFPS.Server/Systems/LightningSystem.cs	game	host: steps Environment
 OpenFPS.Server/Systems/MovementSystem.cs	game	
@@ -390,10 +408,8 @@ OpenFPS.Server/Systems/VehicleSystem.StreetLife.cs	Agents	the street's random ev
 OpenFPS.Server/Systems/VehicleSystem.cs	game	host: steps Agents
 OpenFPS.Server/Systems/WindowSystem.cs	game	
 OpenFPS.Server/Systems/WorldEnvironmentSystem.cs	game	host: steps Environment
-OpenFPS.Server/Water/DrainageNetwork.cs	Environment	a map's drainage from its tiles'
 OpenFPS.Server/Water/MapDrainage.cs	game	host: adapts the map to Environment
 OpenFPS.Sound/AdminGun.cs	Sound	
-OpenFPS.Sound/AirLayers.cs	Environment	the air's layers near the ground
 OpenFPS.Sound/Aircraft.cs	Sound	
 OpenFPS.Sound/AircraftGroundRun.cs	Agents	an aeroplane driven along its runway
 OpenFPS.Sound/Applause.cs	Sound	
@@ -477,22 +493,15 @@ OpenFPS.Sound/DesignedSoundKit.cs	Sound
 OpenFPS.Sound/DoorKnock.cs	Sound	
 OpenFPS.Sound/DoorPhysics.cs	Sound	
 OpenFPS.Sound/Doors.cs	Sound	
-OpenFPS.Sound/Drainage.cs	Environment	one tile's drainage from its ground: below World, which keeps it with a tile
 OpenFPS.Sound/EarWind.cs	Sound	
 OpenFPS.Sound/ElevatorDoor.cs	Sound	
 OpenFPS.Sound/Engines.cs	Sound	
-OpenFPS.Sound/Fire.cs	Environment	what is burning and its shape: the fire's description, which its sound reads
-OpenFPS.Sound/FireShape.cs	Environment	a fire's burning area
-OpenFPS.Sound/FireSpread.cs	Environment	fire spreading through fuel
 OpenFPS.Sound/Footsteps.cs	Sound	
-OpenFPS.Sound/Fuel.cs	Environment	what a thing burns as
 OpenFPS.Sound/GasHob.cs	Sound	
 OpenFPS.Sound/Glass.cs	Sound	
 OpenFPS.Sound/GlassDoor.cs	Sound	
 OpenFPS.Sound/GlassFracture.cs	Sound	
-OpenFPS.Sound/GroundChannelBed.cs	Environment	a drainage line's bed: its width, roughness and the flow it is shaped by
 OpenFPS.Sound/GroundChannels.cs	Sound	
-OpenFPS.Sound/GroundWater.cs	Environment	hydrology of the ground
 OpenFPS.Sound/HandOverSounds.cs	Sound	
 OpenFPS.Sound/Hearing/BandAnalyser.cs	Sound	
 OpenFPS.Sound/Hearing/EarModel.cs	Sound	
@@ -506,7 +515,6 @@ OpenFPS.Sound/Honk.cs	Sound
 OpenFPS.Sound/IPresets.cs	Sound	
 OpenFPS.Sound/ImpactAcoustics.cs	Sound	
 OpenFPS.Sound/KnobDoor.cs	Sound	
-OpenFPS.Sound/Lightning.cs	Environment	strikes, their schedule and channel
 OpenFPS.Sound/LockCylinder.cs	Sound	
 OpenFPS.Sound/Loudness.cs	Sound	
 OpenFPS.Sound/Loudspeakers.cs	Sound	
@@ -516,14 +524,10 @@ OpenFPS.Sound/ModelFailures.cs	Sound
 OpenFPS.Sound/NatureModels.cs	Sound	
 OpenFPS.Sound/PlaybackMode.cs	Sound	
 OpenFPS.Sound/Pneumatics.cs	Sound	
-OpenFPS.Sound/Precipitation.cs	Environment	what falls and its spectrum
 OpenFPS.Sound/PushBarDoor.cs	Sound	
-OpenFPS.Sound/Rain.cs	Environment	rain rates and drop sizes
 OpenFPS.Sound/RainSurfaces.cs	Sound	
 OpenFPS.Sound/Ricochet.cs	Sound	
-OpenFPS.Sound/RoadWater.cs	Environment	water on the road and its puddles
 OpenFPS.Sound/RunningWater.cs	Sound	
-OpenFPS.Sound/Runoff.cs	Environment	rain on its way to the drains
 OpenFPS.Sound/ShapedNoise.cs	Sound	
 OpenFPS.Sound/Signals.cs	Sound	
 OpenFPS.Sound/SlidingDoor.cs	Sound	
@@ -544,11 +548,7 @@ OpenFPS.Sound/Vehicles.cs	Sound
 OpenFPS.Sound/Waves.cs	Sound	
 OpenFPS.Sound/WeaponHandling.cs	Sound	
 OpenFPS.Sound/Weapons.cs	Sound	
-OpenFPS.Sound/WeatherType.cs	Environment	wire
-OpenFPS.Sound/WindWaves.cs	Environment	the waves a wind raises over water
 OpenFPS.Sound/WoodChorus.cs	Sound	
-OpenFPS.Sound/WorldClock.cs	Environment	the one world time a world's weather reads
-OpenFPS.Sound/WorldWeather.cs	Environment	one world's weather state
 OpenFPS.Words/CompassWords.cs	Words	
 OpenFPS.Words/DirectionWords.cs	Words	
 OpenFPS.Words/SafeText.cs	Words	

@@ -25,6 +25,8 @@
     <ProjectReference Include="..\OpenFPS.Geometry\OpenFPS.Geometry.csproj" />
     <ProjectReference Include="..\OpenFPS.Materials\OpenFPS.Materials.csproj" />
     <ProjectReference Include="..\OpenFPS.Physics\OpenFPS.Physics.csproj" />
+    <!-- A tile keeps its drainage, and a map its weather (Environment, stage 3). -->
+    <ProjectReference Include="..\OpenFPS.Environment\OpenFPS.Environment.csproj" />
     <ProjectReference Include="..\OpenFPS.Acoustics\OpenFPS.Acoustics.csproj" />
     <ProjectReference Include="..\OpenFPS.Sound\OpenFPS.Sound.csproj" />
     <ProjectReference Include="..\OpenFPS.Models\OpenFPS.Models.csproj" />

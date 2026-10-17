@@ -102,6 +102,7 @@ FILE_RULES = [
     ('OpenFPS.Accessibility/*', 'Accessibility', ''),
     ('OpenFPS.World/*', 'World', ''),
     ('OpenFPS.Audio/*', 'Audio', ''),
+    ('OpenFPS.Environment/*', 'Environment', ''),
 
     # ── Common ──
     ('OpenFPS.Common/AudioEvents.cs', 'Common', 'wire'),
@@ -125,25 +126,7 @@ FILE_RULES = [
     ('OpenFPS.Common/UpdateThrottle.cs', 'Common', 'a fixed-rate gate'),
     ('OpenFPS.Common/WorldSnapshot.cs', 'Common', 'the client\'s world for one frame'),
 
-    # ── Sound: the world's state and laws that are not sound ──
-    ('OpenFPS.Sound/WeatherType.cs', 'Environment', 'wire'),
-    ('OpenFPS.Sound/Precipitation.cs', 'Environment', 'what falls and its spectrum'),
-    ('OpenFPS.Sound/Rain.cs', 'Environment', 'rain rates and drop sizes'),
-    ('OpenFPS.Sound/Lightning.cs', 'Environment', 'strikes, their schedule and channel'),
-    ('OpenFPS.Sound/Runoff.cs', 'Environment', 'rain on its way to the drains'),
-    ('OpenFPS.Sound/GroundWater.cs', 'Environment', 'hydrology of the ground'),
-    ('OpenFPS.Sound/RoadWater.cs', 'Environment', 'water on the road and its puddles'),
-    ('OpenFPS.Sound/Fire.cs', 'Environment', 'what is burning and its shape: the fire\'s description, which its sound reads'),
-    ('OpenFPS.Sound/FireSpread.cs', 'Environment', 'fire spreading through fuel'),
-    ('OpenFPS.Sound/Fuel.cs', 'Environment', 'what a thing burns as'),
-    ('OpenFPS.Sound/FireShape.cs', 'Environment', 'a fire\'s burning area'),
-    ('OpenFPS.Sound/WorldWeather.cs', 'Environment', 'one world\'s weather state'),
-    ('OpenFPS.Sound/AirLayers.cs', 'Environment', 'the air\'s layers near the ground'),
-    ('OpenFPS.Sound/GroundChannelBed.cs', 'Environment', 'a drainage line\'s bed: its width, roughness and the flow it is shaped by'),
-    ('OpenFPS.Sound/WindWaves.cs', 'Environment', 'the waves a wind raises over water'),
-    ('OpenFPS.Sound/WorldClock.cs', 'Environment', 'the one world time a world\'s weather reads'),
     # ── Sound: what things are ──
-    ('OpenFPS.Sound/Drainage.cs', 'Environment', 'one tile\'s drainage from its ground: below World, which keeps it with a tile'),
     ('OpenFPS.Sound/MachinePower.cs', 'Agents', 'how hard a driver works a machine: a notch, a power lever'),
     ('OpenFPS.Sound/AircraftGroundRun.cs', 'Agents', 'an aeroplane driven along its runway'),
     ('OpenFPS.Sound/*', 'Sound', ''),
@@ -173,8 +156,6 @@ FILE_RULES = [
     ('OpenFPS.Client.Core/*', 'game', ''),
 
     # ── Server ──
-    ('OpenFPS.Server/Water/DrainageNetwork.cs', 'Environment', 'a map\'s drainage from its tiles\''),
-    ('OpenFPS.Server/Systems/GroundWaterSystem.cs', 'Environment', 'the water on the ground, by map'),
     ('OpenFPS.Server/Systems/VehicleSystem.Following.cs', 'Agents', 'the gap to the car in front (IDM): extract from the partial class'),
     ('OpenFPS.Server/Systems/VehicleSystem.Junctions.cs', 'Agents', 'who goes first: extract from the partial class'),
     ('OpenFPS.Server/Systems/VehicleSystem.Crosswalks.cs', 'Agents', 'where a walker crosses a road: extract'),
@@ -224,7 +205,8 @@ TYPE_RULES = {
 }
 
 SORTED_PROJECTS = ('OpenFPS.Words', 'OpenFPS.Schema', 'OpenFPS.Native', 'OpenFPS.Geometry', 'OpenFPS.Materials', 'OpenFPS.Astronomy',
-                   'OpenFPS.Physics', 'OpenFPS.Acoustics', 'OpenFPS.Sound', 'OpenFPS.Models', 'OpenFPS.Audio', 'OpenFPS.World', 'OpenFPS.Common',
+                   'OpenFPS.Physics', 'OpenFPS.Environment', 'OpenFPS.Acoustics', 'OpenFPS.Sound', 'OpenFPS.Models', 'OpenFPS.Audio', 'OpenFPS.World',
+                   'OpenFPS.Common',
                    'OpenFPS.Accessibility',
                    'OpenFPS.Client.Core', 'OpenFPS.Server')
 USERS = ('OpenFPS.Server', 'OpenFPS.Client.Core', 'OpenFPS.Client', 'OpenFPS.Client.Gtk', 'OpenFPS.AudioLab',
@@ -285,7 +267,7 @@ def hashed(path):
     if path.startswith('OpenFPS.Common/'):
         return True
     for pre in ('OpenFPS.Geometry/', 'OpenFPS.Materials/', 'OpenFPS.Acoustics/', 'OpenFPS.Schema/', 'OpenFPS.Physics/',
-                'OpenFPS.Models/', 'OpenFPS.World/'):
+                'OpenFPS.Models/', 'OpenFPS.World/', 'OpenFPS.Environment/'):
         if path.startswith(pre):
             return True
     return path.startswith('OpenFPS.Sound/') and not path.startswith('OpenFPS.Sound/Core/')

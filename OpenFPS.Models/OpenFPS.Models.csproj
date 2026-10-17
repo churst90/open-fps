@@ -21,6 +21,8 @@
     <ProjectReference Include="..\OpenFPS.Materials\OpenFPS.Materials.csproj" />
     <ProjectReference Include="..\OpenFPS.Acoustics\OpenFPS.Acoustics.csproj" />
     <ProjectReference Include="..\OpenFPS.Physics\OpenFPS.Physics.csproj" />
+    <!-- The fires it hands out (FireSpec, Environment's since stage 3). -->
+    <ProjectReference Include="..\OpenFPS.Environment\OpenFPS.Environment.csproj" />
     <ProjectReference Include="..\OpenFPS.Schema\OpenFPS.Schema.csproj" />
     <ProjectReference Include="..\OpenFPS.Sound\OpenFPS.Sound.csproj" />
   </ItemGroup>

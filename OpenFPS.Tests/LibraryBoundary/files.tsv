@@ -183,6 +183,25 @@ OpenFPS.Common/Scopes.cs	host
 OpenFPS.Common/StatePacking.cs	host		
 OpenFPS.Common/UpdateThrottle.cs	host		
 OpenFPS.Common/WorldSnapshot.cs	host		
+OpenFPS.Environment/AirLayers.cs	lib	Environment	
+OpenFPS.Environment/Fire.cs	lib	Environment	
+OpenFPS.Environment/FireShape.cs	lib	Environment	
+OpenFPS.Environment/FireSpread.cs	lib	Environment	
+OpenFPS.Environment/Fuel.cs	lib	Environment	
+OpenFPS.Environment/GroundChannelBed.cs	lib	Environment	
+OpenFPS.Environment/GroundWater.cs	lib	Environment	
+OpenFPS.Environment/Lightning.cs	lib	Environment	
+OpenFPS.Environment/Precipitation.cs	lib	Environment	
+OpenFPS.Environment/Rain.cs	lib	Environment	
+OpenFPS.Environment/RoadWater.cs	lib	Environment	
+OpenFPS.Environment/Runoff.cs	lib	Environment	
+OpenFPS.Environment/Water/Drainage.cs	lib	Environment	
+OpenFPS.Environment/Water/DrainageNetwork.cs	lib	Environment	
+OpenFPS.Environment/Water/GroundWaterSystem.cs	lib	Environment	
+OpenFPS.Environment/WeatherType.cs	lib	Environment	
+OpenFPS.Environment/WindWaves.cs	lib	Environment	
+OpenFPS.Environment/WorldClock.cs	lib	Environment	
+OpenFPS.Environment/WorldWeather.cs	lib	Environment	
 OpenFPS.Geometry/BoxColumns.cs	lib	Geometry	
 OpenFPS.Geometry/BoxContainment.cs	lib	Geometry	
 OpenFPS.Geometry/ColliderShape.cs	lib	Geometry	
@@ -261,7 +280,6 @@ OpenFPS.Physics/WindModel.cs	lib	Physics
 OpenFPS.Schema/FieldDescriptor.cs	lib	Schema	
 OpenFPS.Schema/Tunable.cs	lib	Schema	
 OpenFPS.Sound/AdminGun.cs	lib	Sound	
-OpenFPS.Sound/AirLayers.cs	lib	Sound	
 OpenFPS.Sound/Aircraft.cs	lib	Sound	
 OpenFPS.Sound/AircraftGroundRun.cs	lib	Sound	
 OpenFPS.Sound/Applause.cs	lib	Sound	
@@ -345,22 +363,15 @@ OpenFPS.Sound/DesignedSoundKit.cs	lib	Sound
 OpenFPS.Sound/DoorKnock.cs	lib	Sound	
 OpenFPS.Sound/DoorPhysics.cs	lib	Sound	
 OpenFPS.Sound/Doors.cs	lib	Sound	
-OpenFPS.Sound/Drainage.cs	lib	Sound	
 OpenFPS.Sound/EarWind.cs	lib	Sound	
 OpenFPS.Sound/ElevatorDoor.cs	lib	Sound	
 OpenFPS.Sound/Engines.cs	lib	Sound	
-OpenFPS.Sound/Fire.cs	lib	Sound	
-OpenFPS.Sound/FireShape.cs	lib	Sound	
-OpenFPS.Sound/FireSpread.cs	lib	Sound	
 OpenFPS.Sound/Footsteps.cs	lib	Sound	
-OpenFPS.Sound/Fuel.cs	lib	Sound	
 OpenFPS.Sound/GasHob.cs	lib	Sound	
 OpenFPS.Sound/Glass.cs	lib	Sound	
 OpenFPS.Sound/GlassDoor.cs	lib	Sound	
 OpenFPS.Sound/GlassFracture.cs	lib	Sound	
-OpenFPS.Sound/GroundChannelBed.cs	lib	Sound	
 OpenFPS.Sound/GroundChannels.cs	lib	Sound	
-OpenFPS.Sound/GroundWater.cs	lib	Sound	
 OpenFPS.Sound/HandOverSounds.cs	lib	Sound	
 OpenFPS.Sound/Hearing/BandAnalyser.cs	lib	Sound	
 OpenFPS.Sound/Hearing/EarModel.cs	lib	Sound	
@@ -374,7 +385,6 @@ OpenFPS.Sound/Honk.cs	lib	Sound
 OpenFPS.Sound/IPresets.cs	lib	Sound	
 OpenFPS.Sound/ImpactAcoustics.cs	lib	Sound	
 OpenFPS.Sound/KnobDoor.cs	lib	Sound	
-OpenFPS.Sound/Lightning.cs	lib	Sound	
 OpenFPS.Sound/LockCylinder.cs	lib	Sound	
 OpenFPS.Sound/Loudness.cs	lib	Sound	
 OpenFPS.Sound/Loudspeakers.cs	lib	Sound	
@@ -384,14 +394,10 @@ OpenFPS.Sound/ModelFailures.cs	lib	Sound
 OpenFPS.Sound/NatureModels.cs	lib	Sound	
 OpenFPS.Sound/PlaybackMode.cs	lib	Sound	
 OpenFPS.Sound/Pneumatics.cs	lib	Sound	
-OpenFPS.Sound/Precipitation.cs	lib	Sound	
 OpenFPS.Sound/PushBarDoor.cs	lib	Sound	
-OpenFPS.Sound/Rain.cs	lib	Sound	
 OpenFPS.Sound/RainSurfaces.cs	lib	Sound	
 OpenFPS.Sound/Ricochet.cs	lib	Sound	
-OpenFPS.Sound/RoadWater.cs	lib	Sound	
 OpenFPS.Sound/RunningWater.cs	lib	Sound	
-OpenFPS.Sound/Runoff.cs	lib	Sound	
 OpenFPS.Sound/ShapedNoise.cs	lib	Sound	
 OpenFPS.Sound/Signals.cs	lib	Sound	
 OpenFPS.Sound/SlidingDoor.cs	lib	Sound	
@@ -412,11 +418,7 @@ OpenFPS.Sound/Vehicles.cs	lib	Sound
 OpenFPS.Sound/Waves.cs	lib	Sound	
 OpenFPS.Sound/WeaponHandling.cs	lib	Sound	
 OpenFPS.Sound/Weapons.cs	lib	Sound	
-OpenFPS.Sound/WeatherType.cs	lib	Sound	
-OpenFPS.Sound/WindWaves.cs	lib	Sound	
 OpenFPS.Sound/WoodChorus.cs	lib	Sound	
-OpenFPS.Sound/WorldClock.cs	lib	Sound	
-OpenFPS.Sound/WorldWeather.cs	lib	Sound	
 OpenFPS.World/EntityType.cs	host		
 OpenFPS.World/MapRoadsBuilder.cs	host		
 OpenFPS.World/OneWorld/Elevation.cs	host		

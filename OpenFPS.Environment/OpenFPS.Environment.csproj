@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The weather, the water on the ground and the roads, and fire, as world state and the laws that move it
+       (docs/ENGINE_PACKAGES.md, 3.2 and stage 3): what falls and its drops (Precipitation, Rain), the strikes
+       of a storm (Lightning), the air's layers near the ground (AirLayers), the waves a wind raises
+       (WindWaves), one world's weather (WorldWeather, on the world time of WorldClock), the rain running off
+       to the drains (Runoff), the ground's hydrology and a map's water over it (GroundWater, Water/), the water
+       on the roads (RoadWater), and what burns, how and how it spreads (Fire, FireShape, FireSpread, Fuel). It
+       sits on the physics (the moving air is WindField's) and the materials, below the sound, which reads it
+       and is never read by it. A fire names its preset by a function its host hands it, not the catalogue.
+
+       Namespaces are those the files had (OpenFPS.Common, OpenFPS.Common.Components, OpenFPS.Server.Water,
+       OpenFPS.Server.Systems), as for the other packages' moves. -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenFPS.Geometry\OpenFPS.Geometry.csproj" />
+    <ProjectReference Include="..\OpenFPS.Materials\OpenFPS.Materials.csproj" />
+    <!-- The moving air (WindField, WindWeather, WindAir), gravity and the drops' and the fire's laws of motion. -->
+    <ProjectReference Include="..\OpenFPS.Physics\OpenFPS.Physics.csproj" />
+    <!-- The editor's attribute on a fire's properties (TunableAttribute). -->
+    <ProjectReference Include="..\OpenFPS.Schema\OpenFPS.Schema.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The tests and the lab reach the laws' hooks, as they did in the sound and the server. -->
+    <InternalsVisibleTo Include="OpenFPS.Tests" />
+    <InternalsVisibleTo Include="OpenFPS.AudioLab" />
+  </ItemGroup>
+
+</Project>

@@ -15,6 +15,9 @@
     <ProjectReference Include="..\OpenFPS.Acoustics\OpenFPS.Acoustics.csproj" />
     <ProjectReference Include="..\OpenFPS.Sound\OpenFPS.Sound.csproj" />
     <ProjectReference Include="..\OpenFPS.Physics\OpenFPS.Physics.csproj" />
+    <!-- The weather, the water and fire (docs/ENGINE_PACKAGES.md, stage 3): what falls, the water on the roads
+         and over the ground are its values on the wire. -->
+    <ProjectReference Include="..\OpenFPS.Environment\OpenFPS.Environment.csproj" />
     <!-- The catalogue (docs/ENGINE_PACKAGES.md, stage 2): machines, models, kinds, voices, scopes, rounds. -->
     <ProjectReference Include="..\OpenFPS.Models\OpenFPS.Models.csproj" />
     <!-- Maps and the one world (docs/ENGINE_PACKAGES.md, stage 4): the roads message and the tiles' states are
@@ -45,7 +48,9 @@
        already. Not Sound's Core/: the synthesis came from OpenFPS.Client.Core, only the client runs it,
        and it was never in the hash. The catalogue (Models) is: a server and a client must resolve a model
        id the same way (docs/ENGINE_PACKAGES.md, section 8). So is the world (World): the roads message, the
-       tiles' states and the type of an entity are on the wire, and both sides read the same roads. -->
+       tiles' states and the type of an entity are on the wire, and both sides read the same roads. So is the
+       weather (Environment): what falls, the strikes, the water on the roads and over the ground are sent,
+       and both sides work the same water out from them. -->
   <ItemGroup>
     <WireLibrarySource Include="..\OpenFPS.Geometry\**\*.cs" />
     <WireLibrarySource Include="..\OpenFPS.Materials\**\*.cs" />
@@ -53,6 +58,7 @@
     <WireLibrarySource Include="..\OpenFPS.Sound\**\*.cs" Exclude="..\OpenFPS.Sound\Core\**" />
     <WireLibrarySource Include="..\OpenFPS.Schema\**\*.cs" />
     <WireLibrarySource Include="..\OpenFPS.Physics\**\*.cs" />
+    <WireLibrarySource Include="..\OpenFPS.Environment\**\*.cs" />
     <WireLibrarySource Include="..\OpenFPS.Models\**\*.cs" />
     <WireLibrarySource Include="..\OpenFPS.World\**\*.cs" />
   </ItemGroup>
