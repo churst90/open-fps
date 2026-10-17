@@ -12,16 +12,28 @@ Recent work, newest first. `git log` has the rest.
   `OpenFPS.*` the name `Environment` is the namespace now, so 274 uses of the runtime's class are written
   `System.Environment`; the voices' embedded lines are named `OpenFPS.Models.Speech.*`. Namespaces, usings and
   qualifiers only, in six commits, every reference bound to the same type before and after; nothing stored a type
-  name. The wire hash changes (f82572c7167e to 635768b546d4) and the door fingerprint with it (ce77e122e30b to
-  c8fa0894bef3: the door renders are made again once).
+  name, and nothing a player hears changes. The wire hash changes (f82572c7167e to 635768b546d4) and the door
+  fingerprint with it (ce77e122e30b to c8fa0894bef3: the door renders are made again once).
+- A creek, drainage run or shore laid along a line is in every tile its line crosses, as wide as its bed. A tile
+  held its line only where the line's middle was, so a client holding only the tile a run's far part lies in had
+  no water beside it (on Albany and Magnolia, where the maps are streamed by tile). `WorldStreamingTests` walks
+  every line source across its width and holds each tile it crosses (1,177 on Albany, 1,647 on Magnolia). By the
+  far part of such a line you hear its water now; nothing else heard changes. The wire hash does not change.
 - The sound library's namespaces follow its projects (docs/SOUND_LIBRARY_BOUNDARY.md decision 6, section 21):
   `OpenFPS.Geometry`, `OpenFPS.Acoustics`, `OpenFPS.Sound` (with `.Hearing` and `.Core.*`), `OpenFPS.Native.Platform`
   and `.SteamAudio`, and `OpenFPS.Audio` (with `.Core`, `.Fmod`, `.SteamAudio`, `.Acoustics`, `.Data`), where they
   were `OpenFPS.Common`, `OpenFPS.Client.AudioEngine.*` and `OpenFPS.Client.Core`. FMOD's wrapper keeps `FMOD`; the
   engine packages keep theirs. Namespaces and usings only, in five commits, every reference bound to the same type
-  before and after; nothing stored a type name, so every saved file loads as before. The wire hash changes
-  (4f5934038d29 to f82572c7167e) and the door fingerprint with it (f401bda46391 to ce77e122e30b: the door renders are made
-  again once).
+  before and after; nothing stored a type name, so every saved file loads as before, and nothing a player hears
+  changes. The wire hash changes (4f5934038d29 to f82572c7167e) and the door fingerprint with it (f401bda46391 to
+  ce77e122e30b: the door renders are made again once).
+- Resonance's list of 2026-10-17 (what its copy of the sound fixed) tried on open-fps. Three faults reproduce
+  and wait in todo.md: an engine's voice swapped under its taps carries their share twice for about 250 ms; a
+  doorway route leaves from inside a thick wall when the leaf hangs at one face; speakers sharing a program have no
+  shared clock. Five do not, and guards now hold them: flush joints and a shut leaf are no way round; a point in a
+  room's corner is in its room; a cut line's pieces are placed every frame; no recording is held past its end; FMOD
+  closes with sounds still opening. AudioLab `--resonance-maybes outlet|overdue|close`. Tests and the lab only:
+  nothing a player hears changes.
 - Running water heard from the whole of itself, steps 2 to 4 (docs/RUNNING_WATER.md 15.6 to 15.8; the wire hash
   changes: a source can carry a line, `SoundEmitterComponent.Line`). The mapped creeks are voiced where the map
   draws them: Oak Creek on Albany was silent (-105 dBFS on its bank, the nearest water 57 m off) and is -56 dBFS
@@ -52,14 +64,6 @@ Recent work, newest first. `git log` has the rest.
   before): refused 307 to 0, free at least 0 to 27, the mixer 91 % to 71 %, the budgets no longer shed for the pool.
   `--busy-street cost`: a stage costs 22 us a block (0.1 % of the mixer). `--busy-street handover`: a voice let go
   ends with no step. The wire hash does not change.
-- Your own room's reverberation is binaural again after walking in from a busy street. A room's reverb bus takes
-  a binaural voice for its head only above the direct sounds' reserve; made while traffic and rain held the rest
-  (Selby House's lobby), it had none and stayed 3D, and FMOD's panner folds a 3D bus's two channels into one even
-  at a 3D level of 0: the clap's and the door's tail came out the same in both ears (0.98 to 1.00 between them).
-  A bus with no head now passes its stereo through (2D) unless it is another room heard from outside, and takes a
-  head once a voice is free. AudioLab `--clap-city [busy[=hold]]`: your own clap in the lobby through the whole
-  client path. The code was the same on 2026-10-13 (d0116bb5); what set it off was the pool running dry outdoors.
-  The wire hash does not change.
 - Library stage 7, the client's audio system split (docs/SOUND_LIBRARY_BOUNDARY.md 20). Nothing a player hears
   changes. What turned the world's entities into sounds is the sound library's now, `AudioWorld` in `OpenFPS.Audio`:
   each frame the client hands it the world and a table of the sources in it (what each is, where it is, where its
@@ -69,6 +73,14 @@ Recent work, newest first. `git log` has the rest.
   one-off sounds the server reports (doors, shots, speech, thunder) and the birds are the library's too; the client
   decodes the server's events for them. The voice budgets' variables (OPENFPS_ENGINE_VOICES and the rest) and
   OPENFPS_AUDIO_DEBUG work as before. The wire hash does not change.
+- Your own room's reverberation is binaural again after walking in from a busy street. A room's reverb bus takes
+  a binaural voice for its head only above the direct sounds' reserve; made while traffic and rain held the rest
+  (Selby House's lobby), it had none and stayed 3D, and FMOD's panner folds a 3D bus's two channels into one even
+  at a 3D level of 0: the clap's and the door's tail came out the same in both ears (0.98 to 1.00 between them).
+  A bus with no head now passes its stereo through (2D) unless it is another room heard from outside, and takes a
+  head once a voice is free. AudioLab `--clap-city [busy[=hold]]`: your own clap in the lobby through the whole
+  client path. The code was the same on 2026-10-13 (d0116bb5); what set it off was the pool running dry outdoors.
+  The wire hash does not change.
 
 ## 2026-10-16
 
@@ -103,6 +115,20 @@ Recent work, newest first. `git log` has the rest.
   the A/B, OPENFPS_EXTENT_RULE=middle, which still works) and the cabins' paths are one audio world's options
   (`AudioWorldOptions`), and where the bank and the door renders are is the client's to say (`AudioDataPaths`);
   the folders are the ones they were. The wire hash changes, so the server and the Windows client go out together.
+- Package stage 4, World (docs/ENGINE_PACKAGES.md, stage 4 as built). Nothing a player hears, sees or is told
+  changes. Maps and the one world are a project of their own, `OpenFPS.World`: the map, prefab and composite
+  formats, roads, tiles, laying the terrain, what covers the ground for the rain, and the world's tiles with
+  OpenStreetMap, Overture, the elevation survey and the land cover. It knows nothing of entities: the server
+  makes the terrain, a tile's ground and the prefabs into entities, and names every folder the world is read
+  from (`WorldRoots`). No byte on the wire moved, and `city.json` and both places' maps regenerate byte for
+  byte. A map the server saves no longer writes a scale under its spawn. The wire hash changes, so the server
+  and the Windows client go out together.
+- Six tests of the acoustic worker failed whenever OPENFPS_STEAMAUDIO_TESTS was set, and a wider run's test
+  host once crashed: xUnit builds every test's attribute at discovery, so the opt-in tests' resolver loaded
+  phonon for the whole run, and every threaded acoustic worker in it started Steam Audio. A lab lever
+  (`LabLevers.WithoutSteamAudio`) keeps one world's worker on the hand-rolled tracer; the tests of that path
+  and the whole-client harness set it, so they hold on any machine. Nothing in the game sets it, and nothing
+  a player hears changes.
 - Running water is heard from the whole of its line (Cody: "a sound source should have its sound be the entire
   area of the sound source"; docs/RUNNING_WATER.md 15). A creek, ditch, rivulet or gutter is cut at the listener
   into pieces of equal angle, small beside you and long far along it, at most twelve a voice, out of the 36 place
@@ -114,23 +140,6 @@ Recent work, newest first. `git log` has the rest.
   `AudioLab --extent-walk`, walks the real maps (with `rule=middle` for the old rule, or `OPENFPS_EXTENT_RULE=middle`
   in the game), and a new guard, `ExtentWalkTests`. The wire hash does not change; one stored stream
   (places_and_woods) does.
-- Six tests of the acoustic worker failed whenever OPENFPS_STEAMAUDIO_TESTS was set, and a wider run's test
-  host once crashed: xUnit builds every test's attribute at discovery, so the opt-in tests' resolver loaded
-  phonon for the whole run, and every threaded acoustic worker in it started Steam Audio. A lab lever
-  (`LabLevers.WithoutSteamAudio`) keeps one world's worker on the hand-rolled tracer; the tests of that path
-  and the whole-client harness set it, so they hold on any machine. Nothing in the game sets it, and nothing
-  a player hears changes.
-- Package stage 4, World (docs/ENGINE_PACKAGES.md, stage 4 as built). Nothing a player hears, sees or is told
-  changes. Maps and the one world are a project of their own, `OpenFPS.World`: the map, prefab and composite
-  formats, roads, tiles, laying the terrain, what covers the ground for the rain, and the world's tiles with
-  OpenStreetMap, Overture, the elevation survey and the land cover. It knows nothing of entities: the server
-  makes the terrain, a tile's ground and the prefabs into entities, and names every folder the world is read
-  from (`WorldRoots`). No byte on the wire moved, and `city.json` and both places' maps regenerate byte for
-  byte. A map the server saves no longer writes a scale under its spawn. The wire hash changes, so the server
-  and the Windows client go out together.
-- Package stage 7's clean half finished: the listening-level calibration (/listening) is in
-  `OpenFPS.Accessibility`, playing its cues through `IUiCues` as the lists do; Accessibility now references
-  Models and Sound. Nothing a player hears or is told changes, and the wire hash does not.
 - Library stage 6's first half, the world input (docs/SOUND_LIBRARY_BOUNDARY.md 19). Nothing a player hears
   changes. The sound reads the world through one view of its own (`IAcousticWorld`: the triangles, the rooms, the
   air, the things with boxes and the door leaves), which the client's snapshot fills; the acoustic worker, the
@@ -140,12 +149,6 @@ Recent work, newest first. `git log` has the rest.
   the client hands it. No library file names a game type now (358 references to none). A test holds the view
   still while the world moves on, as the worker needs. The wire hash changes, so the server and the Windows
   client go out together.
-- Library stage 5's rest (docs/SOUND_LIBRARY_BOUNDARY.md 18.8). Nothing a player hears changes. The world's air
-  (`Atmosphere`), the mixer's rate, how a world is heard (`HearingSettings`: /levels, /ear, /listening), the
-  console's levers (`MixSettings`: /tail, /copies, /echoes, /cabin, /valveflow, /enginedetail), the voice chat's
-  streams and the microphone's ring, and the lab's levers (`LabLevers`) are the mixer's, where they were statics
-  every world shared; the host reaches them through its facade. 50 of the library's statics are gone (393 to
-  343). The wire hash changes, so the server and the Windows client go out together.
 - Physics stage 3 (docs/PHYSICS_BOUNDARY.md 17). The server and a client ask the same question of the world
   each has (`IPhysicsWorld`): the floor under a body counts what moves on both sides, the server remembers
   only the floor of the same point, and both gather what a body can walk into in one order. Standing on a
@@ -156,8 +159,15 @@ Recent work, newest first. `git log` has the rest.
   diagonal into a square corner bumps both walls whichever way round they were built. A driven car's
   mechanics are the physics' `VehicleStep`; every drive is what it was. The wire hash changes, so the server
   and the Windows client go out together.
-- Clay and leaves are named underfoot: open clay ground is "clay" and foliage lying on the ground "leaves", where both
-  were "outside" (Cody, 2026-10-16). No map lays either as ground yet.
+- Package stage 7's clean half finished: the listening-level calibration (/listening) is in
+  `OpenFPS.Accessibility`, playing its cues through `IUiCues` as the lists do; Accessibility now references
+  Models and Sound. Nothing a player hears or is told changes, and the wire hash does not.
+- Library stage 5's rest (docs/SOUND_LIBRARY_BOUNDARY.md 18.8). Nothing a player hears changes. The world's air
+  (`Atmosphere`), the mixer's rate, how a world is heard (`HearingSettings`: /levels, /ear, /listening), the
+  console's levers (`MixSettings`: /tail, /copies, /echoes, /cabin, /valveflow, /enginedetail), the voice chat's
+  streams and the microphone's ring, and the lab's levers (`LabLevers`) are the mixer's, where they were statics
+  every world shared; the host reaches them through its facade. 50 of the library's statics are gone (393 to
+  343). The wire hash changes, so the server and the Windows client go out together.
 - The air's stir comes from the air (docs/CLIENT_NOTES.md, "The air's stir from the surface layer"; Cody
   approved). A far sound's rise and fall and the depth of a shadow read how turbulent the air is near the
   ground, which was the thunder's fixed judgement, so on the stillest night a far sound's treble swung 3 dB. Now
@@ -169,6 +179,17 @@ Recent work, newest first. `git log` has the rest.
   since the weather's would move a lawn's middle band up to 4.5 dB at 100 m (a question for Cody). No message
   changes; the wire hash does (Acoustics and Sound are in it), so the server and the Windows client go out
   together. The stored streams do not change.
+- Package stage 2, Models (docs/ENGINE_PACKAGES.md). The catalogue of what things are (machines and their
+  parts lists, the models a map can name, the one table of kinds and their fields for the editor, the
+  vehicle as the editor stores it, which glass a pane is, the voices, scopes and rounds) is a project of its
+  own, `OpenFPS.Models`, above the sound and the physics. The sound no longer asks it anything: whoever makes
+  a voice that names another preset (a train its horn, a mower its engine) hands it in. The registries are
+  one catalogue instance, with the static classes in front of it as before, and the voices' tables are built
+  once. Nothing a player hears changes, and every model and parts list written out is the same byte for
+  byte. The kept door renders are made again once. The wire hash changes, so the server and the Windows
+  client go out together.
+- Clay and leaves are named underfoot: open clay ground is "clay" and foliage lying on the ground "leaves", where both
+  were "outside" (Cody, 2026-10-16). No map lays either as ground yet, so nothing heard changes.
 - The wind's direction comes from the weather (docs/CLIENT_NOTES.md, "Where the wind comes from"; Cody: "wind
   sound should actually follow the wind directions, not random"). Each front blows from round a prevailing
   west-south-west, turned as a depression turns it (rain backed 60 degrees, a storm veered 45, snow veered 60, a
@@ -180,34 +201,6 @@ Recent work, newest first. `git log` has the rest.
   +0.8 dB in a 4.5 m/s breeze, fire and fountain within 0.7; a far sound straight across the wind swings
   several decibels more past 300 m. No message changes, but the wind field is in the wire hash, so the hash
   changes (the server and the Windows client go out together); the stored streams do not change.
-- Package stage 2, Models (docs/ENGINE_PACKAGES.md). The catalogue of what things are (machines and their
-  parts lists, the models a map can name, the one table of kinds and their fields for the editor, the
-  vehicle as the editor stores it, which glass a pane is, the voices, scopes and rounds) is a project of its
-  own, `OpenFPS.Models`, above the sound and the physics. The sound no longer asks it anything: whoever makes
-  a voice that names another preset (a train its horn, a mower its engine) hands it in. The registries are
-  one catalogue instance, with the static classes in front of it as before, and the voices' tables are built
-  once. Nothing a player hears changes, and every model and parts list written out is the same byte for
-  byte. The kept door renders are made again once. The wire hash changes, so the server and the Windows
-  client go out together.
-
-- Sound bent by the wind and the air's layers (docs/CLIENT_NOTES.md). The air's layers near the ground come
-  from the sun, the cloud, the hour and the wind (Monin-Obukhov; Holtslag and van Ulden), and over water from
-  the air against the water; the server sends the day of the year. Every voice in the world is bent by the
-  wind where its way's middle is, gusts and all: upwind or on a sunny afternoon a far low source goes into
-  shadow, the treble first (Harmonoise's curvature, Fleagle's edge, the creeping wave, held 20 to 30 dB down
-  by the stir); downwind or on a clear night its ground bounce comes in steeper and a lawn cancels less; past
-  100 m it rises and falls with the stir. A car's exhaust 300 m upwind of a 4.5 m/s breeze on a sunny afternoon
-  loses 13/27/29 dB (low/middle/high); downwind it keeps 1 dB more of its middle. Still neutral air bends
-  nothing inside 700 m. Thunder unchanged. Stored streams: one new field, false everywhere. The wire hash changes.
-- The accessibility interface's first half in a project of its own (docs/ENGINE_PACKAGES.md, stage 7):
-  `OpenFPS.Accessibility` holds the keys the game knows, the speech output, the beacons' categories, the
-  coordinates as a player reads them, the painted lines from the driver's seat, the turn narration, a zone held
-  before it is said, the driving cues' sounds, the spoken lists and what each interface sound means. It uses
-  nothing else of the game's; the words for where something is from the way you face ("in front", "left
-  behind") went to `OpenFPS.Words`. Nothing a
-  player hears or is told changes: the moved files are as they were, and the spoken-lines replay passes
-  unchanged. The wire hash changes, as four of the files left it, so the server and the Windows client go out
-  together.
 - Snow, ice, oak, pine and maple have names underfoot (docs/MATTER.md 2.4), as Cody approved: "snow", "ice" and,
   for the solid timbers, "boardwalk" as plain wood is, where each was "outside". Plywood and MDF are sheets that
   do not lie open to the weather and have none. No map lays any of them as ground yet, so no walk's lines change.
@@ -220,44 +213,33 @@ Recent work, newest first. `git log` has the rest.
   and a runnel heard along Foundry Street lost 2 to 10 dB of their top at 25 to 200 m to the road; now at most
   0.2 dB. A car heard along the road is the same to 0.05 dB within 50 m and keeps up to 0.4 dB more of its top at
   200 m. No stored data changes; the wire hash changes, and the door renders are made again.
-
+- The accessibility interface's first half in a project of its own (docs/ENGINE_PACKAGES.md, stage 7):
+  `OpenFPS.Accessibility` holds the keys the game knows, the speech output, the beacons' categories, the
+  coordinates as a player reads them, the painted lines from the driver's seat, the turn narration, a zone held
+  before it is said, the driving cues' sounds, the spoken lists and what each interface sound means. It uses
+  nothing else of the game's; the words for where something is from the way you face ("in front", "left
+  behind") went to `OpenFPS.Words`. Nothing a
+  player hears or is told changes: the moved files are as they were, and the spoken-lines replay passes
+  unchanged. The wire hash changes, as four of the files left it, so the server and the Windows client go out
+  together.
+- Sound bent by the wind and the air's layers (docs/CLIENT_NOTES.md). The air's layers near the ground come
+  from the sun, the cloud, the hour and the wind (Monin-Obukhov; Holtslag and van Ulden), and over water from
+  the air against the water; the server sends the day of the year. Every voice in the world is bent by the
+  wind where its way's middle is, gusts and all: upwind or on a sunny afternoon a far low source goes into
+  shadow, the treble first (Harmonoise's curvature, Fleagle's edge, the creeping wave, held 20 to 30 dB down
+  by the stir); downwind or on a clear night its ground bounce comes in steeper and a lawn cancels less; past
+  100 m it rises and falls with the stir. A car's exhaust 300 m upwind of a 4.5 m/s breeze on a sunny afternoon
+  loses 13/27/29 dB (low/middle/high); downwind it keeps 1 dB more of its middle. Still neutral air bends
+  nothing inside 700 m. Thunder unchanged. Stored streams: one new field, false everywhere. The wire hash changes.
+- Friction and restitution in the material table (docs/MATTER.md 2.4): static and sliding friction and the
+  coefficient of restitution, each the material against itself, with their sources. 22 materials have a friction
+  and glass a restitution; the rest are left empty rather than guessed. Nothing reads them until physics stage 4, so nothing heard changes.
 - Materials are told by what they are, not by their names (docs/ENGINE_PACKAGES.md, stage 1). Five places decided
   by a material's name: the place's name underfoot, the driving aids' road, the rain's canopy, the editor's windows
   and a shape's glass, and a struck fence's pale. Each reads a property of the material table now, so a material
   that has the property gets the behaviour whatever it is called. Every material answers as it did but laminated
   glass, which is glass, and an alias answers as its material ("Steel" underfoot is metal grating). A guard keeps
   new name tests out. Nothing heard changes; the wire hash changes, and the door renders are made again, the same.
-- Friction and restitution in the material table (docs/MATTER.md 2.4): static and sliding friction and the
-  coefficient of restitution, each the material against itself, with their sources. 22 materials have a friction
-  and glass a restitution; the rest are left empty rather than guessed. Nothing reads them until physics stage 4.
-- The threads that render ahead of the mixer treat subnormal numbers as zero (docs/AUDIO_QUALITY_2026-10-06.md,
-  row 14). A resonator or a glide ringing down to silence sits on numbers too small to be normal, and an
-  Intel processor works on those about a hundred times slower: a door once took seven minutes. The render
-  pool's workers and the door prewarm threads flush them from their start, and a one-off sound's render, a
-  loudspeaker's and a voice's build flush them while they run (`FlushToZero`: glibc's fesetenv on Linux, the
-  C runtime's `_controlfp_s` on Windows). FMOD's mixer thread already did, so the ground reflection, the
-  near-wall copies and the all-passes, which run there, were never slow. Measured on AMD with AudioLab
-  `--subnormals`: a bell ringing down renders two to four times faster flushed, and the engines no faster.
-  No model was touched and no stored render changes: the seventeen fingerprint renders are the same to the
-  bit made flushed, the doors included, whose floor (`DoorPhysics.Rest`) stays. The wire hash does not change.
-
-- The ground by its impedance (todo, "The ground reflection, done properly"; docs/CLIENT_NOTES.md). The ground's
-  materials carry Nord2000's flow resistivities, and a voice's ground is judged as a spherical wave off a
-  Delany-Bazley impedance with its ground wave, in each of the voice's bands. The copy Cody approved is unchanged;
-  where the real ground carries less than sound and copy, the band is brought down to it. A car's exhaust 0.3 m
-  over Elm Park's lawn loses 2.2 dB of its middle at 25 m, 6.8 at 50 and 9.4 at 100; roads within 0.6 dB, concrete
-  and water as before. On the maps: sources at the ground on grass (rain's rills, runnels, downpipes) lose 8 dB of
-  their middle at 25 m; the train beyond Elm Park 3 to 4 dB at 100 to 170 m; garden mowers 7 dB at 100 m; the
-  fountain's low taps 3.6 dB across the lawn. Stored streams: three new fields, all zero.
-- A door's jamb is not a wall. The near-wall copies took any surface a probe met within 3 m as a whole
-  wall, so standing in a doorway put a copy of everything at each ear off the jambs and the head. Each probe
-  now looks again across the surface it met, on its plane, half and a whole first Fresnel zone each way, and
-  its copy is as whole as the surface there (docs/CLIENT_NOTES.md, "The near-boundary reflection"). A wall
-  stays whole however it is built and however the head is turned; the set's budget is still taken on whole
-  walls, so a copy only ever gets quieter. Marlow Tower's front entrance: the copies were 4.4 to 5.7 dB over
-  the lobby's, now 2.4 under to 2.9 over. Rooms unchanged: 3,820 of 3,837 standing spots and headings.
-  Found in Resonance's copy (a shop's open doorway).
-
 - Physics stage 2, one gravity and one air (docs/PHYSICS_BOUNDARY.md 16.6). Gravity is one number,
   9.80665 m/s² (`Earth.StandardGravity`), where it was written 44 times, 40 of them 9.81; and a map's own
   gravity is what everything on it falls, rolls and flies by on the server: drops, falls, bullets, slugs,
@@ -269,19 +251,24 @@ Recent work, newest first. `git log` has the rest.
   sand off a bullet's strike (0.4 to 0.7 dB in its faint low bands, with the gravity) and the glass's
   landings, which keep their own 1.2 until Cody decides. The wire hash changes, so the server and the Windows client go out
   together.
-
-- Physics stage 2, the ricochet (docs/PHYSICS_BOUNDARY.md 16.5). Whether a round skips off a face, how it
-  leaves and how the tumbling slug flies are the physics' now (`RicochetLaw`); the sound's `Ricochet` keeps
-  the whine. A new guard, the ricochet table (`RicochetTableTests`), holds every weapon's round off every
-  kind of face and half a second of its flight after; stored before the move, it passes unchanged, so
-  nothing a player sees or hears changes. The wire hash changes, so the server and the Windows client go out
-  together.
-- The spoken-lines replay drives (docs/ENGINE_PACKAGES.md, stage 0). A third scenario, `garage_drive`: in
-  the hatchback parked in the city's garage, out onto Main Street and right at Central Street with the
-  indicator on, then out of the car, with the server's half scripted by hand. Its list holds what the road
-  says and every driving cue by tick, so package stage 7 cannot move the driving aids and change them. A new
-  test also holds that walking into a wall knocks on it, in the wall's own material. Tests only: nothing a
-  player sees or hears changes.
+- The ground by its impedance (todo, "The ground reflection, done properly"; docs/CLIENT_NOTES.md). The ground's
+  materials carry Nord2000's flow resistivities, and a voice's ground is judged as a spherical wave off a
+  Delany-Bazley impedance with its ground wave, in each of the voice's bands. The copy Cody approved is unchanged;
+  where the real ground carries less than sound and copy, the band is brought down to it. A car's exhaust 0.3 m
+  over Elm Park's lawn loses 2.2 dB of its middle at 25 m, 6.8 at 50 and 9.4 at 100; roads within 0.6 dB, concrete
+  and water as before. On the maps: sources at the ground on grass (rain's rills, runnels, downpipes) lose 8 dB of
+  their middle at 25 m; the train beyond Elm Park 3 to 4 dB at 100 to 170 m; garden mowers 7 dB at 100 m; the
+  fountain's low taps 3.6 dB across the lawn. Stored streams: three new fields, all zero.
+- The threads that render ahead of the mixer treat subnormal numbers as zero (docs/AUDIO_QUALITY_2026-10-06.md,
+  row 14). A resonator or a glide ringing down to silence sits on numbers too small to be normal, and an
+  Intel processor works on those about a hundred times slower: a door once took seven minutes. The render
+  pool's workers and the door prewarm threads flush them from their start, and a one-off sound's render, a
+  loudspeaker's and a voice's build flush them while they run (`FlushToZero`: glibc's fesetenv on Linux, the
+  C runtime's `_controlfp_s` on Windows). FMOD's mixer thread already did, so the ground reflection, the
+  near-wall copies and the all-passes, which run there, were never slow. Measured on AMD with AudioLab
+  `--subnormals`: a bell ringing down renders two to four times faster flushed, and the engines no faster.
+  No model was touched and no stored render changes: the seventeen fingerprint renders are the same to the
+  bit made flushed, the doors included, whose floor (`DoorPhysics.Rest`) stays. The wire hash does not change.
 - `FireTests.NothingAllocatesWhileAFireBurns` no longer fails now and then on GitHub's runners. Three
   times in 42 runs a fire's four measured seconds counted bytes on the test's thread there, each time a
   different fire and a different number: the crown fire 5,784, the fire pit 3,480, the burning car 8,128.
@@ -290,6 +277,27 @@ Recent work, newest first. `git log` has the rest.
   back in a second one; something that happens once in a process does not. A fire that allocated is now
   burnt again, up to three times, and fails only if every one allocates; the methods the runtime compiled
   on the thread meanwhile are logged with it. Tests only: nothing a player hears changes.
+- The spoken-lines replay drives (docs/ENGINE_PACKAGES.md, stage 0). A third scenario, `garage_drive`: in
+  the hatchback parked in the city's garage, out onto Main Street and right at Central Street with the
+  indicator on, then out of the car, with the server's half scripted by hand. Its list holds what the road
+  says and every driving cue by tick, so package stage 7 cannot move the driving aids and change them. A new
+  test also holds that walking into a wall knocks on it, in the wall's own material. Tests only: nothing a
+  player sees or hears changes.
+- Physics stage 2, the ricochet (docs/PHYSICS_BOUNDARY.md 16.5). Whether a round skips off a face, how it
+  leaves and how the tumbling slug flies are the physics' now (`RicochetLaw`); the sound's `Ricochet` keeps
+  the whine. A new guard, the ricochet table (`RicochetTableTests`), holds every weapon's round off every
+  kind of face and half a second of its flight after; stored before the move, it passes unchanged, so
+  nothing a player sees or hears changes. The wire hash changes, so the server and the Windows client go out
+  together.
+- A door's jamb is not a wall. The near-wall copies took any surface a probe met within 3 m as a whole
+  wall, so standing in a doorway put a copy of everything at each ear off the jambs and the head. Each probe
+  now looks again across the surface it met, on its plane, half and a whole first Fresnel zone each way, and
+  its copy is as whole as the surface there (docs/CLIENT_NOTES.md, "The near-boundary reflection"). A wall
+  stays whole however it is built and however the head is turned; the set's budget is still taken on whole
+  walls, so a copy only ever gets quieter. Marlow Tower's front entrance: the copies were 4.4 to 5.7 dB over
+  the lobby's, now 2.4 under to 2.9 over. Rooms unchanged: 3,820 of 3,837 standing spots and headings.
+  Found in Resonance's copy (a shop's open doorway).
+
 ## 2026-10-14
 
 - No rush into the tail stepping out of a small room. The late field's answers, and the distance law
