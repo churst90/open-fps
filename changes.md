@@ -12,6 +12,14 @@ Recent work, newest first. `git log` has the rest.
   head once a voice is free. AudioLab `--clap-city [busy[=hold]]`: your own clap in the lobby through the whole
   client path. The code was the same on 2026-10-13 (d0116bb5); what set it off was the pool running dry outdoors.
   The wire hash does not change.
+- Library stage 7, the client's audio system split (docs/SOUND_LIBRARY_BOUNDARY.md 20). Nothing a player hears
+  changes. What turned the world's entities into sounds is the sound library's now, `AudioWorld` in `OpenFPS.Audio`:
+  each frame the client hands it the world and a table of the sources in it (what each is, where it is, where its
+  sound comes out), and it decides what gets a voice and places it, as before. The client's side,
+  `ClientAudioSystem`, fills the table from what the server sent, says where you are, runs the game's own sound
+  features (the one-off sounds, the beacons, the driving aids, the birds) at the same moments in the frame, and names
+  the place you stand in. The voice budgets' variables (OPENFPS_ENGINE_VOICES and the rest) work as before. The
+  wire hash does not change.
 
 ## 2026-10-16
 

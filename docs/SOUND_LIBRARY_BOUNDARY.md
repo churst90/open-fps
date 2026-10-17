@@ -33,6 +33,7 @@ library that open-fps and Resonance both reference. Step 1 of
 18. Stage 5 as built: the traced places and the weather per world (18.1-18.5), the clock (18.6), the world
     time (18.7), the air, the mixer's rate, the hearing, the mix and the lab (18.8)
 19. Stage 6 as built: the world input (19.1-19.6), `OpenFPS.Audio` and the world's options and paths (19.7-19.13)
+20. Stage 7 as built: `ClientAudioSystem` split into `AudioWorld` and its host
 
 ---
 
@@ -720,7 +721,8 @@ MemoryPack). 4 built and merged 2026-10-10 (section 17, 9f9bf5ab: the rooms and 
 Acoustics; 384 crossings left), and the acoustic map switched to the rooms flooded from the walls the same day
 (docs/GEOMETRY.md 12.6 item 1, 25a328b9; approved by ear 2026-10-10). Stage 5's first slice built and merged
 2026-10-10 (section 18, 10c1bcf7: the traced places and the weather are per world; 28 library statics fewer,
-crossings unchanged). The rest of stage 5 starts with `AudioClock` (18.3).
+crossings unchanged). The rest of stage 5 starts with `AudioClock` (18.3). Stage 6 built 2026-10-16 (section 19);
+stage 7's first part, `ClientAudioSystem` split into `AudioWorld` and its host, built 2026-10-17 (section 20).
 
 The order agreed with Cody on 2026-10-11 (todo.md, "Next, in order"): the special-cases audit's parts
 (docs/SPECIAL_CASES_AUDIT.md; P0, P1 and P2 done 2026-10-11) with the voice registry (P3a-d), then stage 5's
@@ -2802,9 +2804,176 @@ to 42 (the door cache's pruned flag). The ones that came in are the host's (the 
 
 ### 19.13 Left before stage 7
 
-- A client adapter for `IAcousticWorld` that is not the snapshot itself (19.6), with stage 7's source table.
-- Client.Core's reach into Audio's internals (19.7), which the split's `AudioWorld` makes its interface.
+- A client adapter for `IAcousticWorld` that is not the snapshot itself (19.6), with stage 7's source table: the
+  source table is built, and the world input stays the snapshot (20.1).
+- Client.Core's reach into Audio's internals (19.7), which the split's `AudioWorld` makes its interface: done (20.6).
 - The statics 18.8 left that are not the audio world's: the door models' levers (with the next door model change),
   the geometric acoustics' traces and A/Bs (`Constructions.PanelsOnlyForLab`, `OpeningRoutes.DebugOverTheTop` and
   `ReverseGridOrderForParity`, `EarlyReflections.FlutterTrace`), the geometry's switches, and
   `ExtendedSources.TreePlaces` (OPENFPS_WIDE_TREE_PLACES, read once, a table).
+
+## 20. Stage 7 as built (2026-10-17): `ClientAudioSystem` split
+
+The client's audio system is two classes: `AudioWorld` in `OpenFPS.Audio`, which is what the audio system did, and
+`ClientAudioSystem` in Client.Core, which is open-fps's host of it. Nothing a player hears changes: the stored
+streams and the spoken lines pass unregenerated after every commit, and were never regenerated. Made on da2c967d,
+in seven commits: the source table and the reads that became reads of it, method group by method group (20.1), the
+listener and the host's services as the library has them (20.2), the host's parts of the frame apart and the
+budgets an option (20.3, 20.4), then the move (20.5) and the internals (20.6). `WorldAudioPlayer` and `BirdLife`
+are not split yet (20.9).
+
+### 20.1 The source table
+
+As 7.6 had it: first every snapshot read inside the class became a read of a table the adapter fills once a frame,
+with the emitter stream unchanged, then the body moved. The table's shapes are the library's
+(`OpenFPS.Audio/Data/AudioSources.cs`):
+
+| Type | What it is |
+|---|---|
+| `SourceSpec` | what a source is: the emitter component field by field without its wire format (decision 10), its offset the one its kind implies when none is authored (the catalogue's, so the host's, as 19.7 left `EntityEmission.LocalOffset`), and its body's collider shape and size (a fire's bed, a shore's stretch, a grille from a nameless vehicle's length) |
+| `SourceState` | where it is and what it sends: position, rotation, velocity, the tyres' demand, the wheels, a vehicle's horn and siren bits, a train's or an aeroplane's lever |
+| `AudioSource` | one thing by its id: its spec and state, where its sound comes out and the probe's size there (`AudioEmission`), and whether the host has silenced it (open-fps: a placed beacon whose category is off) |
+| `IAudioSources` | the frame's table: any thing by its id, what sounds by itself and what moves in the host's order (the order voices are given out in, which the streams hold), when the poses were sampled, the woods, what is falling, the rain's rate and the road water |
+
+`SnapshotSources` (Client.Core) is open-fps's: it turns an entity into a source the first time the frame asks about
+it and keeps it for the rest of the frame (anything may be asked about, not only what sounds: a talker, the door a
+beacon sits on, the car you ride in). A frame is a snapshot, and a snapshot never changes once built, so a source
+asked about twice is one answer. Each entity's `AudioSource` object is kept and refilled, so a frame allocates
+nothing per source; the component used to be copied out of the definition at every read.
+
+The reads went over in four commits, each with the streams unchanged: the emitter pass with horns, sirens and
+trains; the rankings; the paths, the cabin, the talkers and the weather; then the listener. `CabinWalls` answers a
+vehicle's windows and profile from its id and sound id, so a source needs no body for them.
+
+**The world input stays the snapshot.** 19.13 asked for a client adapter for `IAcousticWorld` that is not the
+snapshot itself. The snapshot is what the acoustic worker needs it to be, one view that never changes once handed
+out (19.1); an adapter would have to be made once a frame to keep that, and would forward every member. What the
+audio world reads of the entities is the source table, which is not the snapshot; the shapes are still the
+snapshot's `IAcousticWorld`. Question 1 for Cody (below) is whether to make it anyway.
+
+### 20.2 The listener and the host's services
+
+- **The listener** is a `ListenerState` (feet, body, eye height, rotation, yaw, velocity, what it rides in, shelter,
+  indoors), read from the host where the player's state was read, so a step taken between frames is placed from
+  where the listener is then, as before. `Indoor` is the host's from the last frame's naming, as `IsIndoor` was.
+- **The recordings** are an `IRecordings` (`OpenFPS.Audio/Core/AudioHost.cs`), which `SoundMappingService` implements:
+  which take a sound id plays, and a footfall's and a landing's category, asked at the same points (the bank chooses
+  takes at random, so where they are asked is heard in the stream).
+- **A footfall's slope** reaches the world as the level and pitch it means; `StrideAccumulator` stays the host's.
+- **A level crossing** is a `RailCrossing` (its middle, the way the rails run, how far they are crossed, a point on
+  each rail), made once when the map's crossings are set; `CrossingRails` is World's.
+- **The rays** for the ground under a voice and the six near-wall probes are `AcousticRays.FirstSurfaces` over the
+  world input, which `SpatialService.RaycastAll` forwarded to; `LookForGround` and `BoundaryProber` take the world.
+- A copy's band loss is `ImageSource.SpecularBandLossDb`, which `WorldAudioPlayer.SpecularLoss` forwarded to.
+
+### 20.3 The host's parts of the frame
+
+The frame placed the game's own sound features in the middle of the audio world's work, and each places voices
+through the same registry, so the order is heard. They are `IAudioHost`'s, called where they ran:
+
+| Hook | Where | open-fps's |
+|---|---|---|
+| `ListenerPlaced(ear, earSpeed)` | after the listener, the wind at the ears and the shelter | the one-off sounds told where the ears are, the beacons, the driving aids |
+| `RoomsSet(ear, region, newRooms)` | after a new map of rooms goes to the mixer | the rooms that moved (unless the map is new), the place's name, the one-off sounds' update |
+| `SourcesPlaced(ear, earSpeed)` | after the trains, horns, sirens, own voice and talkers | the birds |
+| `WorldLeft()` | leaving a world, after the voices go | the one-off sounds still waiting |
+
+And the host's two answers: the floor under a point (`GroundUnder`, the host's physics, for an aeroplane on its
+wheels) and the one-off sounds waiting (`OneOffsPending`, for the census), and `Listener`.
+
+### 20.4 The voice budgets are a world's
+
+The engines', echoes', front outlets', places' and machines' budgets were statics read from the environment; they
+are `AudioWorldOptions.Budgets` (`VoiceBudgets`), as 7.5 proposed, read from the same variables
+(OPENFPS_ENGINE_VOICES, OPENFPS_ENGINE_ECHOES, OPENFPS_FRONT_VOICES, OPENFPS_PLACE_VOICES, OPENFPS_MACHINE_VOICES)
+by the game's mixer, and `TraceFeet` is OPENFPS_AUDIO_DEBUG's feet lines. A test's or a lab's facade has the world it
+is given: a spike on a recording mixer given no options plays the shipped budgets whatever the environment says
+(one that wants the variables gives its facade `AudioWorldOptions.FromEnvironment()`). The census's names and a
+train's empty plan are the world's own, not statics.
+
+### 20.5 What moved, and what the host keeps
+
+- **Moved** by `git mv`, namespace kept (decision 6): `ClientAudioSystem.cs`, `.Voices.cs`, `.Trains.cs` to
+  `OpenFPS.Audio/Core/AudioWorld*.cs` (4,470 lines), with `VoiceRegistry` (and its lifecycle) and `LoudspeakerVoices`.
+  The registry and its kinds are public: the host's features place their voices through it. Git sees
+  `ClientAudioSystem.cs` as rewritten, since the adapter keeps the name; `git log --follow -C` and `git blame -C`
+  follow the body into `AudioWorld.cs`.
+- **`AudioWorld`** takes the facade, the recordings, its host and a clock (`manualAcoustics` and `seed` as before),
+  owns the acoustics, the worker (and starts it), the registry, the rain, the engines' walls, the cabins and the
+  loudspeakers' renders, and is ticked once a frame: `Tick(IAcousticWorld, IAudioSources)`. Every method that took
+  the snapshot takes the world input. Its events: `OwnFootstep`, `OtherFootstep`, `OnOwnLand`, `OnPlayerLand`,
+  `StartHorn`, `StartTrainSignal`, `ApplyRecordedGround`, `SetCrossings`, `PlayReferenceVoice`, `NotifyMaterialChange`,
+  `ForgetEntity`, `LeaveWorld`, `ModelsChanged`, `NoteSceneLoading`, `OwnEntityId`, `OwnVoiceLive`.
+- **`ClientAudioSystem`** (409 lines, from 4,700) is the host: the 60 Hz throttle, the sources refilled from the
+  snapshot and the world ticked; the game's features built on the world's acoustics, registry and worker (the
+  one-off sounds, the beacons, the driving aids, the birds) and run at their hooks; the rooms that moved; the place's
+  name (`NameOfPlace`, `NameOfGap`, the doorway's); voice chat decoded with the game's codec; a footfall's slope
+  turned into numbers and a crossing into a `RailCrossing`; the entities walked for a model edited. Its public API
+  is what it was, and `World` is the audio world for the tests.
+
+### 20.6 Client.Core and Audio's internals
+
+19.7 let Client.Core into Audio's internals until this split (the worker's manual mode and traced set, the rain's
+ear speed and survey, the voice manager's heard level, the voices' starve count). Their readers are `AudioWorld`'s
+now, and the grant is gone: the host reaches the world through `AudioWorld`'s public members, `IAudioHost` and the
+source table. The tests and the lab keep theirs.
+
+### 20.7 The ratchets and the statics
+
+- Library: crossings 0 before and after. `files.tsv` follows the moves and gains `AudioSources.cs`, `AudioHost.cs`
+  (Audio) and `SnapshotSources.cs` (host); `tools/sound_boundary/classify.py` says what the adapter is now.
+- Engine packages: crossings unchanged by this work (692 at da2c967d). `files.tsv` follows the moves;
+  `tools/engine_packages/classify.py` drops the registry's and the loudspeakers' Client.Core rules and says what the
+  adapter is.
+- Statics (the survey's section 4): 343 to 344. The one that came in is the registry's seed table (`KindSeeds`, a
+  table filled once, 4.2's allowed kind), which moved with it; the budgets, the feet's trace switch, the census's
+  names and the empty train plan were the host's statics and are not statics now.
+
+### 20.8 The wire hash and the checks
+
+- **The wire hash** does not change (edc1fd88b5f6 at da2c967d): nothing in a hashed folder changed.
+- **New guards.** `AudioSourcesTests` (4): every emitter field has a counterpart in the spec and the client copies
+  each (proved by breaking: a field appended to the component, and `Quench` left out of the copy, each failed), an
+  unauthored vehicle sounds from its exhaust as `EntityEmission` has it, and a frame reads its own snapshot.
+  `AudioWorldOptionsTests` gains two: the budgets come from the environment as the statics did, and a world's engine
+  budget is its own (proved by breaking: the world reading the shipped budgets, the machine variable misread).
+- **Checks.** All five builds have no warnings (the server, the GTK client, the Windows client with
+  `-p:EnableWindowsTargeting=true`, the lab and the tests). After every commit, the guards (LibraryBoundary,
+  EnginePackages, RenderFingerprint, EmitterStreamReplay, SpokenLinesReplay, VoiceIdBand, VoiceRegistry,
+  ModelKindTable, MapScoped, ExtentWalk, AcousticWorldView, AudioWorldOptions) with every class the client audio
+  touches (ClientAudio*, the harness's and the replay's users, the selection, the one rank, the budgets, the beacons,
+  the loudspeakers, the ground, the sirens, the trains, the hot path): 366 to 370 passed. After the move, 814 more of
+  the classes it touches (the rain and its probes, the clock, the recorded ground, the seeds, the birds, the one-off
+  sounds, the talkers and own voice, the footsteps, the cabins, horns, woods, fire, water and waves, the reflections,
+  the driving sounds): 814 passed, 3 skipped (the Steam Audio opt-ins). With `DOTNET_PROCESSOR_COUNT=4`, the
+  boundaries, the stored streams, the spoken lines, the fingerprints, the extent walk, the voice ids and the new
+  guards: 111 passed. The surveys' `run.sh` agree with the lists in the tree.
+- **Not run here:** a session. The split is checked by the streams, which cover the integration layer (10); a
+  session is the second check, below.
+
+### 20.9 Left of stage 7
+
+- `WorldAudioPlayer`: the `WorldAudioEvent` decoding stays, the playing moves. Its reads are the source table's
+  already in reach (the speaker's pose, a cabin, the follow), and three need a library answer first: the ray a copy's
+  last leg is tested with (`SpatialService.RaycastSingle` with a filter over entities, `StopsCopies`, which
+  `AcousticBody` can say), the listener's standing eye height, and the ground hook, which becomes the world's own.
+  Then `RoomsSet` hands the world back the one-off sounds' update.
+- `BirdLife`: species and calling move, the habitat survey from entities stays; `SourcesPlaced` then hands the
+  world the calling.
+- `SpatialService`'s acoustic queries are the library's already (19.2); what it keeps is the game's.
+- Namespaces: `AudioWorld` and `VoiceRegistry` keep Client.Core's (decision 6) until the one rename commit.
+
+### 20.10 To hear (the second check)
+
+On the city (`./run-server.sh city`, restart it first), each spot checked standable with `--walk-pair ears=`:
+
+| Where | /tp | Listen for |
+|---|---|---|
+| Main Street before Marlow Tower | `/tp -6.4 -103.5 0.2` | Traffic as before: engines near, borrowed voices far, a car's front and back apart within 20 m, sirens and horns from the grille, no cars cutting in and out |
+| Mill Road level crossing | `/tp -160.0 -175.0 0.1` | The bell between trains silent, ringing as a train comes; a train's horn and its wheels over the crossing |
+| Elm Park, by the fountain | `/tp -325.0 219.0 0.2` | The fountain's taps and the trees round the park spread as before; birds calling |
+| Marlow Tower floor 1 stairwell | `/tp -10.8 -104.2 3.3` | Your own steps and the walls answering them; the place named as you walk through doorways |
+| Foundry Street spawn, in rain | `/tp 60.0 122.0 0.2` | The rain round you, the gutter and the drain |
+| Parking garage, level 0 | `/tp -66.0 62.0 0.3` | Get into a parked car: the engine from inside through its body, the street through the glass, windows down louder |
+
+Voice chat with a second player, and the listening-level calibration's voice, go through the same world.
