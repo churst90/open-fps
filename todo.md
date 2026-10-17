@@ -138,10 +138,10 @@ since the last deploy" list below.
    wire hash changes). The second half, `OpenFPS.Audio` (the mixer, Steam Audio, the worker, the rain round the
    listener; 65 files moved unchanged) with `AudioWorldOptions` (the wide sources' levers, the cabins' paths) and
    `AudioDataPaths` (the bank, the door render cache): BUILT 2026-10-16 (19.7 to 19.12; the wire hash changes).
-   Stage 7's first part, `ClientAudioSystem` split: BUILT 2026-10-17 (20; the body is `AudioWorld` in `OpenFPS.Audio`,
-   ticked with the world input and a source table the client fills once a frame, its host `ClientAudioSystem`;
-   streams unregenerated; the wire hash does not change). Unheard: the spots in 20.10. Next: `WorldAudioPlayer`, then
-   `BirdLife` (20.9).
+   Stage 7: BUILT 2026-10-17 (20; `ClientAudioSystem`'s body is `AudioWorld` in `OpenFPS.Audio`, ticked with the
+   world input and a source table the client fills once a frame, its host `ClientAudioSystem`; the one-off sounds
+   (`OneOffSounds`, `WorldAudioPlayer` the wire's decoder) and the birds the world's; streams unregenerated; the wire
+   hash does not change). Unheard: the spots in 20.11. Next: stage 8, versions and how Resonance takes it.
 6. Geometry stage 5, diggable ground with strata: held until it is wanted.
 7. A source heard from the whole of itself (Cody, 2026-10-16: "a river should sound like a flowing river the
    entire width and length of the river"; the survey, inbox/2026-10-16-extended-sources-survey; the rule,

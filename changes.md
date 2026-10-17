@@ -17,9 +17,10 @@ Recent work, newest first. `git log` has the rest.
   each frame the client hands it the world and a table of the sources in it (what each is, where it is, where its
   sound comes out), and it decides what gets a voice and places it, as before. The client's side,
   `ClientAudioSystem`, fills the table from what the server sent, says where you are, runs the game's own sound
-  features (the one-off sounds, the beacons, the driving aids, the birds) at the same moments in the frame, and names
-  the place you stand in. The voice budgets' variables (OPENFPS_ENGINE_VOICES and the rest) work as before. The
-  wire hash does not change.
+  features (the beacons, the driving aids) at the same moments in the frame, and names the place you stand in. The
+  one-off sounds the server reports (doors, shots, speech, thunder) and the birds are the library's too; the client
+  decodes the server's events for them. The voice budgets' variables (OPENFPS_ENGINE_VOICES and the rest) and
+  OPENFPS_AUDIO_DEBUG work as before. The wire hash does not change.
 
 ## 2026-10-16
 
