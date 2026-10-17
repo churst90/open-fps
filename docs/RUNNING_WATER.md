@@ -1093,7 +1093,8 @@ the city's gutter in rain, /tp 44.5 122.2 0.2 east to /tp 74.0 122.2 0.2, its mi
 
 ### 15.5 What the rest of the rule needs
 
-The order is the survey's; todo.md carries it.
+The order is the survey's; todo.md carries it. Steps 2 to 4 are built (2026-10-17, 15.6 to 15.8); 15.9 is what is
+left.
 
 2. **Voice the mapped streams.** OSM waterways are laid only as water surfaces (`tools/gen_osm.py`), and the
    drainage network places no voice on water cells, so Oak Creek's 3.3 km in Albany is silent where the map
@@ -1115,3 +1116,116 @@ The order is the survey's; todo.md carries it.
 Two things the cut leaves for those steps: a drainage voice is still a 20 m chord (one source per whole line
 needs the line's path on the wire, step 2), and a far piece is still events, not a texture (a kilometre of line
 is never voiced at once today, as only the voices in the machine budget play).
+
+### 15.6 Step 2: the mapped creeks, the bed along a line, and a drainage line heard whole (2026-10-17)
+
+Cody approved steps 2 to 4 on 2026-10-17, the wire change with them.
+
+**A source can be laid along a line of its own** (`SoundEmitterComponent.Line`, appended: points from end to end in
+the entity's own frame; `EntityData.Line` in a map file). The client cuts it as it cut a straight line (`LinePath`;
+`ExtendedSources.Cut`, `Place` and `MeanLawPower` on a path are the straight line's laws taken segment by segment,
+exact for a polyline), and a bed 1.5 m wide or more is heard across itself as three lines a third of its width apart.
+A line's path is asked about, and its distance for the ranking taken, from its point nearest the ear (`HeardPoint`):
+stood beside one end of a long creek whose middle is behind a wall, the water at your feet is not heard through it.
+
+**The mapped creeks are voiced where the map draws them.** `tools/gen_osm.py` lays every OpenStreetMap stream, river,
+canal, ditch and drain also as a source along its line on the water's surface (`waterway_creek`, `waterway_ditch`;
+its box's X its bed's width, the map's), cut where it crosses a tile's edge (a sliver under 20 m going with the part
+beside it). The server joins the parts into one waterway, takes it downstream by the survey's heights, and gives each
+part its water from the ground's drainage (`MapDrainage.VoiceWaterways`): what the ground sends the waterway's own water
+cells, gathered down it; and, for a creek, what its width says its bed was shaped by (w = 3 Q^0.5, as
+`GroundChannelBed.WidthFor`) and the map does not give it, as open ground upstream off the map. Oak Creek's 3 m bed was
+shaped by 1 m³/s, 88 % of it from upstream; in dry weather it carries its catchment's base flow, and an hour of heavy
+rain brings it to about 90 L/s. AudioLab `--ground-water map` lists every part as voiced.
+
+**A drainage line is heard as whole runs**, not 20 m chords: each 20 m stretch judged as before (its kind, its flow,
+whether it is heard), the heard ones end to end one source while they are of one kind and one tile (its last stretch
+reaching at most half a stretch over the edge, so a source is sent with its tile), 400 m at most, its line through its
+cells' middles from upstream down, its bed and flow its downstream end's and its head share (`/HEAD` in its key) the
+share of that flow at its upstream end. Albany's 3,300 voices of 20 m are 1,142 (65.4 km), with 27 parts of mapped
+waterway (4.4 km). A placed line keeps the drainage's voices 15 m clear all along it.
+
+**The bed along a line** (`StreamBed`). A gentle natural bed (a creek under 2 %) gathers its stones into riffles
+between pools, a riffle and a pool every five to seven widths (Leopold, Wolman and Miller 1964, "Fluvial Processes in
+Geomorphology", ch. 7; Keller and Melhorn 1978, GSA Bulletin 89, 723); a steep one (over 3 %) into steps a pool apart
+every one to four widths; between the two it is plane (Montgomery and Buffington 1997, GSA Bulletin 109(5), 596). A
+riffle is 40 % of its unit and holds 80 % of its stones and 70 % of its fall, a step 25 %, 85 % and 85 % (judgements
+within those observations). Every stone is where it is (a hash of the bed and its number), so the stretch beside you
+keeps its stones however the line is recut. A site's water is the share of the line's that has reached it, in a bed as
+much narrower (w as Q^0.5), on its riffle's or pool's slope: Manning in a wide channel gives depth as Q^0.3 S^-0.3 and
+speed as Q^0.2 S^0.3. A line declares its stones' power over its length (`GroundChannels.LengthDb`).
+
+**A long line's synth** (`RunningWaterSynth.FromTheBed`: longer than 40 m, a bed of riffles or steps, or a line that
+gathers its water) takes its sites from the bed as it is cut (`Allot`): in each piece whose bed holds six stones or
+fewer, every stone is its own site; the rest are stand-ins, three a piece and sixteen a line at most, each driving under
+the mean air of its stones across their spread of sizes, sized as its share of those that break, bursting for the
+stones that break and no oftener than forty times a second, every burst, gulp, spray and bubble as loud as those it
+stands for. A metre of 500 m of ditch heard as one piece is within 0.4 dB of a metre of a 20 m stretch (the mean of
+twelve), cut beside you within 0.3 dB; pieces over riffles are about 6 dB a metre over pieces over pools. Everything
+shorter, even and fed at its head keeps the sites it had, bit for bit. A site's own generator has no ring
+(`EventSum.ForDraws`; it was 128 kB, forty a synth).
+
+Measured with the instruments of 15.1, an hour of heavy rain, before and after (`--ground-water game at=`,
+`--extent-walk oak,creek`):
+
+| | Before | After |
+|---|---:|---:|
+| on Oak Creek's bank, dry / after 10 min heavy rain / 30 min after | -105 dBFS, the nearest water 57 m off | -56.3 / -43.4 / -55.3 dBFS |
+| beside Oak Creek, 1.5 m out from its edge, 60 m: swing | 2.3 dB (drainage lines far off) | 1.0 dB |
+| the same: how wide, voices at most | 69 to 88°, 16 | 106 to 110°, 42 |
+| the same, rendered: mean, swing of 1 s windows | | -40.4 dBFS, 6.3 dB, every voice with HRTF |
+| beside the drainage creek of 15.4, 60 m: swing | 3.3 dB (10.4 before step 1) | 1.8 dB, 53 voices (63) |
+| the same, rendered: mean, swing | -45.5 dBFS (step 1) | -48.0 dBFS, 10.0 dB |
+
+The drainage creek is 2.5 dB quieter rendered than with step 1: its runs gather their water along them (the upstream
+part carries less) and its pool-riffle bed puts its stones in the riffles, where the water's depth and speed differ; a
+re-listen. Rendering (`--water-cost line`, four cores, 20 s): 300 m of a 3 m creek at 60 L/s, 17.8 % of a core beside
+it and 32.8 % walked along it as the client recuts it; 60 m of a 1.5 m creek at 20 L/s, 12.2 % and 9.9 %; the 16 m
+creek preset cut beside you, 12.8 %. Before the stand-ins were capped the 300 m line cost 224 %. Placing:
+`ClientAudioSystem.Update` a median 0.10 to 0.16 ms and 0.20 to 0.32 ms at the 99th percentile beside the creeks.
+
+### 15.7 Step 3: shores heard along their whole outlines (2026-10-17)
+
+A pond's or a lake's shore was stretches of about 20 m, each a source with its fetch and the bearing of its water in
+its box. Now `tools/gen_osm.py` lays each outline as one source, its line the real outline running anticlockwise (the
+water on its left) and its box the outline's bounds, so it is sent with every tile it crosses; its preset is what the
+land cover says along most of it. The client keys it `shore:<preset>/outline/<length>`, which the catalogue makes as
+loud as its stretches together (`ShoreSpec.AlongOutline`), and cuts it at the ear as a line. `ShoreSynth`'s outline
+mode gives each of its twelve columns a piece, and reads each piece at up to eight points for which way its water lies
+and how far the water reaches straight across the outline (the fetch); each point's wind sea (`ShoreSpec.WindSea`), and
+the column's waves as high as the points' that have any on the mean of their energy, over the length that has them. So
+the shore the wind blows onto laps and the lee shore is still, piece by piece. A river (OpenStreetMap's river or canal,
+or a waterway 8 m wide or more) has a `river_bank` shore along each edge, the current's eddies off the bank (no map has
+one yet; a made-up river on a copy of Albany laid both banks).
+
+Along the pond of 15.2, 2 m back, the same 60 m: the level swings 0.4 dB (0.7 with step 1, 4.2 before it), 24 voices at
+most (64), the sound 149 to 158° wide (111 to 118). Albany's 219 stretches are 9 outlines (49 to 1,221 m round),
+Magnolia's 38 one. Stretches keep their sound bit for bit. Not built: whitecaps over the open water; a far piece's
+waves are its points' sea, not the lake's surface.
+
+### 15.8 Step 4: the fountain from its spec (2026-10-17)
+
+`WaterTapSpec` has where its water lands from the feature's middle, and `WaterFeatureSpec.HeardFromTaps` says a feature
+is heard from its taps. A map places such a feature once (Elm Park's `elm_fountain`, "water:park_fountain/elm_park", on
+its pool's water); the server lays a voice at every tap from the spec, turned and moved with it
+(`MapManager.SpawnTaps`), and the feature itself has none. The park fountain has nine taps: the bowl (1.55 m over the
+pool), the four sides of the rock heap (2.3 m out, as before), and the four rows of rim jets, 2.8 m out, 2.4 m in from
+nozzles at the kerb's inner face (a jet thrown a metre high at 60°: the nozzles' angle is a judgement). Until now the
+rim jets were heard from the rocks' taps. The outer pool is calm water and has no tap. Every fall is as it was.
+
+On the cut's angles (TrainVoicing's 4 and 7 degrees) a feature whose taps cover under 4° at the ear is one voice, its
+first tap carrying every tap's water (the same independent streams summed, `WaterFeatureVoice.WholeFrom`), one machine
+voice where it took nine; it parts again past 7°: Elm Park's fountain is one voice from about 80 m and nine within 46 m.
+There is no per-tap level: every tap renders against the whole feature's level, so the taps sum to the feature whatever
+the loudness law's compression, and each is as loud as the water that lands in it.
+
+Rendered round the fountain 7 m from its middle (FMOD and Steam Audio): -43.3 dBFS on the mean before and after; its
+octaves within 1.7 dB of before (250 and 500 Hz up 1.6 and 1.7 dB, 1 kHz down 1.4); the ears less alike at 1 and 2 kHz
+(IACC 0.71 to 0.66, 0.43 to 0.33), so wider; 36 voices at most where it took 20, every one with HRTF.
+
+### 15.9 What is left
+
+5 to 8 as in 15.5 (fire and woods on the cut, crowds, far traffic, a path per near piece), and from these steps: a far
+piece of a line is a few loud events, not a texture; whitecaps over a lake; river banks heard on a map with a river;
+mapped waterways in the one world's tiles keep their dry placeholder (the world builds its drainage per frame, and
+`VoiceWaterways` runs at a map's load only); a shore partly of reeds takes the preset of most of it.

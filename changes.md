@@ -4,6 +4,16 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-17
 
+- Running water heard from the whole of itself, steps 2 to 4 (docs/RUNNING_WATER.md 15.6 to 15.8; the wire hash
+  changes: a source can carry a line, `SoundEmitterComponent.Line`). The mapped creeks are voiced where the map
+  draws them: Oak Creek on Albany was silent (-105 dBFS on its bank, the nearest water 57 m off) and is -56 dBFS
+  dry and -43 dBFS in heavy rain, one source along each part, its water from the ground's drainage and its bed's
+  width, its stones gathered into riffles between pools every five to seven widths. The drainage is heard as
+  whole runs (Albany's 3,300 voices of 20 m are 1,142). A pond's or lake's shore is one source along its whole
+  outline, each piece with its own fetch and wind sea (the level along a pond swings 0.4 dB where it swung 4.2);
+  a river's edges have the `river_bank` shore. The Elm Park fountain is placed once and heard from where each
+  of its waters lands, the rim jets near the kerb, and is one voice from about 80 m. Albany's, Magnolia's and the
+  city's maps are regenerated.
 - No voice stops with a click (docs/CLIENT_NOTES.md "A voice is never cut off"). Every way a voice is let go (the
   budget dropping a one-shot or giving up a voice, the registry's stops and retires, an owner's stop, a voice
   replaced, leaving a world, the binaural pool) ended in the mixer stopping the channel outright, a step the size of

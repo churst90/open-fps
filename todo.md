@@ -147,13 +147,11 @@ since the last deploy" list below.
    entire width and length of the river"; the survey, inbox/2026-10-16-extended-sources-survey; the rule,
    docs/RUNNING_WATER.md 15). Step 0, the walk (`--extent-walk`, `ExtentWalkTests`): DONE 2026-10-16. Step 1,
    running water cut at the ear into pieces each as loud as what it holds, without the balance gain: DONE
-   2026-10-16, unheard (re-listen, below). Then, in order:
-   - 2: voice the mapped streams (OSM waterways are silent where the map draws them; Oak Creek is 3.3 km): the
-     waterway's line and width in the map's data (the wire hash changes), its slope from the DEM, one line
-     source along it, its bed's riffles and pools every five to seven widths and a wide bed heard from its
-     banks; a river's edge with the `river_bank` shore;
-   - 3: shores as whole outlines, with whitecaps over the open water;
-   - 4: the fountain from its spec (each tap's offset and measured level, one entity, the basin silent);
+   2026-10-16, unheard (re-listen, below). Steps 2 to 4: DONE 2026-10-17, unheard (docs/RUNNING_WATER.md 15.6
+   to 15.8; the wire hash changes): the mapped creeks voiced along their lines with riffles and pools, the
+   drainage heard as whole runs, shores as whole outlines with a river's `river_bank` edges, the fountain laid
+   from its spec's taps and one voice when far. Left from them (15.9): whitecaps over a lake, a river bank on a
+   map with a river, mapped waterways in the one world's tiles. Then, in order:
    - 5: fire and woods on the same cut (FIRE.md 12.8), the wood's ring replaced by pieces of its crowns;
    - 6: crowds, the seat blocks as geometry with decorrelated applause per piece;
    - 7: far traffic along the roads;
@@ -278,6 +276,12 @@ old PA in --loudspeaker game).
 - Running water heard from the whole of its line (2026-10-16, docs/RUNNING_WATER.md 15): a re-listen of the
   approved creek, gutter, waves, fountain and fire, not a re-fit. Beside a drainage-line creek on Albany the
   level no longer swells every 20 m; the gutter is flat along its length; the shores' 4 dB swing is gone.
+- Steps 2 to 4 of the same (2026-10-17, docs/RUNNING_WATER.md 15.6 to 15.8). Oak Creek on Albany sounds where
+  the map draws it, louder in riffles than over pools, rising in rain (`/tp 719.3 1143.7 -6.6`, walk east to
+  `/tp 748.6 1147.3 -6.5`); the drainage creek of step 1 is 2.5 dB quieter and its water gathers down it
+  (`/tp 929.8 -1272.3 1.7`); a pond's shore is one even sound all the way round, lapping on the shore the wind
+  blows onto (`/tp -412.1 1373.7 -9.5`); the Elm Park fountain's rim jets come from near the kerb, and it is one
+  voice from about 80 m (`/tp -325.0 220.0 0.2`, and from `/tp -325.0 140.0 0.2`).
 
 Approved 2026-10-09 to 11, so off this list: the hull's blows in time; the cheaper reverb tail; the
 shut glass door leak fix (inbox/pa-leak-2026-10-09); the loudspeaker (inbox/loudspeaker-2026-10-10); the
@@ -613,8 +617,6 @@ path trims and other rooms' fields on the thread pool, all 2026-10-12). Left, ea
 - A big river's bank in a calm is silent: an eddy's wave never breaks (`breaks = !eddy`).
 - Shingle reaches the master limiter at 3 m: the plunging breakers (90.9 dB), not the stones.
 - Boats too clicky; lake lows 15-25 dB under the recordings (which carry mic wind).
-- The fountain's rim jets are heard from the rocks' taps, 2.3 m from its middle, though they land near
-  the kerb.
 - Showers 11-22 dB darker than the recordings at 4-16 kHz; the dripping tap rings steel where real
   drips plink into water; the violent-rain gutter outlet 4-6 dB heavy at 250-500 Hz.
 - Not built: toilet flush and cistern refill (its parts written down, docs/RUNNING_WATER.md section 14); the plug as its own control; NPCs using taps; pipe walls
