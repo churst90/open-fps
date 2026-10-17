@@ -2,10 +2,10 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 using Thread = System.Threading.Thread;
 using FMOD;
-using OpenFPS.Client.AudioEngine.Fmod;   // DspCallback.UserData
+using OpenFPS.Audio.Fmod;   // DspCallback.UserData
 using OpenFPS.Native.SteamAudio;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.Audio.SteamAudio;
 
 /// <summary>
 /// The echoes of a few sources, traced from where each one actually is: one simulator with a source per
@@ -84,7 +84,7 @@ internal sealed class TracedEchoes : IDisposable
     /// (0: MixerQuality.DefaultRate; the mixer's is TracedReverbSet.MixerRate) in blocks of <paramref name="frameSize"/>.</summary>
     public TracedEchoes(IntPtr context, int sampleRate = 0, int frameSize = 1024)
     {
-        if (sampleRate <= 0) sampleRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate;
+        if (sampleRate <= 0) sampleRate = OpenFPS.Audio.Fmod.MixerQuality.DefaultRate;
         Context = context; SampleRate = sampleRate; FrameSize = frameSize;
         var s = new Phonon.IPLSimulationSettings
         {
@@ -308,7 +308,7 @@ internal sealed class TracedEchoRig : IGuardedUnit
     public float Blend = -1f;
     /// <summary>Each bank's generation when the rig was given its slot (TracedEchoes.BankGeneration).</summary>
     public readonly int[] AttachGeneration = new int[2];
-    public float SampleRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate;
+    public float SampleRate = OpenFPS.Audio.Fmod.MixerQuality.DefaultRate;
     public Phonon.IPLCoordinateSpace3 Orientation;
     public FMOD.DSP CaptureDsp, MixDsp;
     public GCHandle Handle;

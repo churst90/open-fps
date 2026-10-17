@@ -1,10 +1,10 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Acoustics;
+using OpenFPS.Audio;
+using OpenFPS.Audio.Acoustics;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Nature;
-using OpenFPS.Client.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
@@ -94,22 +94,22 @@ public static class RainSpike
             var (world, ear, about) = make();
             // In a car everything outside comes through its shell (ClientAudioSystem.CabinEnclosure, windows shut).
             _cabinDb = (0f, 0f, 0f);
-            if (_riding >= 0 && OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.Vehicle(world.Entities[_riding]) is { } cabin)
-                _cabinDb = OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.LossDb(cabin, 0f);
+            if (_riding >= 0 && OpenFPS.Audio.Acoustics.CabinWalls.Vehicle(world.Entities[_riding]) is { } cabin)
+                _cabinDb = OpenFPS.Audio.Acoustics.CabinWalls.LossDb(cabin, 0f);
             var survey = new RainSurvey { TraceColumns = args.Contains("columns") }.Run(world, ear, -1, _riding);
             if (survey.Trace != null) foreach (var line in survey.Trace) Console.WriteLine("    " + line);
             Console.WriteLine();
             Console.WriteLine($"== {name}: {about}");
             Console.WriteLine($"  survey: {survey.Describe()}");
             var acoustics = new SpatialAcoustics();
-            var paths = new OpenFPS.Client.AudioEngine.Data.AcousticPathData?[OpenFPS.Client.AudioEngine.Fmod.RainFeeds.Slots];
+            var paths = new OpenFPS.Audio.Data.AcousticPathData?[OpenFPS.Audio.Fmod.RainFeeds.Slots];
             for (int s = 0; s < paths.Length; s++)
             {
                 if (s == RainSurvey.OverheadSlot || survey.Patches[s] == null) continue;
                 if (survey.Direct[s])
                 {
                     // In view: the air alone, as the game gives it (RainField.Emitter).
-                    var direct = new OpenFPS.Client.AudioEngine.Data.AcousticPathData(0f, survey.Centres[s], survey.Patches[s]!.ReferenceDistance);
+                    var direct = new OpenFPS.Audio.Data.AcousticPathData(0f, survey.Centres[s], survey.Patches[s]!.ReferenceDistance);
                     (direct.AirLowDb, direct.AirMidDb, direct.AirHighDb) = OpenFPS.Sound.Core.AudioPhysics.AirLossDb(
                         survey.Patches[s]!.ReferenceDistance, world.Humidity, world.Temperature, world.AirPressure, world.AirAbsorptionMultiplier);
                     paths[s] = direct;
@@ -119,7 +119,7 @@ public static class RainSpike
                 var middle = acoustics.CalculateAcousticPath(world, -1, ear, survey.Centres[s] + new Vector3(0f, 0.3f, 0f));
                 double middleMs = t.Elapsed.TotalMilliseconds;
                 t.Restart();
-                paths[s] = OpenFPS.Client.Core.RainField.PatchPath(at => acoustics.CalculateAcousticPath(world, -1, ear, at), survey, s);
+                paths[s] = OpenFPS.Audio.RainField.PatchPath(at => acoustics.CalculateAcousticPath(world, -1, ear, at), survey, s);
                 static float Db(float g) => 20f * MathF.Log10(MathF.Max(1e-5f, g));
                 Console.WriteLine($"  {RainSurvey.SlotName(s)}: path from {survey.Sources[s].Count} surface(s) {Db(paths[s]!.Value.EqLow):F0}/{Db(paths[s]!.Value.EqMid):F0}/{Db(paths[s]!.Value.EqHigh):F0} dB "
                                 + $"in {t.Elapsed.TotalMilliseconds:F2} ms; from its middle {Db(middle.EqLow):F0}/{Db(middle.EqMid):F0}/{Db(middle.EqHigh):F0} dB in {middleMs:F2} ms");
@@ -171,7 +171,7 @@ public static class RainSpike
         public string BandSummary = "";
     }
 
-    private static Rendered Render(RainSurvey.Result survey, OpenFPS.Client.AudioEngine.Data.AcousticPathData?[] paths,
+    private static Rendered Render(RainSurvey.Result survey, OpenFPS.Audio.Data.AcousticPathData?[] paths,
                                    Vector3 ear, Precipitation fall, float sec, int seed)
     {
         int n = (int)(sec * Rate);
@@ -672,9 +672,9 @@ public static class RainSpike
         {
             var (world, at, _) = scenes[scene]();
             var survey = new RainSurvey().Run(world, at, -1, -1);
-            for (int s = 0; s < OpenFPS.Client.AudioEngine.Fmod.RainFeeds.Slots; s++)
+            for (int s = 0; s < OpenFPS.Audio.Fmod.RainFeeds.Slots; s++)
             {
-                var feed = OpenFPS.Client.AudioEngine.Fmod.RainFeeds.Feed[s];
+                var feed = OpenFPS.Audio.Fmod.RainFeeds.Feed[s];
                 feed.Patch = survey.Patches[s];
                 feed.Rate = mmh;
                 feed.LevelDb = float.NaN;
@@ -688,22 +688,22 @@ public static class RainSpike
                 {
                     var patch = survey.Patches[s];
                     if (patch == null) continue;
-                    float level = OpenFPS.Client.AudioEngine.Fmod.RainFeeds.Feed[s].LevelDb;
+                    float level = OpenFPS.Audio.Fmod.RainFeeds.Feed[s].LevelDb;
                     if (float.IsNaN(level)) level = 40f;
                     var (gain, reference) = LabHearing.Place(level, patch.ReferenceDistance);
                     predicted += Math.Pow(10, (20 * Math.Log10(Math.Max(1e-9, gain)) - VehicleProfile.PeakHeadroomDb) / 10);
-                    provider.PlaySpatialSound(new OpenFPS.Client.AudioEngine.Data.SpatialEmitter
+                    provider.PlaySpatialSound(new OpenFPS.Audio.Data.SpatialEmitter
                     {
                         EntityId = -2_400_000 - s,
                         SoundId = "rain",
                         IsSynth = true,
-                        PhysicalKey = OpenFPS.Client.AudioEngine.Fmod.RainFeeds.Key(s),
+                        PhysicalKey = OpenFPS.Audio.Fmod.RainFeeds.Key(s),
                         EngineKey = "",
                         Mode = PlaybackMode.LoopOne,
-                        Type = OpenFPS.Client.AudioEngine.Data.EmitterType.WorldLocked,
+                        Type = OpenFPS.Audio.Data.EmitterType.WorldLocked,
                         Position = survey.Centres[s],
                         ApparentPosition = survey.Centres[s],
-                        Volume = gain * OpenFPS.Client.AudioEngine.Fmod.PhysicalVoiceState.HeadroomGain(OpenFPS.Client.AudioEngine.Fmod.RainVoiceState.HeadroomDb),
+                        Volume = gain * OpenFPS.Audio.Fmod.PhysicalVoiceState.HeadroomGain(OpenFPS.Audio.Fmod.RainVoiceState.HeadroomDb),
                         MinDistance = reference,
                         ExtentMetres = patch.ReferenceDistance,
                         Range = MathF.Max(60f, LabHearing.AudibleRange(level)),
@@ -718,7 +718,7 @@ public static class RainSpike
                 }
             });
             results.Add((name, db, 10 * Math.Log10(Math.Max(1e-20, predicted))));
-            for (int s = 0; s < OpenFPS.Client.AudioEngine.Fmod.RainFeeds.Slots; s++) OpenFPS.Client.AudioEngine.Fmod.RainFeeds.Feed[s].Patch = null;
+            for (int s = 0; s < OpenFPS.Audio.Fmod.RainFeeds.Slots; s++) OpenFPS.Audio.Fmod.RainFeeds.Feed[s].Patch = null;
         }
 
         foreach (var (name, key, level, extent, headroom, dist) in new[]
@@ -730,16 +730,16 @@ public static class RainSpike
         {
             var (gain, reference) = LabHearing.Place(level, extent);
             string cap = Path.Combine(dir, key.Replace(':', '_') + ".wav");
-            double db = Capture(cap, ear, sec, provider => provider.PlaySpatialSound(new OpenFPS.Client.AudioEngine.Data.SpatialEmitter
+            double db = Capture(cap, ear, sec, provider => provider.PlaySpatialSound(new OpenFPS.Audio.Data.SpatialEmitter
             {
                 EntityId = 777001,
-                Type = OpenFPS.Client.AudioEngine.Data.EmitterType.EntityAttached,
+                Type = OpenFPS.Audio.Data.EmitterType.EntityAttached,
                 IsSynth = true,
                 PhysicalKey = key,
                 EngineRunning = true,
                 Position = ear + new Vector3(0f, 0f, dist),
                 Direction = Vector3.UnitZ,
-                Volume = gain * OpenFPS.Client.AudioEngine.Fmod.PhysicalVoiceState.HeadroomGain(headroom),
+                Volume = gain * OpenFPS.Audio.Fmod.PhysicalVoiceState.HeadroomGain(headroom),
                 MinDistance = reference,
                 ExtentMetres = extent,
                 Range = MathF.Max(60f, LabHearing.AudibleRange(level)),
@@ -760,11 +760,11 @@ public static class RainSpike
     /// <summary>One provider, the listener at <paramref name="ear"/> facing north, <paramref name="each"/>
     /// called every frame; the master captured to <paramref name="path"/>; its rms after the first three
     /// seconds, dBFS.</summary>
-    private static double Capture(string path, Vector3 ear, float sec, Action<OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider> each)
+    private static double Capture(string path, Vector3 ear, float sec, Action<OpenFPS.Audio.Fmod.FmodAudioProvider> each)
     {
         // The mixer into a file instead of the sound card: exact, and silent.
         Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", path);
-        var provider = new OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider { Hearing = LabHearing };
+        var provider = new OpenFPS.Audio.Fmod.FmodAudioProvider { Hearing = LabHearing };
         if (!provider.Initialize()) throw new InvalidOperationException("provider init failed");
         provider.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, -1);
         var sw = Stopwatch.StartNew();

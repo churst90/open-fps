@@ -1,8 +1,7 @@
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Audio;
+using OpenFPS.Audio.Core;
+using OpenFPS.Audio.Fmod;
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Data;
-using OpenFPS.Client.AudioEngine.Fmod;
-using OpenFPS.Client.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;

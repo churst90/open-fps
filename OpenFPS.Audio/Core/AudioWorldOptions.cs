@@ -3,7 +3,7 @@ using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Engine;
 using OpenFPS.Sound.Core.Nature;
 
-namespace OpenFPS.Client.AudioEngine.Core;
+namespace OpenFPS.Audio.Core;
 
 /// <summary>
 /// The options of one audio world where hosts may differ (docs/SOUND_LIBRARY_BOUNDARY.md, 7.5): how it hears
@@ -84,7 +84,7 @@ public sealed record VoiceBudgets
     /// the roughness of its wall (EngineEchoState.Scattering) and swells and fades over a few hundred
     /// milliseconds instead of switching.
     /// </remarks>
-    public int Echoes { get; init; } = OpenFPS.Client.AudioEngine.Acoustics.EngineReflections.MaxEchoesPerEngine;
+    public int Echoes { get; init; } = OpenFPS.Audio.Acoustics.EngineReflections.MaxEchoesPerEngine;
 
     /// <summary>
     /// How many machines may have their front outlet voiced separately (OPENFPS_FRONT_VOICES=0 keeps

@@ -1,6 +1,6 @@
 using System.Numerics;
 using Arch.Core;
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Audio.Core;
 using OpenFPS.Client.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
@@ -105,7 +105,7 @@ public class DroppedItemBeaconTests
         var ear = Feet + new Vector3(0f, 1.6f, 0f);
         facade.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, -1);
         // His own body left out of the rays, as the client says whose it is (ClientAudioSystem.OwnEntityId).
-        var acoustics = new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics()
+        var acoustics = new OpenFPS.Audio.Acoustics.SpatialAcoustics()
         {
             ListenerBodyId = body.Id,
         };

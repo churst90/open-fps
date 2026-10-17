@@ -299,7 +299,7 @@ public class LibraryBoundaryTests
                        new[] { "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Schema", "OpenFPS.Physics", "OpenFPS.Environment", "OpenFPS.Sound", "Serilog" } },
         // The runtime (stage 6): the mixer, Steam Audio, the acoustic worker, over the catalogue's presets and the
         // native bindings. Serilog: the mixer and the worker log (decision 5).
-        new object[] { typeof(OpenFPS.Client.AudioEngine.Core.AudioEngineFacade).Assembly.GetName().Name!,
+        new object[] { typeof(OpenFPS.Audio.Core.AudioEngineFacade).Assembly.GetName().Name!,
                        new[] { "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Acoustics", "OpenFPS.Schema", "OpenFPS.Physics", "OpenFPS.Environment", "OpenFPS.Sound",
                                "OpenFPS.Models", "OpenFPS.Native", "Serilog" } },
     };

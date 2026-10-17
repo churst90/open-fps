@@ -2,10 +2,10 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
 using System.Text;
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Audio.Core;
+using OpenFPS.Audio.Fmod;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Nature;
-using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Client.Core;
 using OpenFPS.Client.Services;
 using OpenFPS.Common;
@@ -31,7 +31,7 @@ public static class DistantWoodsSpike
 
     /// <summary>This instrument's audio world's options (the wide sources, the cabins' paths), from the environment
     /// as the game's mixer starts with, shared with the mixers it makes and set by its own arguments.</summary>
-    private static readonly OpenFPS.Client.AudioEngine.Core.AudioWorldOptions LabOptions = OpenFPS.Client.AudioEngine.Core.AudioWorldOptions.FromEnvironment();
+    private static readonly OpenFPS.Audio.Core.AudioWorldOptions LabOptions = OpenFPS.Audio.Core.AudioWorldOptions.FromEnvironment();
 
     private static string? Arg(string[] args, string key) => args.FirstOrDefault(x => x.StartsWith(key, StringComparison.Ordinal))?[key.Length..];
 

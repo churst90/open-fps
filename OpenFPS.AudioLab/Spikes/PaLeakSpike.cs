@@ -1,10 +1,9 @@
 using System.Globalization;
 using System.Numerics;
 using Thread = System.Threading.Thread;
-using OpenFPS.Client.AudioEngine.Acoustics;
-using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Client.AudioEngine.Data;
-using OpenFPS.Client.AudioEngine.Fmod;
+using OpenFPS.Audio.Acoustics;
+using OpenFPS.Audio.Data;
+using OpenFPS.Audio.Fmod;
 using OpenFPS.Common;
 using OpenFPS.Acoustics;
 

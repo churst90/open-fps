@@ -182,7 +182,7 @@ public class WavesTests
         const int Seconds = 40;
         foreach (int seed in new[] { 23, 2 })
         {
-            var voice = new OpenFPS.Client.AudioEngine.Fmod.PlacedNatureVoice("shore:sea", spec, spec.DefaultGeometry, Rate, seed, Vector3.Zero, weather);
+            var voice = new OpenFPS.Audio.Fmod.PlacedNatureVoice("shore:sea", spec, spec.DefaultGeometry, Rate, seed, Vector3.Zero, weather);
             // The first block is where the sea is got under way: what that costs the render thread once.
             var clock = System.Diagnostics.Stopwatch.StartNew();
             voice.Sample(0, 0);

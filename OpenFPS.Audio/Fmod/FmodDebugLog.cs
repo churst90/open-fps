@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+namespace OpenFPS.Audio.Fmod;
 
 /// <summary>
 /// FMOD's own logging, from its validating build (`libfmodL.so`), which names the stale handle or the

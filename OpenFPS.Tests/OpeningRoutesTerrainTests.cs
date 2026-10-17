@@ -30,7 +30,7 @@ public class OpeningRoutesTerrainTests
             for (int i = 0; i < posts; i++)
                 heights[j * posts + i] = height(-124f + i * spacing, -124f + j * spacing);
         return SolidSpec.OfTerrain(1, Vector3.Zero, new Heightfield(posts, spacing, heights, null, null),
-                                   OpenFPS.Client.Core.AudioEngine.SteamAudio.SceneTerrain.Surface);
+                                   OpenFPS.Audio.SteamAudio.SceneTerrain.Surface);
     }
 
     /// <summary>A ridge along x, its crest <paramref name="top"/> m high at z = <paramref name="at"/>, its sides 1 in 2.</summary>
@@ -189,10 +189,10 @@ public class OpeningRoutesTerrainTests
                 for (int i = 0; i < posts; i++)
                     heights[j * posts + i] = Ridge(-124f + j * 2f, 0f, 4f);
             var field = new Heightfield(posts, 2f, heights, null, new[] { cover });
-            var ground = SolidSpec.OfTerrain(1, Vector3.Zero, field, OpenFPS.Client.Core.AudioEngine.SteamAudio.SceneTerrain.Surface);
-            using var scene = new OpenFPS.Client.Core.AudioEngine.SteamAudio.SteamAudioScene(ctx);
-            scene.Build(Array.Empty<OpenFPS.Client.Core.AudioEngine.SteamAudio.SteamAudioScene.Box>(), new[] { ground });
-            using var sim = new OpenFPS.Client.Core.AudioEngine.SteamAudio.SteamAudioSimulator(ctx, maxSources: 2);
+            var ground = SolidSpec.OfTerrain(1, Vector3.Zero, field, OpenFPS.Audio.SteamAudio.SceneTerrain.Surface);
+            using var scene = new OpenFPS.Audio.SteamAudio.SteamAudioScene(ctx);
+            scene.Build(Array.Empty<OpenFPS.Audio.SteamAudio.SteamAudioScene.Box>(), new[] { ground });
+            using var sim = new OpenFPS.Audio.SteamAudio.SteamAudioSimulator(ctx, maxSources: 2);
             sim.SetScene(scene);
             var source = sim.AcquireSource();
             sim.SetListener(ear);
@@ -202,8 +202,8 @@ public class OpeningRoutesTerrainTests
             var routes = Routes(Array.Empty<(Vector3, Vector3, string)>(), ground);
             var k = routes.SimulatorCorrection(src, ear);
             var corrected = raw with { TransLow = raw.TransLow * k.X, TransMid = raw.TransMid * k.Y, TransHigh = raw.TransHigh * k.Z };
-            var through = OpenFPS.Client.Core.AudioEngine.SteamAudio.SteamAudioSimulator.ToAcousticParams(raw);
-            var closed = OpenFPS.Client.Core.AudioEngine.SteamAudio.SteamAudioSimulator.ToAcousticParams(corrected);
+            var through = OpenFPS.Audio.SteamAudio.SteamAudioSimulator.ToAcousticParams(raw);
+            var closed = OpenFPS.Audio.SteamAudio.SteamAudioSimulator.ToAcousticParams(corrected);
             var over = routes.BarrierGains(src, ear, WallTransmission.SoundSpeed, out _, out _, out _, out bool found);
             _o.WriteLine($"{cover}: visibility {raw.Visibility:F3}, through {Db(through.EqLow):F1}/{Db(through.EqMid):F1}/{Db(through.EqHigh):F1} dB; "
                        + $"the earth closed {Db(closed.EqLow):F1}/{Db(closed.EqMid):F1}/{Db(closed.EqHigh):F1}; over the crest {Db3(over)}");

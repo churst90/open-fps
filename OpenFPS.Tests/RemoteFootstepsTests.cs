@@ -11,6 +11,7 @@ using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
 using Xunit.Abstractions;
 using OpenFPS.Geometry;
+using OpenFPS.Audio.Core;
 
 namespace OpenFPS.Tests;
 
@@ -209,7 +210,7 @@ public class RemoteFootstepsTests
         others.OnStepTriggered += Near(r, () => steps++);
         // ...and what each of his steps has between it and Cody's ears, asked as the audio system asks
         // it (ClientAudioSystem.CarryThePath): a clear street, so nothing but his own body could be.
-        var acoustics = new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics { ListenerBodyId = r.Cody.Entity.Id };
+        var acoustics = new OpenFPS.Audio.Acoustics.SpatialAcoustics { ListenerBodyId = r.Cody.Entity.Id };
         var heard = new List<(float Distance, float Mid, float Occlusion)>();
         others.OnStepTriggered += (p, _, _, _, body) =>
         {

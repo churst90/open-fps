@@ -6,7 +6,7 @@ using OpenFPS.Acoustics;
 using OpenFPS.Native.SteamAudio;
 using PV = OpenFPS.Native.SteamAudio.Phonon.IPLVector3;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.Audio.SteamAudio;
 
 /// <summary>
 /// Builds and owns a Steam Audio <c>IPLScene</c> from the game's solid box colliders, for occlusion,

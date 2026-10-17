@@ -1,5 +1,5 @@
 using System.Numerics;
-using OpenFPS.Client.Core;
+using OpenFPS.Audio.Core;
 using OpenFPS.Acoustics;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;

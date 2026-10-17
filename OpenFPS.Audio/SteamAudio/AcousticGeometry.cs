@@ -2,7 +2,7 @@ using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Geometry;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.Audio.SteamAudio;
 
 /// <summary>
 /// The acoustic scene as a triangle world (docs/GEOMETRY.md stage 1): the boxes of

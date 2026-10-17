@@ -9,7 +9,7 @@ using OpenFPS.Sound.Core.Pneumatics;
 using System.Runtime.CompilerServices;
 using OpenFPS.Acoustics;
 
-namespace OpenFPS.Client.AudioEngine.Fmod;
+namespace OpenFPS.Audio.Fmod;
 
 /// <summary>
 /// The state of one live vehicle: the engine, its driveline, and the driver that follows whatever
@@ -229,10 +229,10 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
 
     /// <summary>The ground between this voice and the listener; see GroundReflection. Applied to what
     /// the mixer takes, never to the ring, so echoes and borrowed voices read the car itself.</summary>
-    public readonly OpenFPS.Client.AudioEngine.Acoustics.GroundReflection Ground;
+    public readonly OpenFPS.Audio.Acoustics.GroundReflection Ground;
     private float _nearShare;
     /// <summary>The front voice's ground, when there is one, so it hears the same tyre share.</summary>
-    internal OpenFPS.Client.AudioEngine.Acoustics.GroundReflection? _frontGround;
+    internal OpenFPS.Audio.Acoustics.GroundReflection? _frontGround;
 
     /// <summary>Samples the mixer has taken — the position of "now" for anything reading back.</summary>
     public long Played => Volatile.Read(ref _played);
@@ -470,8 +470,8 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     public EngineVoiceState(VehicleProfile v, float sampleRate, int seed, bool cabinPaths = true)
     {
         // The engine, its driveline and its body calibrate themselves: 15-70 ms.
-        OpenFPS.Client.AudioEngine.Core.PlacementThread.Heavy("An engine's model");
-        Ground = new OpenFPS.Client.AudioEngine.Acoustics.GroundReflection(sampleRate);
+        OpenFPS.Audio.Core.PlacementThread.Heavy("An engine's model");
+        Ground = new OpenFPS.Audio.Acoustics.GroundReflection(sampleRate);
         Vehicle = v;
         PascalsAtFullScale = v.PascalsAtFullScale;
         SampleRate = sampleRate;
@@ -1946,7 +1946,7 @@ public sealed class EngineTapState : IGuardedUnit
     }
 
     /// <summary>The ground between the front of the machine and the listener.</summary>
-    public readonly OpenFPS.Client.AudioEngine.Acoustics.GroundReflection Ground;
+    public readonly OpenFPS.Audio.Acoustics.GroundReflection Ground;
 
     public void Render(Span<float> mono) => Render(mono, long.MinValue);
 

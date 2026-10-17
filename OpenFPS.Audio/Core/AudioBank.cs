@@ -1,4 +1,4 @@
-namespace OpenFPS.Client.AudioEngine.Core;
+namespace OpenFPS.Audio.Core;
 
 /// <summary>The recorded sounds under ASSETS/SOUNDS, by folder and by their own id.</summary>
 public class AudioBank

@@ -1,7 +1,7 @@
 using System.Numerics;
 using OpenFPS.Native.SteamAudio;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.Audio.SteamAudio;
 
 /// <summary>
 /// What an HRTF does to the level at the ears, band by band, for one direction: the two ears' mean
@@ -28,7 +28,7 @@ internal static class HrtfBands
     public static float[]? Measure(IntPtr context, IntPtr hrtf, int rate, int frame, Vector3 direction)
     {
         if (context == IntPtr.Zero || hrtf == IntPtr.Zero || frame <= 0) return null;
-        OpenFPS.Client.AudioEngine.Core.PlacementThread.Heavy("An HRTF's bands for a cabin path");
+        OpenFPS.Audio.Core.PlacementThread.Heavy("An HRTF's bands for a cabin path");
         var au = new Phonon.IPLAudioSettings { samplingRate = rate, frameSize = frame };
         var es = new Phonon.IPLBinauralEffectSettings { hrtf = hrtf };
         if (Phonon.iplBinauralEffectCreate(context, ref au, ref es, out IntPtr effect) != Phonon.IPL_STATUS_SUCCESS) return null;

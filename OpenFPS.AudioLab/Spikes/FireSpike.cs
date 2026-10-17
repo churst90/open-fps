@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
 using System.Text;
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Audio.Core;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
 using OpenFPS.Sound.Core.Nature;
@@ -38,7 +38,7 @@ public static class FireSpike
 
     /// <summary>This instrument's audio world's options (the wide sources, the cabins' paths), from the environment
     /// as the game's mixer starts with, shared with the mixers it makes and set by its own arguments.</summary>
-    private static readonly OpenFPS.Client.AudioEngine.Core.AudioWorldOptions LabOptions = OpenFPS.Client.AudioEngine.Core.AudioWorldOptions.FromEnvironment();
+    private static readonly OpenFPS.Audio.Core.AudioWorldOptions LabOptions = OpenFPS.Audio.Core.AudioWorldOptions.FromEnvironment();
 
     private const int Rate = 48000;
     private const float PascalsToFull = 0.1f;
@@ -240,7 +240,7 @@ public static class FireSpike
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(outDir, "capture.post.wav"));
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
         Console.WriteLine($"Extended sources {(LabOptions.WideSources.Enabled ? "spread" : "one point")}; ear model {(LabHearing.EarModelOn ? "on" : "off")}");
-        var provider = new OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider { Hearing = LabHearing, Options = LabOptions };
+        var provider = new OpenFPS.Audio.Fmod.FmodAudioProvider { Hearing = LabHearing, Options = LabOptions };
         var facade = new AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();
         facade.InitializeForTest(sounds);

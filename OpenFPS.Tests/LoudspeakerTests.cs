@@ -1,12 +1,12 @@
 using System.Numerics;
 using MemoryPack;
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Audio.Core;
+using OpenFPS.Audio.Data;
+using OpenFPS.Audio.Fmod;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
 using OpenFPS.Sound.Core.Signals;
 using OpenFPS.Sound.Hearing;
-using OpenFPS.Client.AudioEngine.Data;
-using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
@@ -281,14 +281,14 @@ public class LoudspeakerTests
     {
         var (program, rate) = Program("ANNOUNCE", "st_louis_welcome");
         var r = LoudspeakerChain.Render("test", LoudspeakerSpec.PaHorn, program, rate, Rate);
-        var horn = new OpenFPS.Client.AudioEngine.Data.AudioSource(7);
-        horn.Set(new OpenFPS.Client.AudioEngine.Data.SourceSpec { Direction = Vector3.UnitZ },
-                 new OpenFPS.Client.AudioEngine.Data.SourceState { Position = Vector3.Zero, Rotation = Quaternion.Identity });
+        var horn = new OpenFPS.Audio.Data.AudioSource(7);
+        horn.Set(new OpenFPS.Audio.Data.SourceSpec { Direction = Vector3.UnitZ },
+                 new OpenFPS.Audio.Data.SourceState { Position = Vector3.Zero, Rotation = Quaternion.Identity });
         var listener = new Vector3(0f, 0f, -5f);
         // A wall 10 m ahead: the image is 20 m ahead and the sound left along the axis.
-        var ahead = OpenFPS.Client.Core.AudioWorld.CopyBeam(r, horn, new Vector3(0f, 0f, 20f), listener);
+        var ahead = OpenFPS.Audio.Core.AudioWorld.CopyBeam(r, horn, new Vector3(0f, 0f, 20f), listener);
         // A wall 5 m behind the listener: the image is behind too, and the sound left backwards.
-        var behind = OpenFPS.Client.Core.AudioWorld.CopyBeam(r, horn, new Vector3(0f, 0f, -20f), listener);
+        var behind = OpenFPS.Audio.Core.AudioWorld.CopyBeam(r, horn, new Vector3(0f, 0f, -20f), listener);
         _o.WriteLine($"wall ahead {Db(ahead.Low):F1}/{Db(ahead.Mid):F1}/{Db(ahead.High):F1} dB, behind {Db(behind.Low):F1}/{Db(behind.Mid):F1}/{Db(behind.High):F1}");
         Assert.True(ahead.High > 0.9f && ahead.Mid > 0.9f);
         Assert.True(Db(behind.High) < -20 && behind.Low > 0.7f);

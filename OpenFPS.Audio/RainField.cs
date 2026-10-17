@@ -1,16 +1,16 @@
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Acoustics;
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Audio.Acoustics;
+using OpenFPS.Audio.Core;
+using OpenFPS.Audio.Data;
+using OpenFPS.Audio.Fmod;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
 using OpenFPS.Sound.Core.Nature;
-using OpenFPS.Client.AudioEngine.Data;
-using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Common;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
 
-namespace OpenFPS.Client.Core;
+namespace OpenFPS.Audio;
 
 /// <summary>
 /// Where the rain is heard from: the surfaces round the listener, sampled from the sky down.

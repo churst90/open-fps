@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Audio.Core;
 using OpenFPS.Common;
 using OpenFPS.Acoustics;
 using OpenFPS.Sound;
@@ -216,8 +216,8 @@ public static class GlassSpike
             var s = s0;
             if (!string.IsNullOrEmpty(s.SynthKey) && s.SynthKey.StartsWith(GlassFracture.KeyPrefix, StringComparison.Ordinal))
             {
-                pcm = OpenFPS.Client.Core.OneOffSounds.RenderDoorKey(s.SynthKey, own, new DoorRenderCache(OpenFPS.Client.Core.ClientAudioPaths.ForPlayer()));
-                s = OpenFPS.Client.Core.OneOffSounds.AtOwnLevel(s, own);
+                pcm = OpenFPS.Audio.Core.OneOffSounds.RenderDoorKey(s.SynthKey, own, new DoorRenderCache(OpenFPS.Client.Core.ClientAudioPaths.ForPlayer()));
+                s = OpenFPS.Audio.Core.OneOffSounds.AtOwnLevel(s, own);
                 if (raw != null)
                 {
                     GlassFracture.TryParseKey(s.SynthKey, out var spec);

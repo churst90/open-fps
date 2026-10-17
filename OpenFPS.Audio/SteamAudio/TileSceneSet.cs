@@ -3,7 +3,7 @@ using OpenFPS.Acoustics;
 using OpenFPS.Geometry;
 using OpenFPS.Native.SteamAudio;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.Audio.SteamAudio;
 
 /// <summary>
 /// The Steam Audio geometry as a tile owns it (docs/WORLD_STREAMING.md, docs/GEOMETRY.md 2.4): each tile

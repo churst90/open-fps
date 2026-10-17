@@ -1,6 +1,6 @@
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Client.AudioEngine.Data;
+using OpenFPS.Audio.Core;
+using OpenFPS.Audio.Data;
 using OpenFPS.Sound;
 
 namespace OpenFPS.Tests;

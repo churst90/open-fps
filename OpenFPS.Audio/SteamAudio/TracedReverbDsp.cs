@@ -1,9 +1,9 @@
 using System.Runtime.InteropServices;
 using FMOD;
-using OpenFPS.Client.AudioEngine.Fmod;   // DspCallback.UserData
+using OpenFPS.Audio.Fmod;   // DspCallback.UserData
 using OpenFPS.Native.SteamAudio;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.Audio.SteamAudio;
 
 /// <summary>
 /// One reverb bus's traced stage: what the bus's sends carry, played through the place's measured
@@ -71,8 +71,8 @@ internal sealed class TracedReverbState
 
     /// <summary>One per ear: the tail the trace hands back is the same in both, and a room is not.
     /// Made for the stage's rate (<see cref="SampleRate"/>): their all-passes are times.</summary>
-    public EarDecorrelator Left { get; private set; } = new(0, OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate);
-    public EarDecorrelator Right { get; private set; } = new(1, OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate);
+    public EarDecorrelator Left { get; private set; } = new(0, OpenFPS.Audio.Fmod.MixerQuality.DefaultRate);
+    public EarDecorrelator Right { get; private set; } = new(1, OpenFPS.Audio.Fmod.MixerQuality.DefaultRate);
 
     /// <summary>The rate the stage runs at: the trace's, which is the mixer's.</summary>
     public int SampleRate
@@ -80,7 +80,7 @@ internal sealed class TracedReverbState
         get => _sampleRate;
         init { _sampleRate = value; Left = new EarDecorrelator(0, value); Right = new EarDecorrelator(1, value); }
     }
-    private readonly int _sampleRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate;
+    private readonly int _sampleRate = OpenFPS.Audio.Fmod.MixerQuality.DefaultRate;
 
     /// <summary>Running totals of the energy in (mono) and out (per ear), for the lab.</summary>
     public double InEnergy, OutEnergy, ChannelEnergy;
@@ -456,7 +456,7 @@ internal sealed class DiffuseTail
     /// so the tail is the same tail at any rate.</param>
     public DiffuseTail(int sampleRate)
     {
-        SampleRate = sampleRate > 0 ? sampleRate : OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate;
+        SampleRate = sampleRate > 0 ? sampleRate : OpenFPS.Audio.Fmod.MixerQuality.DefaultRate;
         _lpA = 1f - MathF.Exp(-2f * MathF.PI * SplitHz / SampleRate);
         _loL1 = Biquad.LowPass(EarSplitHz, SampleRate); _loL2 = Biquad.LowPass(EarSplitHz, SampleRate);
         _hiL1 = Biquad.HighPass(EarSplitHz, SampleRate); _hiL2 = Biquad.HighPass(EarSplitHz, SampleRate);
@@ -491,7 +491,7 @@ internal sealed class DiffuseTail
     {
         if (hrtf == IntPtr.Zero) return null;
         // Its ears are calibrated on a second of noise: 100-450 ms, made where a room's reverb stage is added.
-        OpenFPS.Client.AudioEngine.Core.PlacementThread.Heavy("A room's traced tail");
+        OpenFPS.Audio.Core.PlacementThread.Heavy("A room's traced tail");
         var d = new DiffuseTail(sampleRate) { Context = context };
         for (int i = 0; i < DiffuseBranch.Count; i++) d.Branches[i] = new DiffuseBranch(i, rate: d.SampleRate);
         d.W = new float[subFrame]; d.Branch = new float[subFrame]; d.Low = new float[subFrame];

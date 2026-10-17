@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using OpenFPS.Common;
-using OpenFPS.Client.AudioEngine.Fmod;
+using OpenFPS.Audio.Fmod;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
 using OpenFPS.Sound.Core.Engine;
@@ -76,7 +76,7 @@ public static class EngineCostSpike
         var presets = args.Where(a => VehicleProfile.Presets.ContainsKey(a)).ToList();
         if (presets.Count == 0) presets.AddRange(VehicleProfile.Presets.Keys);
 
-        const int sr = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, block = 1024;   // the rate the game runs it at
+        const int sr = OpenFPS.Audio.Fmod.MixerQuality.DefaultRate, block = 1024;   // the rate the game runs it at
         Console.WriteLine($"\n  Discontinuities in one live voice at {kmh:F0} km/h, {seconds:F0} s, no mixer.\n");
         Console.WriteLine("    preset            peak     median step    >0.04/s    >0.08/s    >0.15/s   largest");
         foreach (var key in presets)
@@ -118,7 +118,7 @@ public static class EngineCostSpike
         float kmh = Arg(args, "kmh", 280f), seconds = Arg(args, "sec", 5f);
         string key = args.FirstOrDefault(a => VehicleProfile.Presets.ContainsKey(a)) ?? "nascar_v8";
         var v = VehicleProfile.ByName(key);
-        const int sr = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate;   // the rate the game runs it at
+        const int sr = OpenFPS.Audio.Fmod.MixerQuality.DefaultRate;   // the rate the game runs it at
 
         var engine = new EngineSynth(v.Engine, sr, 11);
         var dl = new Driveline(v);
@@ -168,7 +168,7 @@ public static class EngineCostSpike
     {
         float kmh = 180f, seconds = 4f;
         bool withBody = true;
-        int rate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate;   // rate=44100 for the old mixer
+        int rate = OpenFPS.Audio.Fmod.MixerQuality.DefaultRate;   // rate=44100 for the old mixer
         var presets = new System.Collections.Generic.List<string>();
         foreach (var arg in args)
         {
@@ -246,7 +246,7 @@ public static class EngineCostSpike
     /// </summary>
     public static int VoiceLevels(string[] args)
     {
-        const int sr = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, block = 1024;   // the rate the game runs it at
+        const int sr = OpenFPS.Audio.Fmod.MixerQuality.DefaultRate, block = 1024;   // the rate the game runs it at
         var presets = args.Where(a => MachineRegistry.Knows(a)).ToList();
         if (presets.Count == 0) presets.AddRange(MachineRegistry.Ids);
         if (args.Contains("sweep")) return Sweep(presets, sr, block);

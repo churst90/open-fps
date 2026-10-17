@@ -1,4 +1,4 @@
-namespace OpenFPS.Client.AudioEngine.Fmod;
+namespace OpenFPS.Audio.Fmod;
 
 /// <summary>Helpers every DSP read callback uses. Mixer thread: no locks, no waits, and no allocation after
 /// a thread's first look at FMOD's function table.</summary>

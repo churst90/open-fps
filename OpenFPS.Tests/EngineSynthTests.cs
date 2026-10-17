@@ -2,7 +2,7 @@ using OpenFPS.Common;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
 using OpenFPS.Sound.Core.Engine;
-using OpenFPS.Client.AudioEngine.Fmod;
+using OpenFPS.Audio.Fmod;
 
 namespace OpenFPS.Tests;
 
@@ -731,7 +731,7 @@ public class EngineSynthTests
     [Fact]
     public void EngineProcessor_RendersFiniteAudio_InRealTimeBudget()
     {
-        var state = new OpenFPS.Client.AudioEngine.Fmod.EngineVoiceState(VehicleProfile.V8Muscle, Sr, 9)
+        var state = new OpenFPS.Audio.Fmod.EngineVoiceState(VehicleProfile.V8Muscle, Sr, 9)
         {
             TargetSpeed = 12f,
         };

@@ -2,11 +2,11 @@ using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using FMOD;
-using OpenFPS.Client.AudioEngine.Acoustics;
+using OpenFPS.Audio.Acoustics;
+using OpenFPS.Audio.Fmod;
+using OpenFPS.Audio.SteamAudio;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Signals;
-using OpenFPS.Client.AudioEngine.Fmod;
-using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 using OpenFPS.Native.Platform;
 using OpenFPS.Common;
 

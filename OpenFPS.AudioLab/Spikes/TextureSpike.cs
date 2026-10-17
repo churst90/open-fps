@@ -227,7 +227,7 @@ public static class TextureSpike
     private static float[] ReadRawPascals(string path, int n)
     {
         var (x, sr) = ReadWav(path);
-        if (sr != Rate) x = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.Resample(x, sr, Rate);
+        if (sr != Rate) x = OpenFPS.Audio.Fmod.MixerQuality.Resample(x, sr, Rate);
         var y = new float[n];
         for (int i = 0; i < n; i++) y[i] = x[i % x.Length] / 0.1f;
         return y;
@@ -236,7 +236,7 @@ public static class TextureSpike
     public static float[] ReadMono48k(string path)
     {
         var (x, sr) = ReadWav(path);
-        return sr == Rate ? x : OpenFPS.Client.AudioEngine.Fmod.MixerQuality.Resample(x, sr, Rate);
+        return sr == Rate ? x : OpenFPS.Audio.Fmod.MixerQuality.Resample(x, sr, Rate);
     }
 
     /// <summary>Any PCM or float WAV, mixed to mono.</summary>

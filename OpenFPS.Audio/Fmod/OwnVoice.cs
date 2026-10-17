@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
 using FMOD;
 
-namespace OpenFPS.Client.AudioEngine.Fmod;
+namespace OpenFPS.Audio.Fmod;
 
 /// <summary>
 /// The player's own voice as their room answers it, and the ring a talker's voice is played from. Your

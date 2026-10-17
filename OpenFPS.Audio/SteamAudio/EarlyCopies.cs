@@ -1,9 +1,8 @@
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Common;
 using OpenFPS.Acoustics;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.Audio.SteamAudio;
 
 /// <summary>
 /// The early energy of the place you stand in that the placed copies already carry, so the traced

@@ -1,11 +1,11 @@
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Audio.Core;
+using OpenFPS.Audio.Data;
+using OpenFPS.Audio.Fmod;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Engine;
-using OpenFPS.Client.AudioEngine.Data;
-using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Common;
-using ActiveSound = OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.ActiveSound;
+using ActiveSound = OpenFPS.Audio.Fmod.FmodAudioProvider.ActiveSound;
 
 namespace OpenFPS.Tests;
 

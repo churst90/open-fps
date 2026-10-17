@@ -185,7 +185,7 @@ public class TyreAndTurboTests
     {
         float Rms(float slip)
         {
-            var voice = new OpenFPS.Client.AudioEngine.Fmod.EngineVoiceState(
+            var voice = new OpenFPS.Audio.Fmod.EngineVoiceState(
                 VehicleProfile.ByName("nascar_v8"), 44100f, seed: 4);
             voice.PlaceAtSpeed(60f);
             voice.TargetSpeed = 60f;

@@ -2,7 +2,7 @@ using System.Numerics;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Stove;
 
-namespace OpenFPS.Client.AudioEngine.Fmod;
+namespace OpenFPS.Audio.Fmod;
 
 /// <summary>
 /// A gas hob as a voice (GasHobSynth, docs/GAS_HOB.md). Its state is its key (HobKey): what each knob was,

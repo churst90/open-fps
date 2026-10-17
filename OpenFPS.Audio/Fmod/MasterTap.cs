@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
 using FMOD;
 
-namespace OpenFPS.Client.AudioEngine.Fmod;
+namespace OpenFPS.Audio.Fmod;
 
 /// <summary>
 /// Writes what the mixer makes to a WAV file while it still plays: a pass-through DSP on the master,

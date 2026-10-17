@@ -1,8 +1,8 @@
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Data;
+using OpenFPS.Audio.Data;
 using OpenFPS.Acoustics;
 
-namespace OpenFPS.Client.AudioEngine.Acoustics;
+namespace OpenFPS.Audio.Acoustics;
 
 /// <summary>
 /// A vehicle standing between you and a sound, as a barrier (Maekawa 1968): the extra distance round the

@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
 using FMOD;
 
-namespace OpenFPS.Client.AudioEngine.Fmod;
+namespace OpenFPS.Audio.Fmod;
 
 /// <summary>
 /// A recorded sound's copy off a wall, split as the wall splits it: the mirror share clean, and the share

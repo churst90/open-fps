@@ -1,5 +1,5 @@
-using OpenFPS.Client.AudioEngine.Data;
-using OpenFPS.Client.Core;
+using OpenFPS.Audio.Core;
+using OpenFPS.Audio.Data;
 using OpenFPS.Sound;
 using OpenFPS.Acoustics;
 

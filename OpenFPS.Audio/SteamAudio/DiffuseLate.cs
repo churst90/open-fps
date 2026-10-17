@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.Audio.SteamAudio;
 
 /// <summary>
 /// The late tail of the room you stand in as a field: each of the tail's directions

@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
 using FMOD;
 
-namespace OpenFPS.Client.AudioEngine.Fmod;
+namespace OpenFPS.Audio.Fmod;
 
 /// <summary>One synthesizer voice: its parameters (from the SpatialEmitter) and its oscillator, LFO,
 /// envelope and filter state.</summary>
@@ -10,7 +10,7 @@ public class SynthVoiceState : IGuardedUnit
     /// <summary>The non-finite guard's flag and name for this unit (NonFinite).</summary>
     public NonFiniteUnit Guard { get; } = new();
 
-    public OpenFPS.Client.AudioEngine.Data.SynthWaveType WaveType;
+    public OpenFPS.Audio.Data.SynthWaveType WaveType;
     public float Frequency; 
     public float LfoRate; 
     public float LfoDepth; 
@@ -149,19 +149,19 @@ public static class SynthProcessor
                 float rawSignal = 0.0f;
                 switch (state.WaveType)
                 {
-                    case OpenFPS.Client.AudioEngine.Data.SynthWaveType.Sine:
+                    case OpenFPS.Audio.Data.SynthWaveType.Sine:
                         rawSignal = MathF.Sin(state.Phase * 2.0f * MathF.PI);
                         break;
-                    case OpenFPS.Client.AudioEngine.Data.SynthWaveType.Square:
+                    case OpenFPS.Audio.Data.SynthWaveType.Square:
                         rawSignal = (state.Phase < 0.5f) ? 1.0f : -1.0f;
                         break;
-                    case OpenFPS.Client.AudioEngine.Data.SynthWaveType.Saw:
+                    case OpenFPS.Audio.Data.SynthWaveType.Saw:
                         rawSignal = (state.Phase * 2.0f) - 1.0f;
                         break;
-                    case OpenFPS.Client.AudioEngine.Data.SynthWaveType.Triangle:
+                    case OpenFPS.Audio.Data.SynthWaveType.Triangle:
                         rawSignal = 4.0f * MathF.Abs(state.Phase - 0.5f) - 1.0f;
                         break;
-                    case OpenFPS.Client.AudioEngine.Data.SynthWaveType.Noise:
+                    case OpenFPS.Audio.Data.SynthWaveType.Noise:
                         rawSignal = (float)(state.Rnd.NextDouble() * 2.0 - 1.0);
                         break;
                 }

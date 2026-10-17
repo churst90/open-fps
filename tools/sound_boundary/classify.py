@@ -144,12 +144,12 @@ TYPE_RULES = {
     'OpenFPS.Common.PuddleField': ('c', 'Environment', ''),
     'OpenFPS.Sound.WeaponRegistry': ('c', 'Sound', 'content registry both read'),
     'OpenFPS.Geometry.MathHelper': ('a', 'Geometry', ''),
-    'OpenFPS.Client.Core.RainSurvey': ('a', 'Audio', 'reads entities to find roofs and gutters: becomes a reader of the world input'),
-    'OpenFPS.Client.Core.DropBank': ('a', 'Audio', ''),
+    'OpenFPS.Audio.RainSurvey': ('a', 'Audio', 'reads entities to find roofs and gutters: becomes a reader of the world input'),
+    'OpenFPS.Audio.DropBank': ('a', 'Audio', ''),
     'OpenFPS.Client.Core.Platform.FmodMicrophoneCapture': ('b', '', 'microphone for voice chat (uses Native)'),
-    'OpenFPS.Client.AudioEngine.Fmod.TalkerStream': ('a', 'Audio', 'plays decoded voice-chat PCM; the codec is host-side'),
-    'OpenFPS.Client.AudioEngine.Core.ScoredCandidate': ('a', 'Audio', ''),
-    'OpenFPS.Client.AudioEngine.Core.IVoiceSink': ('a', 'Audio', ''),
+    'OpenFPS.Audio.Fmod.TalkerStream': ('a', 'Audio', 'plays decoded voice-chat PCM; the codec is host-side'),
+    'OpenFPS.Audio.Core.ScoredCandidate': ('a', 'Audio', ''),
+    'OpenFPS.Audio.Core.IVoiceSink': ('a', 'Audio', ''),
 }
 
 # The library's layers, lowest first. A project may use only those before it in this list (Native
@@ -546,11 +546,11 @@ md.append('For each type that holds both sound logic and open-fps\'s world: how 
 md.append('| Type | Members | Lines | Members reading host | Their lines | Host refs | Most-read host types |')
 md.append('|---|---:|---:|---:|---:|---:|---|')
 SPLIT_TYPES = ['OpenFPS.Client.Core.ClientAudioSystem', 'OpenFPS.Client.Core.WorldAudioPlayer', 'OpenFPS.Client.Core.SpatialService',
-               'OpenFPS.Client.Core.BirdLife', 'OpenFPS.Client.Core.RainSurvey', 'OpenFPS.Client.Core.RainField',
-               'OpenFPS.Client.AudioEngine.Acoustics.AsyncAcousticWorker', 'OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics',
-               'OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph', 'OpenFPS.Client.AudioEngine.Acoustics.CabinWalls',
-               'OpenFPS.Client.AudioEngine.Acoustics.VehicleShadow', 'OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider',
-               'OpenFPS.Client.Core.AudioEngine.SteamAudio.SteamAudioScene', 'OpenFPS.Acoustics.Systems.AcousticVolumeGenerator',
+               'OpenFPS.Audio.Core.BirdLife', 'OpenFPS.Audio.RainSurvey', 'OpenFPS.Audio.RainField',
+               'OpenFPS.Audio.Acoustics.AsyncAcousticWorker', 'OpenFPS.Audio.Acoustics.SpatialAcoustics',
+               'OpenFPS.Audio.Acoustics.OpeningGraph', 'OpenFPS.Audio.Acoustics.CabinWalls',
+               'OpenFPS.Audio.Acoustics.VehicleShadow', 'OpenFPS.Audio.Fmod.FmodAudioProvider',
+               'OpenFPS.Audio.SteamAudio.SteamAudioScene', 'OpenFPS.Acoustics.Systems.AcousticVolumeGenerator',
                'OpenFPS.Sound.AudioEmission', 'OpenFPS.Acoustics.RoomAcoustics', 'OpenFPS.Acoustics.OpeningRoutes']
 mem_lines = {}
 for m in MEMBERS:

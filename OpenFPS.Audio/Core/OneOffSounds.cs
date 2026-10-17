@@ -1,15 +1,14 @@
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Client.AudioEngine.Data;
-using OpenFPS.Client.AudioEngine.Fmod;
-using OpenFPS.Client.AudioEngine.Acoustics;
+using OpenFPS.Audio.Acoustics;
+using OpenFPS.Audio.Data;
+using OpenFPS.Audio.Fmod;
 using OpenFPS.Common;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
 
-namespace OpenFPS.Client.Core;
+namespace OpenFPS.Audio.Core;
 
 /// <summary>
 /// Plays the one-off sounds the world reports (open-fps: a WorldAudioEvent, which its WorldAudioPlayer decodes):
@@ -172,8 +171,8 @@ public sealed class OneOffSounds
     public VoiceRegistry Voices { get; set; }
 
     /// <summary>The simulator's worker, for a one-shot's first answer. See
-    /// <see cref="OpenFPS.Client.AudioEngine.Acoustics.AsyncAcousticWorker.TryGetNearby"/>.</summary>
-    public OpenFPS.Client.AudioEngine.Acoustics.AsyncAcousticWorker? Worker { get; set; }
+    /// <see cref="OpenFPS.Audio.Acoustics.AsyncAcousticWorker.TryGetNearby"/>.</summary>
+    public OpenFPS.Audio.Acoustics.AsyncAcousticWorker? Worker { get; set; }
 
     /// <summary>
     /// The id the simulator files its answer for a sounding entity under (a talker, a one-shot's source): a
@@ -891,17 +890,17 @@ public sealed class OneOffSounds
 
     /// <summary>Every vehicle's windows as this client has them. Without it a cabin's windows are taken
     /// to be wherever the server last sent them.</summary>
-    public OpenFPS.Client.AudioEngine.Acoustics.CabinWalls? Cabins { get; set; }
+    public OpenFPS.Audio.Acoustics.CabinWalls? Cabins { get; set; }
 
     /// <summary>Whether a sound was made inside the cabin of the vehicle that made it.</summary>
     private static bool InCabin(IAcousticWorld world, int sourceId, Vector3 at, out AcousticBody car, out VehicleProfile vehicle)
     {
         car = default; vehicle = null!;
         if (sourceId < 0 || !world.TryGetBody(sourceId, out car)) return false;
-        if (OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.Vehicle(car) is not { } v
-            || !OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.HasCabin(v)) return false;
+        if (OpenFPS.Audio.Acoustics.CabinWalls.Vehicle(car) is not { } v
+            || !OpenFPS.Audio.Acoustics.CabinWalls.HasCabin(v)) return false;
         vehicle = v;
-        return OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.Contains(car, v, at);
+        return OpenFPS.Audio.Acoustics.CabinWalls.Contains(car, v, at);
     }
 
     /// <summary>A sound inside a cabin, heard from outside it: through the glass, the seals and whatever
@@ -910,10 +909,10 @@ public sealed class OneOffSounds
     {
         if (car.Id == ListenerVehicleId) { e.InsideListenersVehicle = true; return; }
         float open = Cabins?.WindowsOpen(car, now) ?? car.WindowsOpen;
-        var (low, mid, high) = OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.LossDb(vehicle, open);
-        e.EqLow *= OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.Gain(low);
-        e.EqMid *= OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.Gain(mid);
-        e.EqHigh *= OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.Gain(high);
+        var (low, mid, high) = OpenFPS.Audio.Acoustics.CabinWalls.LossDb(vehicle, open);
+        e.EqLow *= OpenFPS.Audio.Acoustics.CabinWalls.Gain(low);
+        e.EqMid *= OpenFPS.Audio.Acoustics.CabinWalls.Gain(mid);
+        e.EqHigh *= OpenFPS.Audio.Acoustics.CabinWalls.Gain(high);
     }
 
     /// <summary>How long a voice has to start before following it stops. A line that lost the voice
@@ -965,7 +964,7 @@ public sealed class OneOffSounds
                 // Where the vehicle is now decides whether you are inside it with the sound: you may have
                 // got in, or out, while the window was moving.
                 e.InsideListenersVehicle = f.SourceEntityId == ListenerVehicleId;
-                if (OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.Vehicle(speaker) is { } vehicle)
+                if (OpenFPS.Audio.Acoustics.CabinWalls.Vehicle(speaker) is { } vehicle)
                     ThroughCabin(ref e, speaker, vehicle, now);
             }
             else if (!f.Moving && !f.Sky) Facing(ref e, speaker.Rotation, listenerPosition);
@@ -1492,7 +1491,7 @@ public sealed class OneOffSounds
     /// <summary>The sound through the diffuser, with room after it for the smear to ring out.</summary>
     internal static float[] Diffuse(float[] pcm, float scattering, int seed)
     {
-        var d = new OpenFPS.Client.AudioEngine.Fmod.EchoDiffuser(scattering, seed, TransientSynth.SampleRate);
+        var d = new OpenFPS.Audio.Fmod.EchoDiffuser(scattering, seed, TransientSynth.SampleRate);
         int tail = (int)(0.004f * (1f + 24f * scattering) * TransientSynth.SampleRate);
         var y = new float[pcm.Length + tail];
         for (int i = 0; i < y.Length; i++) y[i] = d.Process(i < pcm.Length ? pcm[i] : 0f);

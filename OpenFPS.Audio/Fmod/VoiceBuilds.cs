@@ -1,10 +1,9 @@
 using System.Collections.Concurrent;
-using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Client.AudioEngine.Data;
+using OpenFPS.Audio.Data;
 using OpenFPS.Common;
 using OpenFPS.Sound;
 
-namespace OpenFPS.Client.AudioEngine.Fmod;
+namespace OpenFPS.Audio.Fmod;
 
 /// <summary>
 /// Makes the models that take longer than a frame to make, away from the threads that place sounds
@@ -80,7 +79,7 @@ public sealed class VoiceBuilds
     private readonly IAudioClock _clock;
     private readonly OpenFPS.Sound.Core.Atmosphere? _atmosphere;
     private readonly OpenFPS.Sound.Core.MixSettings? _mix;
-    private readonly OpenFPS.Client.AudioEngine.Core.AudioWorldOptions? _options;
+    private readonly OpenFPS.Audio.Core.AudioWorldOptions? _options;
     /// <summary>Models being made for a voice, by voice.</summary>
     private readonly ConcurrentDictionary<int, Build> _forVoice = new();
     /// <summary>Models made ahead, by what they are made from.</summary>
@@ -98,7 +97,7 @@ public sealed class VoiceBuilds
     /// <param name="options">The world's options (whether an engine's cabin is split into paths); null: the shipped.</param>
     public VoiceBuilds(IAudioClock clock, OpenFPS.Sound.Core.Atmosphere? atmosphere = null,
                        OpenFPS.Sound.Core.MixSettings? mix = null,
-                       OpenFPS.Client.AudioEngine.Core.AudioWorldOptions? options = null)
+                       OpenFPS.Audio.Core.AudioWorldOptions? options = null)
     {
         _clock = clock;
         _atmosphere = atmosphere;

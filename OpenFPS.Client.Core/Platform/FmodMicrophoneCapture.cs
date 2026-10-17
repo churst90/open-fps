@@ -1,4 +1,4 @@
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Audio.Core;
 
 namespace OpenFPS.Client.Core.Platform;
 

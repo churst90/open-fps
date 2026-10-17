@@ -1,6 +1,6 @@
 using System.Numerics;
 using Arch.Core;
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Audio.Core;
 using OpenFPS.Client.Core;
 using OpenFPS.Client.Core.Input;
 using OpenFPS.Client.Core.Platform;
@@ -336,8 +336,8 @@ public class WeaponsTests : IDisposable
     {
         var hit = UiSounds.Render(UiCue.Hit);
         var kill = UiSounds.Render(UiCue.Kill);
-        Assert.InRange(hit.Length / (float)OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, 0.05f, 0.15f);
-        Assert.InRange(kill.Length / (float)OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, 0.2f, 0.6f);
+        Assert.InRange(hit.Length / (float)OpenFPS.Audio.Fmod.MixerQuality.DefaultRate, 0.05f, 0.15f);
+        Assert.InRange(kill.Length / (float)OpenFPS.Audio.Fmod.MixerQuality.DefaultRate, 0.2f, 0.6f);
         Assert.NotEqual(hit.Length, kill.Length);
         Assert.InRange(hit.Max(MathF.Abs), 0.5f, 0.95f);
     }

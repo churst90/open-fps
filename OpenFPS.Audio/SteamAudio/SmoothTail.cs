@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.Audio.SteamAudio;
 
 /// <summary>
 /// The tail of the place you stand in, played as a late field is: noise under the room's energy

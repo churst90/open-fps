@@ -1,4 +1,4 @@
-using OpenFPS.Client.Core;
+using OpenFPS.Audio.Core;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;

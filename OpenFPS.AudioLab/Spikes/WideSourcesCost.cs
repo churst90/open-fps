@@ -35,9 +35,9 @@ public static class WideSourcesCost
 
         RainSpike._riding = -1;
         var (shelter, shelterEar, _) = RainSpike.Scenes().First(x => x.Name == "shelter").Make();
-        var roof = new OpenFPS.Client.Core.RainSurvey().Run(shelter, shelterEar, -1, -1).Patches[OpenFPS.Client.Core.RainSurvey.OverheadSlot]!;
+        var roof = new OpenFPS.Audio.RainSurvey().Run(shelter, shelterEar, -1, -1).Patches[OpenFPS.Audio.RainSurvey.OverheadSlot]!;
         var (street, streetEar, _) = RainSpike.Scenes().First(x => x.Name == "street").Make();
-        var near = new OpenFPS.Client.Core.RainSurvey().Run(street, streetEar, -1, -1).Patches[2]!;
+        var near = new OpenFPS.Audio.RainSurvey().Run(street, streetEar, -1, -1).Patches[2]!;
         Rain("bus shelter roof, 1 voice", roof, 1);
         Rain("bus shelter roof, 4 parts", roof, 4);
         Rain("near street quarter, 1 voice", near, 1);

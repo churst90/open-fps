@@ -2,6 +2,7 @@ using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Sound;
 using OpenFPS.Native.SteamAudio;
+using OpenFPS.Audio.SteamAudio;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 

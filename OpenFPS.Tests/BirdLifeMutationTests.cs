@@ -1,7 +1,6 @@
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Acoustics;
-using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Client.Core;
+using OpenFPS.Audio.Acoustics;
+using OpenFPS.Audio.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
@@ -34,7 +33,7 @@ public class BirdLifeMutationTests
         public double Now;
         public bool Pump;
         /// <summary>An acoustic worker run by hand between updates, as the replay runs it; null, none.</summary>
-        public OpenFPS.Client.AudioEngine.Acoustics.AsyncAcousticWorker? Worker;
+        public OpenFPS.Audio.Acoustics.AsyncAcousticWorker? Worker;
 
         public Rig(int seed, SpatialAcoustics? acoustics = null)
         {
@@ -403,7 +402,7 @@ public class BirdLifeMutationTests
         var wall = Box(1, new Vector3(0f, 5f, 5f), new Vector3(200f, 10f, 0.3f), "Concrete");
         var hedges = Grid(2, 100, 6f, 1f, (i, at) => Box(i, at, Hedge, "Foliage"), new Vector3(0f, 0f, 40f));
         var world = World(hedges.Append(wall));
-        using var worker = new OpenFPS.Client.AudioEngine.Acoustics.AsyncAcousticWorker(acoustics) { Manual = true };
+        using var worker = new OpenFPS.Audio.Acoustics.AsyncAcousticWorker(acoustics) { Manual = true };
         using var rig = new Rig(13, acoustics) { Pump = true, Worker = worker };
         rig.Birds.Worker = worker;
         rig.Run(world, Ear, 0, 120, dt: 0.1);

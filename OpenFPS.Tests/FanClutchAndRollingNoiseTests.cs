@@ -195,7 +195,7 @@ public class GearHuntingTests
         foreach (float kmh in new[] { 30f, 45f })
         {
             float speed = kmh / 3.6f;
-            var voice = new OpenFPS.Client.AudioEngine.Fmod.EngineVoiceState(v, 44100, 7) { TargetSpeed = speed };
+            var voice = new OpenFPS.Audio.Fmod.EngineVoiceState(v, 44100, 7) { TargetSpeed = speed };
             voice.PlaceAtSpeed(speed);
             voice.Revive();
             var buf = new float[1024];

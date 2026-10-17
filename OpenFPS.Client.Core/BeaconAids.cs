@@ -1,7 +1,7 @@
 using System.Numerics;
 using System.Text.Json;
-using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Client.AudioEngine.Data;
+using OpenFPS.Audio.Core;
+using OpenFPS.Audio.Data;
 using OpenFPS.Common;
 using Serilog;
 using OpenFPS.Sound;
@@ -21,7 +21,7 @@ public sealed class BeaconAids
 {
     private readonly AudioEngineFacade _audio;
     private readonly BeaconPreferences _prefs;
-    private readonly OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics? _acoustics;
+    private readonly OpenFPS.Audio.Acoustics.SpatialAcoustics? _acoustics;
     private Dictionary<string, Beacons.Policy> _policy = Beacons.ReadPolicies(null);
 
     /// <summary>How many blips have been made: each its own voice.</summary>
@@ -65,7 +65,7 @@ public sealed class BeaconAids
     internal VoiceRegistry Voices { get; set; }
 
     public BeaconAids(AudioEngineFacade audio, BeaconPreferences? prefs = null,
-                      OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics? acoustics = null)
+                      OpenFPS.Audio.Acoustics.SpatialAcoustics? acoustics = null)
     {
         _audio = audio;
         Voices = new VoiceRegistry { Mixer = audio };
@@ -220,20 +220,20 @@ public sealed class BeaconAids
     /// sounds, where from and how loud are the one answer, and so is the tracker's "behind a wall".
     /// </summary>
     internal bool Reaches(WorldSnapshot world, int sourceId, Vector3 listener, Vector3 at,
-                          out OpenFPS.Client.AudioEngine.Data.AcousticPathData? path)
+                          out OpenFPS.Audio.Data.AcousticPathData? path)
     {
         path = Answered(world, sourceId, listener, at);
         return Hears(path, () => InSight(world, sourceId, listener, at));
     }
 
     /// <summary>The rule on an answer: in sight, or no more than <see cref="MaxOcclusion"/> blocked.</summary>
-    internal static bool Hears(OpenFPS.Client.AudioEngine.Data.AcousticPathData? path, Func<bool> inSight)
+    internal static bool Hears(OpenFPS.Audio.Data.AcousticPathData? path, Func<bool> inSight)
         => path is not { } blocked || blocked.Occlusion <= MaxOcclusion || inSight();
 
     /// <summary>The worker's answer for this beacon's blip at <paramref name="at"/> heard at
     /// <paramref name="listener"/>, if it has a fresh one; otherwise the hand-rolled tracer's; null without
     /// acoustics.</summary>
-    internal OpenFPS.Client.AudioEngine.Data.AcousticPathData? Answered(WorldSnapshot world, int sourceId, Vector3 listener, Vector3 at)
+    internal OpenFPS.Audio.Data.AcousticPathData? Answered(WorldSnapshot world, int sourceId, Vector3 listener, Vector3 at)
     {
         if (_acoustics == null) return null;
         float speed = world.Entities.TryGetValue(sourceId, out var e) ? e.Velocity.Length() : 0f;
@@ -255,7 +255,7 @@ public sealed class BeaconAids
     }
 
     /// <summary>The acoustic worker blips are heard by (P6); null, the hand-rolled tracer alone.</summary>
-    internal OpenFPS.Client.AudioEngine.Acoustics.AsyncAcousticWorker? Worker { get; set; }
+    internal OpenFPS.Audio.Acoustics.AsyncAcousticWorker? Worker { get; set; }
 
     /// <summary>How fast the ear moves, m/s: how far from here an answer traced a moment ago may have been
     /// asked (AcousticPathData.Answers).</summary>
@@ -273,7 +273,7 @@ public sealed class BeaconAids
     private void Ask(WorldSnapshot world, int sourceId, Vector3 at, Vector3 listener)
     {
         if (Worker == null) return;
-        Worker.EnqueueRequest(new OpenFPS.Client.AudioEngine.Acoustics.AcousticRequest
+        Worker.EnqueueRequest(new OpenFPS.Audio.Acoustics.AcousticRequest
         {
             EntityId = ProbeOf(sourceId), ListenerPos = listener, SourcePos = at,
             SourceRadius = AudioEmission.MinOcclusionRadius, LeaveOut = sourceId,

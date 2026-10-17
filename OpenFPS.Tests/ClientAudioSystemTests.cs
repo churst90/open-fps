@@ -1,6 +1,5 @@
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Audio.Core;
 using System.Numerics;
-using OpenFPS.Client.Core;
 using OpenFPS.Common;
 using Xunit.Abstractions;
 

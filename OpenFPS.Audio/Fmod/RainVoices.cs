@@ -3,7 +3,7 @@ using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Nature;
 using OpenFPS.Common;
 
-namespace OpenFPS.Client.AudioEngine.Fmod;
+namespace OpenFPS.Audio.Fmod;
 
 /// <summary>
 /// What the rain survey (RainField, game thread) and the rain voices (the render pool) share: one
@@ -77,7 +77,7 @@ public static class RainFeeds
     public static int PartsFor(int slot, bool wide)
     {
         if (!wide) return 1;
-        if (slot == OpenFPS.Client.Core.RainSurvey.OverheadSlot) return RoofParts;
+        if (slot == OpenFPS.Audio.RainSurvey.OverheadSlot) return RoofParts;
         return slot >= 1 && slot <= 4 ? NearParts : 1;
     }
 

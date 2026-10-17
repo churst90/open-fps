@@ -3,6 +3,7 @@ using OpenFPS.Common;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
 using OpenFPS.Native.SteamAudio;
+using OpenFPS.Audio.SteamAudio;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 

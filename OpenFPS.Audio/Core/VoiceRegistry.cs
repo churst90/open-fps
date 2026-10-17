@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace OpenFPS.Client.Core;
+namespace OpenFPS.Audio.Core;
 
 /// <summary>What a registered voice is: which part of which thing it is the sound of.</summary>
 public enum VoiceKind : byte
@@ -420,7 +420,7 @@ public sealed partial class VoiceRegistry
     public int IdsHeld { get { lock (_lock) return _given.Count; } }
 
     /// <summary>
-    /// What a voice's chance is drawn from (<see cref="OpenFPS.Client.AudioEngine.Data.SpatialEmitter.Seed"/>):
+    /// What a voice's chance is drawn from (<see cref="OpenFPS.Audio.Data.SpatialEmitter.Seed"/>):
     /// a hash of what it is the sound of, its kind, owner and part. The same on every machine and in every run,
     /// so two clients hear the same mower. Never below zero, as an entity's id never was while that seeded its
     /// engine (a model may take its seed's remainder). Neighbours' seeds are far apart: seeded by their ids, one

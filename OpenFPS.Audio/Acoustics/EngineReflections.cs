@@ -1,12 +1,12 @@
 using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Sound;
-using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Client.AudioEngine.Data;
+using OpenFPS.Audio.Core;
+using OpenFPS.Audio.Data;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
 
-namespace OpenFPS.Client.AudioEngine.Acoustics;
+namespace OpenFPS.Audio.Acoustics;
 
 /// <summary>
 /// The walls answering a live engine. An engine is synthesized in the mixer, so there is no file to
@@ -74,7 +74,7 @@ public sealed class EngineReflections
     private readonly List<ReflectingSurface> _surfaces = new();
     /// <summary>The boxes the surfaces came from, for the obstruction test: one list, so the mirror and the
     /// obstruction cannot disagree.</summary>
-    private List<OpenFPS.Client.Core.AudioEngine.SteamAudio.SteamAudioScene.Box> _boxes = new();
+    private List<OpenFPS.Audio.SteamAudio.SteamAudioScene.Box> _boxes = new();
     private int _builtFrom = -1;
     private int _lastEntityCount = -1;
 
@@ -114,7 +114,7 @@ public sealed class EngineReflections
         if (world.BodyCount == _lastEntityCount) return;
         _lastEntityCount = world.BodyCount;
 
-        var boxes = OpenFPS.Client.Core.AudioEngine.SteamAudio.SteamAudioScene.BoxesFromWorld(world);
+        var boxes = OpenFPS.Audio.SteamAudio.SteamAudioScene.BoxesFromWorld(world);
         if (boxes.Count == _builtFrom) return;
         _builtFrom = boxes.Count;
         _boxes = boxes;

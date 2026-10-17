@@ -3,7 +3,7 @@ using OpenFPS.Common;
 using OpenFPS.Common.Networking;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
-using OpenFPS.Client.AudioEngine.Fmod;
+using OpenFPS.Audio.Fmod;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 using OpenFPS.Native.SteamAudio;
 

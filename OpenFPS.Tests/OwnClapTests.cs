@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Audio.Core;
 using OpenFPS.Client.Core;
 using OpenFPS.Sound;
 using OpenFPS.Common.Networking;
@@ -21,7 +21,7 @@ public class OwnClapTests
         var provider = new SteelDoorSoundTests.CapturingProvider();
         var facade = new AudioEngineFacade(provider);
         facade.InitializeForTest();
-        var player = new OneOffSounds(facade, new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics(), prewarm: false);
+        var player = new OneOffSounds(facade, new OpenFPS.Audio.Acoustics.SpatialAcoustics(), prewarm: false);
         // The client has you 1.4 m further along than the server did, facing east (+x).
         var feet = new Vector3(11.4f, 0f, 5f);
         var east = Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI / 2f);

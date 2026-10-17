@@ -156,8 +156,8 @@ public static class FireSpreadSpike
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE", Path.Combine(outDir, "capture.post.wav"));
         Environment.SetEnvironmentVariable("OPENFPS_AUDIO_CAPTURE_FLOAT", "1");
         AcousticRegistry.Initialize();
-        var provider = new OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider();
-        var facade = new OpenFPS.Client.AudioEngine.Core.AudioEngineFacade(provider);
+        var provider = new OpenFPS.Audio.Fmod.FmodAudioProvider();
+        var facade = new OpenFPS.Audio.Core.AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();
         facade.InitializeForTest(sounds);
         if (!facade.IsInitialized) { Console.WriteLine("FAIL: provider init failed"); return 1; }

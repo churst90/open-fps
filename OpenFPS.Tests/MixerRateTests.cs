@@ -1,10 +1,10 @@
 using System.Numerics;
 using System.Reflection;
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Audio.Core;
+using OpenFPS.Audio.Fmod;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
 using OpenFPS.Sound.Core.Signals;
-using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Client.Core;
 using OpenFPS.Common;
 using Xunit.Abstractions;

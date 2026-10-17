@@ -1,5 +1,5 @@
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Acoustics;
+using OpenFPS.Audio.Acoustics;
 using OpenFPS.Client.Core;
 using OpenFPS.Common;
 using OpenFPS.Acoustics;
@@ -51,7 +51,7 @@ public class CityZoneTests
     public void BrandtCourtDoorwaysAreRoomsForSound(float x, float z)
     {
         var world = City();
-        var acoustics = new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics();
+        var acoustics = new OpenFPS.Audio.Acoustics.SpatialAcoustics();
         Assert.NotNull(acoustics.RoutesFor(world));
         var eye = new Vector3(x, 0.05f + 1.7f, z);
         Assert.Equal(AcousticConstants.GlobalRegionId, acoustics.GetZoneAt(world, eye));

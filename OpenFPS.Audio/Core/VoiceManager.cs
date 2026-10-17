@@ -1,9 +1,9 @@
 using System.Numerics;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
-using OpenFPS.Client.AudioEngine.Data;
+using OpenFPS.Audio.Data;
 
-namespace OpenFPS.Client.AudioEngine.Core;
+namespace OpenFPS.Audio.Core;
 
 public class ScoredCandidate
 {

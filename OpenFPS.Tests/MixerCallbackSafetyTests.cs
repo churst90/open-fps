@@ -1,5 +1,5 @@
 using System.Runtime.InteropServices;
-using OpenFPS.Client.AudioEngine.Fmod;
+using OpenFPS.Audio.Fmod;
 
 namespace OpenFPS.Tests;
 

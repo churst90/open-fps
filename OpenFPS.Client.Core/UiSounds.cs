@@ -1,4 +1,4 @@
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Audio.Core;
 using OpenFPS.Common.Networking;
 
 namespace OpenFPS.Client.Core;
@@ -93,7 +93,7 @@ public sealed class UiSounds : IUiCues
 
     /// <summary>The waveform of a cue at the default mixer's rate: peak 1.28 times its gain, at most 0.95. Public
     /// so a test can measure it.</summary>
-    public static float[] Render(UiCue cue) => Render(cue, OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate);
+    public static float[] Render(UiCue cue) => Render(cue, OpenFPS.Audio.Fmod.MixerQuality.DefaultRate);
 
     /// <summary>A cue at any sample rate, for writing it out to be listened to.</summary>
     public static float[] Render(UiCue cue, int rate) => cue switch

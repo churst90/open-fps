@@ -1,13 +1,13 @@
 using System.Collections.Concurrent;
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Data;
-using OpenFPS.Client.AudioEngine.Fmod;
+using OpenFPS.Audio.Data;
+using OpenFPS.Audio.Fmod;
 using OpenFPS.Common;
 using OpenFPS.Acoustics;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
 
-namespace OpenFPS.Client.AudioEngine.Core;
+namespace OpenFPS.Audio.Core;
 
 /// <summary>
 /// The audio engine's public face: the provider, the voice budget and the bank behind one interface.
@@ -139,7 +139,7 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     /// <summary>Whether the mixer traces this entity's echoes now, so the host stops making its mirror images
     /// (FmodAudioProvider.HasTracedEchoes). Never without an FMOD mixer.</summary>
     public bool HasTracedEchoes(int entityId)
-        => (_provider as OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider)?.HasTracedEchoes(entityId) ?? false;
+        => (_provider as OpenFPS.Audio.Fmod.FmodAudioProvider)?.HasTracedEchoes(entityId) ?? false;
 
     /// <summary>The rate the mixer runs at, Hz, for what the host renders for it to play without a resampler:
     /// the FMOD mixer's (FmodAudioProvider.MixerRate), or MixerQuality.DefaultRate without one.</summary>
@@ -379,7 +379,7 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     public int SpatialVoicesFree => _isInitialized ? _provider.SpatialVoicesFree : int.MaxValue / 4;
 
     /// <summary>See IAudioProvider.PlanTrainSlot.</summary>
-    public void PlanTrainSlot(string preset, string train, int slot, OpenFPS.Client.AudioEngine.Fmod.TrainSlotPlan plan)
+    public void PlanTrainSlot(string preset, string train, int slot, OpenFPS.Audio.Fmod.TrainSlotPlan plan)
     {
         if (_isInitialized) _provider.PlanTrainSlot(preset, train, slot, plan);
     }
@@ -437,22 +437,22 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     /// <summary>The routes through openings, for the reverberant fields of the places beyond them.</summary>
     public Func<OpenFPS.Acoustics.OpeningRoutes?>? RoutesSource
     {
-        set { if (_provider is OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider fmod) fmod.RoutesSource = value; }
+        set { if (_provider is OpenFPS.Audio.Fmod.FmodAudioProvider fmod) fmod.RoutesSource = value; }
     }
 
     /// <summary>The places the mixer plays traced, for the acoustic worker to configure on its context.
     /// Null without FMOD: the worker then traces into a set of its own that nothing plays.</summary>
-    internal OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet? Traced
-        => (_provider as OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider)?.Traced;
+    internal OpenFPS.Audio.SteamAudio.TracedReverbSet? Traced
+        => (_provider as OpenFPS.Audio.Fmod.FmodAudioProvider)?.Traced;
 
     /// <summary>The /reverb readout (FmodAudioProvider.TracedReverbStatus).</summary>
     public string TracedReverbStatus()
-        => (_provider as OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider)?.TracedReverbStatus()
+        => (_provider as OpenFPS.Audio.Fmod.FmodAudioProvider)?.TracedReverbStatus()
            ?? "No trace yet — the scene is still being built.";
 
     /// <summary>The /echoes readout (FmodAudioProvider.TracedEchoesStatus).</summary>
     public string TracedEchoesStatus()
-        => (_provider as OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider)?.TracedEchoesStatus()
+        => (_provider as OpenFPS.Audio.Fmod.FmodAudioProvider)?.TracedEchoesStatus()
            ?? $"Echoes {(Mix.TracedEchoesOn ? "on" : "off")}. No tracer yet — the scene is still being built.";
 
     public void SetAcousticMap(AcousticMap map)

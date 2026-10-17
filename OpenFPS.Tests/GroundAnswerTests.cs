@@ -234,7 +234,7 @@ public class GroundAnswerTests
             for (int i = 0; i < Sines; i++)
             {
                 double hz = bands[band].From * Math.Pow(bands[band].To / bands[band].From, (i + 0.5) / Sines);
-                var g = new OpenFPS.Client.AudioEngine.Acoustics.GroundReflection(Rate);
+                var g = new OpenFPS.Audio.Acoustics.GroundReflection(Rate);
                 g.Set(b.DelaySeconds, b.LowGain, b.HighGain);
                 double inE = 0.0, outE = 0.0;
                 for (int n = 0; n < 12000; n++)

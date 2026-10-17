@@ -1,9 +1,9 @@
 using System.Runtime.InteropServices;
 using FMOD;
-using OpenFPS.Client.AudioEngine.Fmod;   // DspCallback.UserData
+using OpenFPS.Audio.Fmod;   // DspCallback.UserData
 using OpenFPS.Native.SteamAudio;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.Audio.SteamAudio;
 
 /// <summary>
 /// Per-voice state for the Steam Audio binaural FMOD DSP: the Phonon handles and scratch buffers, all
@@ -39,7 +39,7 @@ internal sealed class SteamAudioVoiceState
     /// (EngineVoiceState and the rest), so the provider sets it for recorded sounds only and it stays
     /// silent for everything else. Null when the stage was built without one.
     /// </summary>
-    public OpenFPS.Client.AudioEngine.Acoustics.GroundReflection? Ground;
+    public OpenFPS.Audio.Acoustics.GroundReflection? Ground;
 
     /// <summary>
     /// The ground's answer, placed at the source's mirror image below the surface through an HRTF of its

@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
 using FMOD;
 
-namespace OpenFPS.Client.AudioEngine.Fmod;
+namespace OpenFPS.Audio.Fmod;
 
 /// <summary>One granular voice: its source PCM, its parameters (from the SpatialEmitter) and its grains.</summary>
 public class GranularVoiceState : IGuardedUnit

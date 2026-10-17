@@ -1,4 +1,4 @@
-using OpenFPS.Client.AudioEngine.Fmod;
+using OpenFPS.Audio.Fmod;
 using OpenFPS.Client.Core.Platform;
 
 namespace OpenFPS.Tests;

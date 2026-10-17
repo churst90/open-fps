@@ -40,12 +40,12 @@ public static class VoiceCodec
 
 /// <summary>A talker's frames through Opus (<see cref="VoiceCodec"/>), as the sound library's talker streams take
 /// them (TalkerStream).</summary>
-public sealed class OpusVoiceDecoder : OpenFPS.Client.AudioEngine.Fmod.IVoiceDecoder
+public sealed class OpusVoiceDecoder : OpenFPS.Audio.Fmod.IVoiceDecoder
 {
     private readonly IOpusDecoder _decoder = VoiceCodec.CreateDecoder();
 
     /// <summary>A new decoder each: for TalkerStreams.For.</summary>
-    public static readonly Func<OpenFPS.Client.AudioEngine.Fmod.IVoiceDecoder> Create = static () => new OpusVoiceDecoder();
+    public static readonly Func<OpenFPS.Audio.Fmod.IVoiceDecoder> Create = static () => new OpusVoiceDecoder();
 
     public int Rate => VoiceCodec.Rate;
     public int FrameSamples => VoiceCodec.FrameSamples;

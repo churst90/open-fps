@@ -3,7 +3,7 @@ using FMOD;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Signals;
 
-namespace OpenFPS.Client.AudioEngine.Fmod;
+namespace OpenFPS.Audio.Fmod;
 
 /// <summary>
 /// A loudspeaker's beam toward the listener (Radiator), band by band: the voice split into the

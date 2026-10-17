@@ -2,9 +2,9 @@ using System.Numerics;
 using OpenFPS.Acoustics;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
-using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Client.AudioEngine.Data;
-using OpenFPS.Client.AudioEngine.Fmod;
+using OpenFPS.Audio.Core;
+using OpenFPS.Audio.Data;
+using OpenFPS.Audio.Fmod;
 
 namespace OpenFPS.Tests;
 

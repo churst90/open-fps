@@ -1,9 +1,9 @@
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Acoustics;
-using OpenFPS.Client.AudioEngine.Data;
+using OpenFPS.Audio.Acoustics;
+using OpenFPS.Audio.Data;
 using OpenFPS.Acoustics;
 
-namespace OpenFPS.Client.Core;
+namespace OpenFPS.Audio.Core;
 
 /// <summary>
 /// The voices heard by their owner's path (docs/SPECIAL_CASES_AUDIT.md, P3a and P3b): an engine, its intake

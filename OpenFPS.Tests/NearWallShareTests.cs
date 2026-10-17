@@ -5,6 +5,7 @@ using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Geometry;
+using OpenFPS.Audio.Core;
 
 namespace OpenFPS.Tests;
 
@@ -152,8 +153,8 @@ public class NearWallShareTests
         Span<BoundaryTap> now = stackalloc BoundaryTap[n], whole = stackalloc BoundaryTap[n];
         Span<bool> liveNow = stackalloc bool[n], liveWhole = stackalloc bool[n];
         var asWalls = probes.Select(p => p with { Share = 1f }).ToArray();
-        float trimNow = OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.BoundaryTaps(probes, AudioPhysics.SpeedOfSound, SampleRate, now, liveNow);
-        float trimWhole = OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.BoundaryTaps(asWalls, AudioPhysics.SpeedOfSound, SampleRate, whole, liveWhole);
+        float trimNow = OpenFPS.Audio.Fmod.FmodAudioProvider.BoundaryTaps(probes, AudioPhysics.SpeedOfSound, SampleRate, now, liveNow);
+        float trimWhole = OpenFPS.Audio.Fmod.FmodAudioProvider.BoundaryTaps(asWalls, AudioPhysics.SpeedOfSound, SampleRate, whole, liveWhole);
         Assert.True(trimWhole < 1f, "the walls as whole ones did not reach the budget: the test proves nothing");
         for (int i = 0; i < n; i++)
         {

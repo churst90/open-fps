@@ -1,7 +1,7 @@
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Client.AudioEngine.Data;
-using OpenFPS.Client.AudioEngine.Fmod;
+using OpenFPS.Audio.Core;
+using OpenFPS.Audio.Data;
+using OpenFPS.Audio.Fmod;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
@@ -139,7 +139,7 @@ public class PlacementThreadTests
             Material = new MaterialComponent { Material = "Brick" },
         });
         var world = client.GetSnapshot();
-        var acoustics = new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics();
+        var acoustics = new OpenFPS.Audio.Acoustics.SpatialAcoustics();
         var ear = new Vector3(0f, 1.7f, 20f);
         var (before, _) = PlacementThread.HeavyOnThisThread;
         using (PlacementThread.Enter())

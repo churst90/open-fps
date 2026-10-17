@@ -11,7 +11,7 @@ public static class ScopeSounds
 {
     /// <summary>The rate both loops and the breath are rendered at unless asked for another: the default mixer's.
     /// The game asks for its mixer's (AudioEngineFacade.MixerRate), so they play without a resampler.</summary>
-    public const int SampleRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate;
+    public const int SampleRate = OpenFPS.Audio.Fmod.MixerQuality.DefaultRate;
 
     /// <summary>The held note, Hz, about E5: thirty cycles in 2000 samples at 44.1 kHz, kept at any rate by
     /// a loop of whole cycles (<see cref="SteadyLoopSamples"/>).</summary>

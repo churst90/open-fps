@@ -6,8 +6,8 @@ using OpenFPS.Common;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Nature;
 using OpenFPS.Sound.Hearing;
-using OpenFPS.Client.AudioEngine.Fmod;
-using OpenFPS.Client.Core.AudioEngine.SteamAudio;
+using OpenFPS.Audio.Fmod;
+using OpenFPS.Audio.SteamAudio;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;
@@ -291,7 +291,7 @@ public class DspCallbackTests
         var read = Callback(typeof(SynthProcessor));
         var tone = new SynthVoiceState
         {
-            WaveType = OpenFPS.Client.AudioEngine.Data.SynthWaveType.Sine, Frequency = 440f,
+            WaveType = OpenFPS.Audio.Data.SynthWaveType.Sine, Frequency = 440f,
             FilterCutoff = 1f, FilterResonance = 0.1f, PulseWidth = 0.9f,
         };
         using var dsp = new FakeDsp(tone);
@@ -305,7 +305,7 @@ public class DspCallbackTests
             Assert.Equal(output.Data[2 * i], output.Data[2 * i + 1]);
         }
 
-        var still = new SynthVoiceState { WaveType = OpenFPS.Client.AudioEngine.Data.SynthWaveType.Sine, Frequency = 0f, FilterCutoff = 1f };
+        var still = new SynthVoiceState { WaveType = OpenFPS.Audio.Data.SynthWaveType.Sine, Frequency = 0f, FilterCutoff = 1f };
         using var quiet = new FakeDsp(still);
         Run(read, quiet, IntPtr.Zero, output, Block, 0, 2);
         Assert.All(output.Data, v => Assert.Equal(0f, v));

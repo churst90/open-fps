@@ -1,4 +1,4 @@
-namespace OpenFPS.Client.AudioEngine.Core;
+namespace OpenFPS.Audio.Core;
 
 /// <summary>
 /// The host's recordings (open-fps: the sound bank by material and action, SoundMappingService): which file a sound
@@ -25,7 +25,7 @@ public interface IAudioHost
 {
     /// <summary>The listener now: asked whenever the world places something, so a step taken between frames is
     /// placed from where the listener is then.</summary>
-    OpenFPS.Client.AudioEngine.Data.ListenerState Listener { get; }
+    OpenFPS.Audio.Data.ListenerState Listener { get; }
 
     /// <summary>The floor under <paramref name="at"/> as the host's physics has it, not counting
     /// <paramref name="leaveOut"/> (an aeroplane on its wheels).</summary>

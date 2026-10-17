@@ -1,13 +1,12 @@
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Acoustics;
-using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Client.AudioEngine.Data;
+using OpenFPS.Audio.Acoustics;
+using OpenFPS.Audio.Data;
 using OpenFPS.Common;
 using OpenFPS.Sound;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
 
-namespace OpenFPS.Client.Core;
+namespace OpenFPS.Audio.Core;
 
 /// <summary>
 /// The birds. Nobody places one: sparrows and doves live in foliage, pigeons and crows on roofs, and a

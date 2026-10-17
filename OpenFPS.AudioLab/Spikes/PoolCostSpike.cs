@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.Numerics;
 using System.Security.Cryptography;
 using OpenFPS.Common;
-using OpenFPS.Client.AudioEngine.Fmod;
+using OpenFPS.Audio.Fmod;
 using OpenFPS.Sound;
 
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;

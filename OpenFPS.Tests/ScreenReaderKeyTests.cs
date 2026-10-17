@@ -2,7 +2,7 @@ using OpenFPS.Client.Core;
 using OpenFPS.Client.Core.Input;
 using OpenFPS.Client.Core.Platform;
 using OpenFPS.Client.Core.Session;
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Audio.Core;
 using OpenFPS.Common;
 
 namespace OpenFPS.Tests;

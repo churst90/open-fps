@@ -1,6 +1,6 @@
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Fmod;
-using OpenFPS.Client.Core;
+using OpenFPS.Audio.Core;
+using OpenFPS.Audio.Fmod;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
@@ -98,10 +98,10 @@ public class EchoWashTests
 
     // ── In the game's choices ──────────────────────────────────────────────────────────────────────
 
-    private static List<OpenFPS.Client.AudioEngine.Data.SpatialEmitter> StepCopies(ClientAudioHarness h, int from)
+    private static List<OpenFPS.Audio.Data.SpatialEmitter> StepCopies(ClientAudioHarness h, int from)
         => h.Mixer.StartedAs(VoiceKind.StepEcho, from).ToList();
 
-    private static List<OpenFPS.Client.AudioEngine.Data.SpatialEmitter> StepBesideA(string material)
+    private static List<OpenFPS.Audio.Data.SpatialEmitter> StepBesideA(string material)
     {
         var h = new ClientAudioHarness(Sounds());
         h.AddWall(1, new Vector3(3.25f, 1.5f, 0f), new Vector3(0.5f, 3f, 10f), material);
@@ -149,7 +149,7 @@ public class EchoWashTests
     }
 
     /// <summary>A recorded loop's copies in a yard walled in this, as ReflectionSlotTests's yard.</summary>
-    private static List<OpenFPS.Client.AudioEngine.Data.SpatialEmitter> LoopCopiesIn(string material)
+    private static List<OpenFPS.Audio.Data.SpatialEmitter> LoopCopiesIn(string material)
     {
         var h = new ClientAudioHarness();
         Solid(h, 2, new Vector3(15.25f, 3f, 0f), new Vector3(0.5f, 6f, 31f), material);

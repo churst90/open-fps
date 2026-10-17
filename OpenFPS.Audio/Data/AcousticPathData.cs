@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace OpenFPS.Client.AudioEngine.Data;
+namespace OpenFPS.Audio.Data;
 
 /// <summary>What the path from a source to the listener does to it, as the acoustic worker answered.</summary>
 public struct AcousticPathData

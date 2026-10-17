@@ -2,14 +2,13 @@ using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
-using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Client.AudioEngine.Data;
-using OpenFPS.Client.AudioEngine.Acoustics;
+using OpenFPS.Audio.Acoustics;
+using OpenFPS.Audio.Data;
 using Serilog;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
 
-namespace OpenFPS.Client.Core;
+namespace OpenFPS.Audio.Core;
 
 /// <summary>
 /// An audio world (docs/SOUND_LIBRARY_BOUNDARY.md 7.2, stage 7): turns the host's sources into sounds, their
@@ -453,7 +452,7 @@ public partial class AudioWorld
     {
         using var _perf = PerfProbe.Measure("audio.update");
         // Every source is placed here: nothing that takes longer than a frame belongs in it (PlacementThread).
-        using var _placing = OpenFPS.Client.AudioEngine.Core.PlacementThread.Enter();
+        using var _placing = OpenFPS.Audio.Core.PlacementThread.Enter();
 
         // This is the only place an emitter's position is resubmitted, so the gap between two runs is how
         // long a car's engine sits still in the air while the car drives on. Measured here for that.
@@ -939,9 +938,9 @@ public partial class AudioWorld
         {
             cover = EarCover.Cabin;
             if (_sources.TryGet(Listener.RidingId, out var ride)
-                && OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.Vehicle(ride.Spec.SoundId) is { } vehicle)
+                && OpenFPS.Audio.Acoustics.CabinWalls.Vehicle(ride.Spec.SoundId) is { } vehicle)
             {
-                if (OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.HasCabin(vehicle))
+                if (OpenFPS.Audio.Acoustics.CabinWalls.HasCabin(vehicle))
                     windows = _cabins.WindowsOpen(ride.Id, ride.Spec.WindowsOpen, _now());
                 else cover = EarCover.Helmet;
             }
@@ -955,7 +954,7 @@ public partial class AudioWorld
 
     /// <summary>Every vehicle's windows as this client has them, and what a cabin's walls take off a
     /// sound crossing them.</summary>
-    private readonly OpenFPS.Client.AudioEngine.Acoustics.CabinWalls _cabins = new();
+    private readonly OpenFPS.Audio.Acoustics.CabinWalls _cabins = new();
 
 
 
@@ -969,11 +968,11 @@ public partial class AudioWorld
     private (float Low, float Mid, float High) CabinEnclosure()
     {
         if (!Listener.Riding || !_sources.TryGet(Listener.RidingId, out var ride)) return (0f, 0f, 0f);
-        if (OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.Vehicle(ride.Spec.SoundId) is not { } vehicle) return (0f, 0f, 0f);
+        if (OpenFPS.Audio.Acoustics.CabinWalls.Vehicle(ride.Spec.SoundId) is not { } vehicle) return (0f, 0f, 0f);
         // A bus's open doors: about 2.4 m^2 in a hundred-odd m^2 of wall, the street at a couple of per
         // cent of its power. The voice decides when the doors are open.
         float doorway = _audio.EngineDoorsOpen(Listener.RidingId) ? DoorwayPowerFraction : 0f;
-        return OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.LossDb(vehicle, _cabins.WindowsOpen(ride.Id, ride.Spec.WindowsOpen, _now()), doorway);
+        return OpenFPS.Audio.Acoustics.CabinWalls.LossDb(vehicle, _cabins.WindowsOpen(ride.Id, ride.Spec.WindowsOpen, _now()), doorway);
     }
 
     /// <summary>
@@ -1110,20 +1109,20 @@ public partial class AudioWorld
             // A line cut into pieces is as loud as the law over its whole length, not its middle alone: stood at
             // one end of a stretch you are beside it.
             float line = LineHeard(src, voiceKey, reference, eyePos, d);
-            float level = OpenFPS.Client.AudioEngine.Core.VoiceManager.HeardLevel(_audio.Hearing,
+            float level = OpenFPS.Audio.Core.VoiceManager.HeardLevel(_audio.Hearing,
                 gain * em.Volume * chorus * line, reference, range, d, UnaskedOcclusion, levelDb, PhysicalKeyOf(src, voiceKey), physical: true);
             _heardInRanking[entityId] = level;
             // Switched off by the server (a crossing's bell between trains) and within earshot: the voice it
             // would start with is made now, off the threads that place sounds, so it starts when switched on.
             if (!em.SynthRunning && d < range && !_liveMachines.Contains(entityId)
-                && OpenFPS.Client.AudioEngine.Fmod.VoiceBuilds.Makes(OpenFPS.Common.ModelKindTable.KindOf(voiceKey)?.Synth))
+                && OpenFPS.Audio.Fmod.VoiceBuilds.Makes(OpenFPS.Common.ModelKindTable.KindOf(voiceKey)?.Synth))
                 _audio.PrepareVoice(PhysicalKeyOf(src, voiceKey), VoiceRegistry.SeedOf(OwnVoiceKind(em, entityId, true), entityId));
 
             // A water feature's taps are one fountain the same way, and come and go together.
-            bool rail = OpenFPS.Client.AudioEngine.Fmod.TrainVoiceState.ParseKey(em.SoundId, out string preset, out string train, out _);
+            bool rail = OpenFPS.Audio.Fmod.TrainVoiceState.ParseKey(em.SoundId, out string preset, out string train, out _);
             string group = rail
                 ? preset + "/" + train
-                : OpenFPS.Client.AudioEngine.Fmod.WaterFeatureVoice.ParseKey(em.SoundId, out string waterPreset, out string feature, out _)
+                : OpenFPS.Audio.Fmod.WaterFeatureVoice.ParseKey(em.SoundId, out string waterPreset, out string feature, out _)
                 ? "water:" + waterPreset + "/" + feature : "#" + entityId;
             if (!_machineGroups.TryGetValue(group, out var g))
             {
@@ -1365,7 +1364,7 @@ public partial class AudioWorld
         // ramped to silence), which the mixer's load never sees. On the city a pool a core or two short
         // gave 50-190 starves a second and the nearest car came out chopped. Starving gives up machines,
         // then cars; reflections and front taps cost the producers nothing.
-        int starves = OpenFPS.Client.AudioEngine.Fmod.EngineVoiceState.GlobalStarves + OpenFPS.Client.AudioEngine.Fmod.PhysicalVoiceState.GlobalStarves;
+        int starves = OpenFPS.Audio.Fmod.EngineVoiceState.GlobalStarves + OpenFPS.Audio.Fmod.PhysicalVoiceState.GlobalStarves;
         if (_starveSampledAt > 0 && now > _starveSampledAt)
             _starveRate += ((starves - _starvesSeen) / (float)(now - _starveSampledAt) - _starveRate) * 0.3f;
         _starvesSeen = starves; _starveSampledAt = now;
@@ -1446,7 +1445,7 @@ public partial class AudioWorld
             var profile = OpenFPS.Common.MachineRegistry.VehicleFor(preset);
             float levelDb = DeclaredLevel(preset, profile);
             var (gain, reference) = _audio.Hearing.Place(levelDb, OutletSeparation(preset));
-            float heard = OpenFPS.Client.AudioEngine.Core.VoiceManager.HeardLevel(_audio.Hearing,
+            float heard = OpenFPS.Audio.Core.VoiceManager.HeardLevel(_audio.Hearing,
                 gain * em.Volume, reference, MathF.Max(1f, MathF.Max(em.Range, _audio.Hearing.AudibleRange(levelDb))),
                 Vector3.Distance(src.Emission, eyePos), UnaskedOcclusion, levelDb, VoiceKey(em), physical: true);
             // Louder sorts first, so negated. The keep bias and the hold stop the set churning as cars trade
@@ -2154,7 +2153,7 @@ public partial class AudioWorld
         foreach (int id in live)
         {
             if (!latest.TryGetValue(id, out var e) || !source(e.PhysicalKey ?? "")) continue;
-            float g = OpenFPS.Sound.Loudness.RenderedGain(OpenFPS.Client.AudioEngine.Core.VoiceManager.WithoutHeadroom(e.Volume, e.HeadroomGain),
+            float g = OpenFPS.Sound.Loudness.RenderedGain(OpenFPS.Audio.Core.VoiceManager.WithoutHeadroom(e.Volume, e.HeadroomGain),
                                                           e.MinDistance, e.Range, Vector3.Distance(e.Position, ear));
             double p = ShareOfVoice(latest, pieces, e, wide) * (double)g * g;
             voices++;
@@ -2305,7 +2304,7 @@ public partial class AudioWorld
         if (!_signalTrains.TryGetValue(soundId, out string? train))
         {
             train = null;
-            if (OpenFPS.Client.AudioEngine.Fmod.TrainVoiceState.ParseKey(soundId, out string preset, out string name, out int index))
+            if (OpenFPS.Audio.Fmod.TrainVoiceState.ParseKey(soundId, out string preset, out string name, out int index))
             {
                 try
                 {
@@ -2871,7 +2870,7 @@ public partial class AudioWorld
                 var (gain, reference) = _audio.Hearing.Place(levelDb, extent);
                 // A voice rendered with more headroom than the shared one (a fire's crackles) gets the
                 // difference back, so it is placed by its level and not its peaks.
-                headroomGain = OpenFPS.Client.AudioEngine.Fmod.PhysicalVoiceState.HeadroomGain(PhysicalHeadroom(resolvedSoundId));
+                headroomGain = OpenFPS.Audio.Fmod.PhysicalVoiceState.HeadroomGain(PhysicalHeadroom(resolvedSoundId));
                 engineVolume = gain * spec.Volume * headroomGain;
                 // A tree's share of itself, or a wood's gain (its synth renders its trees: WoodChorus).
                 engineVolume *= ChorusShare(src.Id, out chorusTrees);
@@ -3197,7 +3196,7 @@ public partial class AudioWorld
             facing.Y = 0f;
             facing = facing.LengthSquared() > 1e-6f ? Vector3.Normalize(facing) : Vector3.UnitZ;
             // Seated in a vehicle: a seated mouth, heard outside through the glass or open windows.
-            bool seated = OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.TryFind(world, talker.State.Position,
+            bool seated = OpenFPS.Audio.Acoustics.CabinWalls.TryFind(world, talker.State.Position,
                                                                                 out var cabin, out var cabinVehicle);
             float mouthHeight = seated ? SeatedMouthHeight : OpenFPS.Common.Speech.MouthHeight;
             Vector3 mouth = talker.State.Position + new Vector3(0f, mouthHeight, 0f) + facing * 0.1f;
@@ -3221,7 +3220,7 @@ public partial class AudioWorld
                 Seed = VoiceRegistry.SeedOf(VoiceKind.Talker, id),
                 SoundId = "voice chat",
                 IsSynth = true,
-                PhysicalKey = OpenFPS.Client.AudioEngine.Fmod.Talkers.Key(id),
+                PhysicalKey = OpenFPS.Audio.Fmod.Talkers.Key(id),
                 EngineKey = "",
                 Mode = PlaybackMode.LoopOne,
                 Type = EmitterType.EntityAttached,
@@ -3252,11 +3251,11 @@ public partial class AudioWorld
                 if (cabin.Id == Listener.RidingId) e.InsideListenersVehicle = true;
                 else
                 {
-                    var (low, mid, high) = OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.LossDb(
+                    var (low, mid, high) = OpenFPS.Audio.Acoustics.CabinWalls.LossDb(
                         cabinVehicle, _cabins.WindowsOpen(cabin, now));
-                    e.EqLow *= OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.Gain(low);
-                    e.EqMid *= OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.Gain(mid);
-                    e.EqHigh *= OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.Gain(high);
+                    e.EqLow *= OpenFPS.Audio.Acoustics.CabinWalls.Gain(low);
+                    e.EqMid *= OpenFPS.Audio.Acoustics.CabinWalls.Gain(mid);
+                    e.EqHigh *= OpenFPS.Audio.Acoustics.CabinWalls.Gain(high);
                 }
             }
             _voices.Declare(voiceId, id, VoiceKind.Talker, mouth - talker.State.Position, levelDb);
@@ -3339,7 +3338,7 @@ public partial class AudioWorld
         float flight = Vector3.Distance(mouth, ear) / _audio.Atmosphere.SpeedOfSound;
         room.Answering = PlaceVoiceCopies(world, mouth, ear, room.Arrivals, gain, reference, flight,
                                           room.Block, room.On,
-                                          OpenFPS.Client.AudioEngine.Fmod.Talkers.CopyKey(id), "voice chat", region, range,
+                                          OpenFPS.Audio.Fmod.Talkers.CopyKey(id), "voice chat", region, range,
                                           VoiceKind.TalkerCopy, id);
     }
 
@@ -3602,7 +3601,7 @@ public partial class AudioWorld
             Seed = VoiceRegistry.SeedOf(VoiceKind.OwnVoice, VoiceRegistry.NoEntity),
             SoundId = "own voice",
             IsSynth = true,
-            PhysicalKey = OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.OwnVoiceRoomKey,
+            PhysicalKey = OpenFPS.Audio.Fmod.FmodAudioProvider.OwnVoiceRoomKey,
             EngineKey = "",
             Mode = PlaybackMode.LoopOne,
             Type = EmitterType.WorldLocked,
@@ -3631,7 +3630,7 @@ public partial class AudioWorld
         // Its whole path, less what the microphone has already cost.
         int slot = PlaceVoiceCopies(world, mouth, ear, _voiceArrivals, gain, reference, MicrophoneLatency,
                                     VoiceRegistry.NoEntity, _voiceCopyOn,
-                                    OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.OwnVoiceCopyKey, "own voice",
+                                    OpenFPS.Audio.Fmod.FmodAudioProvider.OwnVoiceCopyKey, "own voice",
                                     _listenerRegion, _audio.Hearing.AudibleRange(levelDb), VoiceKind.OwnVoiceCopy, OwnEntityId);
         if (now >= _voiceNextLog)
         {
@@ -3785,7 +3784,7 @@ public partial class AudioWorld
             // wall's roughness, coloured by what it absorbs but not by the mirror's loss (a one-off sound's
             // wash, WorldAudioPlayer.QueueWash). Nothing off a smooth wall.
             float s = Math.Clamp(a.Scattering, 0f, 1f);
-            float wash = a.Order == 1 && OpenFPS.Client.AudioEngine.Fmod.EchoWashState.Applies(s) ? placed * MathF.Sqrt(s) : 0f;
+            float wash = a.Order == 1 && OpenFPS.Audio.Fmod.EchoWashState.Applies(s) ? placed * MathF.Sqrt(s) : 0f;
             if (wash >= OpenFPS.Acoustics.ImageSource.MinGain)
                 SubmitStepCopy(a, soundId, stepGain, stepReference, stepLevelDb,
                                wash * _audio.Mix.CopiesTrim, lowDb, highDb, s);

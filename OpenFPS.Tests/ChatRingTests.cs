@@ -75,7 +75,7 @@ public class ChatRingTests
             var w = UiSounds.Render(cue);
             float peak = w.Max(MathF.Abs);
             Assert.InRange(peak, 0.2f, 0.95f);
-            Assert.True(w.Length < OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate * 1.3, $"{cue} is too long");
+            Assert.True(w.Length < OpenFPS.Audio.Fmod.MixerQuality.DefaultRate * 1.3, $"{cue} is too long");
             shapes.Add(w.Length);
         }
         Assert.True(shapes.Count >= 6, "the cues are not distinguishable by shape");

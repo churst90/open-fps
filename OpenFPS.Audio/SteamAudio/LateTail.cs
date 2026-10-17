@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.Audio.SteamAudio;
 
 /// <summary>
 /// The late part of a traced impulse response, ready to convolve: the trace's own omnidirectional

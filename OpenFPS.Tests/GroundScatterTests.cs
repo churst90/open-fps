@@ -68,8 +68,8 @@ public class GroundScatterTests
     {
         var ground = Ground(0.8f);
         var farOut = new Vector3(450f, 1.5f, 450f);
-        Assert.Equal(1.5f * 1.5f, OpenFPS.Client.AudioEngine.Acoustics.EngineReflections.DistanceSquaredToFace(ground, farOut), 3);
+        Assert.Equal(1.5f * 1.5f, OpenFPS.Audio.Acoustics.EngineReflections.DistanceSquaredToFace(ground, farOut), 3);
         var beyond = new Vector3(510f, 1.5f, 0f);            // 10 m past the edge, 1.5 m up
-        Assert.Equal(10f * 10f + 1.5f * 1.5f, OpenFPS.Client.AudioEngine.Acoustics.EngineReflections.DistanceSquaredToFace(ground, beyond), 2);
+        Assert.Equal(10f * 10f + 1.5f * 1.5f, OpenFPS.Audio.Acoustics.EngineReflections.DistanceSquaredToFace(ground, beyond), 2);
     }
 }

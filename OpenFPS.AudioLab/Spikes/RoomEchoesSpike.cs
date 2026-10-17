@@ -3,6 +3,7 @@ using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Sound.Core;
 using OpenFPS.Acoustics;
+using OpenFPS.Audio.SteamAudio;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 

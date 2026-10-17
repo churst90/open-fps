@@ -3,6 +3,7 @@ using OpenFPS.Sound.Core.Nature;
 using OpenFPS.Client.Core;
 using Xunit.Abstractions;
 using OpenFPS.Acoustics;
+using OpenFPS.Audio.Core;
 
 namespace OpenFPS.Tests;
 

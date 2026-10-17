@@ -3,7 +3,7 @@ using OpenFPS.Common;
 using OpenFPS.Acoustics;
 using OpenFPS.Sound;
 
-namespace OpenFPS.Client.AudioEngine.Acoustics;
+namespace OpenFPS.Audio.Acoustics;
 
 /// <summary>
 /// A vehicle's cabin as a wall: what it takes off a sound crossing it, either way, by the same three

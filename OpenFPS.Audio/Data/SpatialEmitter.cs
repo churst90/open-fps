@@ -1,7 +1,7 @@
 using System.Numerics;
 using OpenFPS.Sound;
 
-namespace OpenFPS.Client.AudioEngine.Data;
+namespace OpenFPS.Audio.Data;
 
 public enum EmitterType { EntityAttached, WorldLocked, Atmospheric, UI }
 public enum SynthWaveType { Sine, Square, Triangle, Saw, Noise }

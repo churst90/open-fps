@@ -1,7 +1,6 @@
-using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Client.AudioEngine.Data;
+using OpenFPS.Audio.Data;
 
-namespace OpenFPS.Client.Core;
+namespace OpenFPS.Audio.Core;
 
 /// <summary>How a voice is taken down when its owner lets it go (<see cref="VoiceRegistry.Retire"/>).</summary>
 public enum VoiceFade : byte

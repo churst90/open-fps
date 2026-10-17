@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 using FMOD;
-using OpenFPS.Client.Core.AudioEngine.SteamAudio;
+using OpenFPS.Audio.SteamAudio;
 
 namespace OpenFPS.Tests;
 

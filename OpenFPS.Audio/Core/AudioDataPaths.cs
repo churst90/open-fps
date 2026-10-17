@@ -1,4 +1,4 @@
-namespace OpenFPS.Client.AudioEngine.Core;
+namespace OpenFPS.Audio.Core;
 
 /// <summary>
 /// Where one audio world reads and keeps its data, as the host says (docs/SOUND_LIBRARY_BOUNDARY.md, 7.4): the

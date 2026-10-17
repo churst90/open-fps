@@ -1,8 +1,8 @@
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Data;
+using OpenFPS.Audio.Data;
 using OpenFPS.Sound.Core;
 
-namespace OpenFPS.Client.AudioEngine.Fmod;
+namespace OpenFPS.Audio.Fmod;
 
 public interface IAudioProvider : IDisposable
 {
@@ -78,7 +78,7 @@ public interface IAudioProvider : IDisposable
     void SignalTrain(string train, float[] warning, float bellSeconds, double secondsAgo) { }
     /// <summary>What one of a train's voices carries (TrainVoicing, TrainSlotPlan): "preset/train", the
     /// voice, its sources and their weights. Kept until replaced; the voice reads it as it renders.</summary>
-    void PlanTrainSlot(string preset, string train, int slot, OpenFPS.Client.AudioEngine.Fmod.TrainSlotPlan plan) { }
+    void PlanTrainSlot(string preset, string train, int slot, OpenFPS.Audio.Fmod.TrainSlotPlan plan) { }
     /// <summary>The pieces a line of running water is cut into at the listener (ExtendedSources.Cut), by its own
     /// voice's id: its synth writes each event into the place that plays the piece it happens in. Kept until
     /// replaced or the voice stops.</summary>

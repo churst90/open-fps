@@ -1,7 +1,8 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Acoustics;
+using OpenFPS.Audio.Acoustics;
+using OpenFPS.Audio.SteamAudio;
 using OpenFPS.Common;
 using OpenFPS.Acoustics;
 
@@ -148,7 +149,7 @@ public static class PopHuntSpike
             {
                 if (!worker.TryGetResult(c.Id, out var paths) || paths.Count == 0) continue;
                 var p = paths[0];
-                var (_, mid, high) = OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.PathEqDb(p.EqLow, p.EqMid, p.EqHigh, p.AirLowDb, p.AirMidDb, p.AirHighDb);
+                var (_, mid, high) = OpenFPS.Audio.Fmod.FmodAudioProvider.PathEqDb(p.EqLow, p.EqMid, p.EqHigh, p.AirLowDb, p.AirMidDb, p.AirHighDb);
                 mid = MathF.Max(-80f, mid); high = MathF.Max(-80f, high);
                 if (worker.Provenance.TryGetValue(c.Id, out var prov)) c.Prov = prov;
                 c.AnsweredAt = p.SourcePosition;

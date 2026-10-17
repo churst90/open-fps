@@ -1,8 +1,8 @@
 using System.Globalization;
 using System.Numerics;
 using System.Text;
-using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Client.AudioEngine.Fmod;
+using OpenFPS.Audio.Core;
+using OpenFPS.Audio.Fmod;
 using OpenFPS.Client.Core;
 using OpenFPS.Client.Services;
 using OpenFPS.Common;
@@ -732,7 +732,7 @@ public static class GameLevelsSpike
     /// </summary>
     public static int Spectra(string[] names)
     {
-        const int rate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, block = 512;   // the rate the game runs it at
+        const int rate = OpenFPS.Audio.Fmod.MixerQuality.DefaultRate, block = 512;   // the rate the game runs it at
         if (names.Length == 0) names = new[] { "i4_economy", "i4_midsize", "police_interceptor", "v8_mild", "diesel_i4" };
         Console.WriteLine($"{"preset",-20} {"declared",8} {"idle Z",7} {"idle A",7} {"Z-A",5} {"load Z",7} {"load A",7} {"Z-A",5}");
         foreach (var n in names)

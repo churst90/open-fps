@@ -1,5 +1,5 @@
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Audio.Core;
 using Serilog;
 
 namespace OpenFPS.Client.Core;

@@ -1,8 +1,8 @@
-using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Client.Core.AudioEngine.SteamAudio;
+using OpenFPS.Audio.Core;
+using OpenFPS.Audio.SteamAudio;
 using OpenFPS.Native.SteamAudio;
 
-namespace OpenFPS.Client.AudioEngine.Fmod;
+namespace OpenFPS.Audio.Fmod;
 
 /// <summary>
 /// Reverb buses' traced stages, made ahead and away from the threads that place sounds (PlacementThread).

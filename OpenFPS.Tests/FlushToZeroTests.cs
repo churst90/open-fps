@@ -1,5 +1,5 @@
 using System.Runtime.InteropServices;
-using OpenFPS.Client.AudioEngine.Fmod;
+using OpenFPS.Audio.Fmod;
 using OpenFPS.Native.Platform;
 using Xunit.Abstractions;
 

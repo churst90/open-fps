@@ -290,7 +290,7 @@ public class RailAndSignalTests
     public void ARungBellArrivesWhole(string id)
     {
         var spec = ModelLibrary.Bell(id);
-        var voice = new OpenFPS.Client.AudioEngine.Fmod.BellVoiceState(spec, Sr, 5);
+        var voice = new OpenFPS.Audio.Fmod.BellVoiceState(spec, Sr, 5);
         var bell = new StruckBell(spec, Sr, 5) { Ringing = true };
         var block = new float[512];
         double eVoice = 0, eBell = 0, eUnits = 0;
@@ -311,7 +311,7 @@ public class RailAndSignalTests
         double level = 10 * Math.Log10(eVoice / eBell), peak = 20 * Math.Log10(peakVoice / peakBell);
         // Given back, the voice's RMS against where the shared headroom would put this bell's.
         double placed = 10 * Math.Log10(eUnits / n)
-                      + 20 * Math.Log10(OpenFPS.Client.AudioEngine.Fmod.PhysicalVoiceState.HeadroomGain(spec.PeakHeadroomDb));
+                      + 20 * Math.Log10(OpenFPS.Audio.Fmod.PhysicalVoiceState.HeadroomGain(spec.PeakHeadroomDb));
         double shared = 10 * Math.Log10(eBell / n) - (spec.ReferenceDb + VehicleProfile.PeakHeadroomDb) - 20 * Math.Log10(20e-6);
         _o.WriteLine($"{id}: headroom {spec.PeakHeadroomDb:F0} dB; the voice against the bell: level {level:F2} dB, "
                    + $"peak {peak:F1} dB; given back, {placed - shared:F2} dB from where the shared headroom puts it");

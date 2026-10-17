@@ -1,7 +1,7 @@
-using OpenFPS.Client.AudioEngine.Fmod;
-using OpenFPS.Client.Core.AudioEngine.SteamAudio;
-using ActiveSound = OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.ActiveSound;
-using Answer = OpenFPS.Client.AudioEngine.Fmod.BinauralStages.Answer;
+using OpenFPS.Audio.Fmod;
+using OpenFPS.Audio.SteamAudio;
+using ActiveSound = OpenFPS.Audio.Fmod.FmodAudioProvider.ActiveSound;
+using Answer = OpenFPS.Audio.Fmod.BinauralStages.Answer;
 
 namespace OpenFPS.Tests;
 

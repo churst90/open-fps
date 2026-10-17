@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using LiteNetLib;
 using MemoryPack;
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Audio.Core;
 using OpenFPS.Client.Core;
 using OpenFPS.Client.Core.Platform;
 using OpenFPS.Client.Core.Session;

@@ -1,11 +1,11 @@
 using System.Numerics;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Rail;
-using OpenFPS.Client.AudioEngine.Data;
-using OpenFPS.Client.AudioEngine.Fmod;
+using OpenFPS.Audio.Data;
+using OpenFPS.Audio.Fmod;
 using OpenFPS.Acoustics;
 
-namespace OpenFPS.Client.Core;
+namespace OpenFPS.Audio.Core;
 
 /// <summary>
 /// Trains: a handful of voices however long the train (TrainVoicing, RailVoice.cs). The server places

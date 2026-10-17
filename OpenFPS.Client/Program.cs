@@ -1,5 +1,5 @@
 using Serilog;
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Audio.Core;
 using OpenFPS.Client.Core;
 
 namespace OpenFPS.Client;
@@ -34,7 +34,7 @@ public static class Program
 
         // FMOD's logging build (fmodL.dll) names API misuse by handle and thread. Armed before
         // System::create or not at all; a no-op unless OPENFPS_FMOD_DEBUG is set.
-        string? fmodArmed = OpenFPS.Client.Core.AudioEngine.Fmod.FmodDebugLog.ArmFromEnvironment();
+        string? fmodArmed = OpenFPS.Audio.Fmod.FmodDebugLog.ArmFromEnvironment();
         if (fmodArmed != null) Log.Information("{Line}", fmodArmed);
 
         ProcessLifeLog.Install(StartedUtc);

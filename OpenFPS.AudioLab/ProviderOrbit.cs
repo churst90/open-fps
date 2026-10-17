@@ -2,8 +2,8 @@ using System.Numerics;
 using Thread = System.Threading.Thread;
 using OpenFPS.Sound.Core;
 using OpenFPS.Acoustics;
-using OpenFPS.Client.AudioEngine.Data;
-using OpenFPS.Client.AudioEngine.Fmod;
+using OpenFPS.Audio.Data;
+using OpenFPS.Audio.Fmod;
 
 /// <summary>
 /// The real FmodAudioProvider driven headless under load, and raw-FMOD probes of channel and send

@@ -1,11 +1,11 @@
 using System.Numerics;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
-using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Client.AudioEngine.Data;
+using OpenFPS.Audio.Core;
+using OpenFPS.Audio.Data;
 using OpenFPS.Acoustics;
 
-namespace OpenFPS.Client.AudioEngine.Acoustics;
+namespace OpenFPS.Audio.Acoustics;
 
 /// <summary>
 /// The acoustic paths a voice takes without the Steam Audio simulator: through the walls, by the
@@ -110,7 +110,7 @@ public class SpatialAcoustics
         if (ReferenceEquals(_reflectionSolidsFor, world.Rooms) && _reflectionSolidsVersion == world.GeometryVersion
             && _reflectionSolids.Count > 0)
             return _reflectionSolids;
-        var boxes = OpenFPS.Client.Core.AudioEngine.SteamAudio.SteamAudioScene.BoxesFromWorld(world);
+        var boxes = OpenFPS.Audio.SteamAudio.SteamAudioScene.BoxesFromWorld(world);
         var solids = new List<EarlyReflections.Solid>(boxes.Count);
         foreach (var b in boxes) solids.Add(new EarlyReflections.Solid(b.Center, b.Size, b.Rotation, b.Material));
         _reflectionSolids = solids;
@@ -216,7 +216,7 @@ public class SpatialAcoustics
     private OpeningRoutes BuildLocalRoutes(IAcousticWorld world)
     {
         PlacementThread.Heavy("A map's routes through its openings");
-        return OpeningGraph.Build(world, OpenFPS.Client.Core.AudioEngine.SteamAudio.SteamAudioScene.BoxesFromWorld(world),
+        return OpeningGraph.Build(world, OpenFPS.Audio.SteamAudio.SteamAudioScene.BoxesFromWorld(world),
                                   p => GetRegionAt(world, p), world.TerrainSolids());
     }
 

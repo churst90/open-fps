@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 using FMOD;
 using Serilog;
 
-namespace OpenFPS.Client.AudioEngine.Fmod;
+namespace OpenFPS.Audio.Fmod;
 
 /// <summary>
 /// Sound files decoded to interleaved float PCM in memory, for DSPs that read samples themselves

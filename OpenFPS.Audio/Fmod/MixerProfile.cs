@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 
-namespace OpenFPS.Client.AudioEngine.Fmod;
+namespace OpenFPS.Audio.Fmod;
 
 /// <summary>
 /// Where the mixer's time goes: each of our DSP callbacks adds what it took, by kind, and the mixer

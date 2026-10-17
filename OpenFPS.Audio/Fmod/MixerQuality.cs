@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 using FMOD;
 using Serilog;
 
-namespace OpenFPS.Client.AudioEngine.Fmod;
+namespace OpenFPS.Audio.Fmod;
 
 /// <summary>
 /// Settings of the mixer itself that decide how clean every voice is.

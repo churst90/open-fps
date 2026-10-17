@@ -2,7 +2,7 @@ using Gtk;
 using Serilog;
 using OpenFPS.Common;
 using OpenFPS.Common.Networking;
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Audio.Core;
 using OpenFPS.Client.Core;          // ClientNetworkService
 using OpenFPS.Client.Core.Platform; // ISpeechOutput / SpeechDispatcherOutput / NativeAudioLibraries
 using OpenFPS.Client.Core.Session;  // ClientGameSession
@@ -99,7 +99,7 @@ internal static partial class GtkClientProgram
         // FMOD's logging build (libfmodL.so, `run-gtk-client.sh fmodlog`) reports API misuse by name.
         // It must be armed before System::create, so here and not in the audio provider; with the
         // ordinary libfmod.so this does nothing.
-        string? fmodArmed = OpenFPS.Client.Core.AudioEngine.Fmod.FmodDebugLog.ArmFromEnvironment();
+        string? fmodArmed = OpenFPS.Audio.Fmod.FmodDebugLog.ArmFromEnvironment();
         if (fmodArmed != null) Serilog.Log.Information("{Line} Use `run-gtk-client.sh fmodlog`.", fmodArmed);
 
         ProcessLifeLog.Install(_startedUtc);

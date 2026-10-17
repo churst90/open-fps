@@ -4,7 +4,7 @@ using OpenFPS.Acoustics;
 using OpenFPS.Sound;
 using OpenFPS.Native.SteamAudio;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.Audio.SteamAudio;
 
 /// <summary>
 /// The place you are standing in, measured: an impulse response traced through the map's geometry and
@@ -211,7 +211,7 @@ internal sealed class TracedReverb : IDisposable
                         OpenFPS.Sound.Core.LabLevers? lab = null)
     {
         Lab = lab ?? new OpenFPS.Sound.Core.LabLevers();
-        if (sampleRate <= 0) sampleRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate;
+        if (sampleRate <= 0) sampleRate = OpenFPS.Audio.Fmod.MixerQuality.DefaultRate;
         _refreshMs = refreshMs;
         Context = context; SampleRate = sampleRate; FrameSize = frameSize;
         var s = new Phonon.IPLSimulationSettings
@@ -552,7 +552,7 @@ internal sealed class TracedReverbSet
     public OpenFPS.Sound.Core.Atmosphere Atmosphere { get; set; } = new();
     /// <summary>The rate of the mixer the traces are played in, Hz, which the mixer gives the set once it is made
     /// (FmodAudioProvider.MixerRate): every trace is made at it.</summary>
-    public int MixerRate { get; set; } = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate;
+    public int MixerRate { get; set; } = OpenFPS.Audio.Fmod.MixerQuality.DefaultRate;
     /// <summary>The lab's levers on that world, which every trace made here is made with (the mixer's).</summary>
     public OpenFPS.Sound.Core.LabLevers Lab { get; set; } = new();
     private readonly Dictionary<int, (TracedReverb Trace, Vector3 At)> _rooms = new();
@@ -579,7 +579,7 @@ internal sealed class TracedReverbSet
 
     private void Making(string what)
     {
-        OpenFPS.Client.AudioEngine.Core.PlacementThread.Heavy(what);
+        OpenFPS.Audio.Core.PlacementThread.Heavy(what);
         if (Monitor.IsEntered(_gate))
         {
             if (Interlocked.Increment(ref _madeUnderLock) == 1)

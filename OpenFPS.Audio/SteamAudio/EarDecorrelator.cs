@@ -1,4 +1,4 @@
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.Audio.SteamAudio;
 
 /// <summary>
 /// One direction's share of a diffuse field: the tail through a velvet-noise filter of its own (taps

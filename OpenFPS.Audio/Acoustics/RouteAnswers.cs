@@ -1,7 +1,7 @@
 using System.Numerics;
 using OpenFPS.Acoustics;
 
-namespace OpenFPS.Client.AudioEngine.Acoustics;
+namespace OpenFPS.Audio.Acoustics;
 
 /// <summary>
 /// Each voice's last answer from the routes through openings (AsyncAcousticWorker.AskRoutes), kept while

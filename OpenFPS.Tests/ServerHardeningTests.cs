@@ -141,7 +141,7 @@ public class ServerHardeningTests : IDisposable
     public void TheClientOpensNoSoundFileOutsideItsSoundsFolder(string id)
     {
         string root = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ASSETS"));
-        string path = OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.SoundFilePath(id);
+        string path = OpenFPS.Audio.Fmod.FmodAudioProvider.SoundFilePath(id);
         Assert.True(path.Length == 0 || Path.GetFullPath(path).StartsWith(root, StringComparison.Ordinal), path);
     }
 

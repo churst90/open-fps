@@ -1,4 +1,4 @@
-using OpenFPS.Client.Core.AudioEngine.SteamAudio;
+using OpenFPS.Audio.SteamAudio;
 using OpenFPS.Native.SteamAudio;
 
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
@@ -15,7 +15,7 @@ namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 /// </summary>
 public static class TailIaccSpike
 {
-    private const int Fs = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, Sub = 256;
+    private const int Fs = OpenFPS.Audio.Fmod.MixerQuality.DefaultRate, Sub = 256;
 
     public static int Run()
     {

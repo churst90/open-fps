@@ -3,7 +3,7 @@ using OpenFPS.Common;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Nature;
 
-namespace OpenFPS.Client.AudioEngine.Fmod;
+namespace OpenFPS.Audio.Fmod;
 
 /// <summary>
 /// The voices for things nobody made: falling water, a fire, the wind in a tree. Ranked and budgeted

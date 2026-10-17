@@ -1,6 +1,6 @@
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Client.AudioEngine.Fmod;
+using OpenFPS.Audio.Core;
+using OpenFPS.Audio.Fmod;
 using OpenFPS.Client.Core;
 using OpenFPS.Client.Core.AudioEngine.Fmod;
 using OpenFPS.Client.Services;

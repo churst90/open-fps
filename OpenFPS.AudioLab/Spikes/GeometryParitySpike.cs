@@ -9,6 +9,7 @@ using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Acoustics;
+using OpenFPS.Audio.SteamAudio;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
@@ -560,8 +561,8 @@ public static class GeometryParitySpike
             tallies.Add(t);
             var boxes = SteamAudioScene.BoxesFromWorld(newSnap);
             var acoustic = AcousticGeometry.FromBoxes(boxes, data.TileMetres);
-            var oldEchoes = new OpenFPS.Client.AudioEngine.Acoustics.EngineReflections();
-            var newEchoes = new OpenFPS.Client.AudioEngine.Acoustics.EngineReflections();
+            var oldEchoes = new OpenFPS.Audio.Acoustics.EngineReflections();
+            var newEchoes = new OpenFPS.Audio.Acoustics.EngineReflections();
             oldEchoes.SyncGeometry(newSnap); newEchoes.SyncGeometry(newSnap, acoustic);
             var r0 = new Reflection[16]; var r1 = new Reflection[16];
             double worstOld = 0, worstNew = 0;
@@ -1181,8 +1182,8 @@ public static class GeometryParitySpike
                 snap.Entities[def.EntityId] = new EntitySnapshot { Id = def.EntityId, Definition = def, Transform = def.Transform };
                 if (def.Region.RoomSize.X > 0) snap.RegionEntityIds.Add(def.EntityId);
             }
-            var acoustics = new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics();
-            return OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(snap, SteamAudioScene.BoxesFromWorld(snap), p => acoustics.GetRegionAt(snap, p), snap.TerrainSolids());
+            var acoustics = new OpenFPS.Audio.Acoustics.SpatialAcoustics();
+            return OpenFPS.Audio.Acoustics.OpeningGraph.Build(snap, SteamAudioScene.BoxesFromWorld(snap), p => acoustics.GetRegionAt(snap, p), snap.TerrainSolids());
         }
         clock.Restart();
         var routesBefore = Routes(before);
@@ -1657,9 +1658,9 @@ public static class GeometryParitySpike
         // The rooms as their floods, as a client has them once the geometry is built.
         world.AcousticMap = ClientWorldState.BuildAcousticMap(defs, mapSize, data.MinBound, data.VoxelResolution, data.OcclusionFloor,
                                                               streamed: false, report: false, geometry: serverWorld);
-        var acoustics = new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics();
+        var acoustics = new OpenFPS.Audio.Acoustics.SpatialAcoustics();
         var boxes = SteamAudioScene.BoxesFromWorld(world);
-        var graph = OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, boxes, p => acoustics.GetRegionAt(world, p), world.TerrainSolids());
+        var graph = OpenFPS.Audio.Acoustics.OpeningGraph.Build(world, boxes, p => acoustics.GetRegionAt(world, p), world.TerrainSolids());
         string path = Arg(args, "route", "routes.dump");
         using var w = new StreamWriter(path);
         foreach (var o in graph.Openings)
@@ -1688,18 +1689,18 @@ public static class GeometryParitySpike
         world.TileMetres = data.TileMetres;
         world.AcousticMap = ClientWorldState.BuildAcousticMap(defs, mapSize, data.MinBound, data.VoxelResolution, data.OcclusionFloor,
                                                               streamed: data.TileMetres > 0, report: false);
-        var acoustics = new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics();
+        var acoustics = new OpenFPS.Audio.Acoustics.SpatialAcoustics();
         Func<Vector3, int> regionAt = p => acoustics.GetRegionAt(world, p);
         var boxes = SteamAudioScene.BoxesFromWorld(world);
         var terrains = world.TerrainSolids();
 
         // Warm both paths once (the first build of anything pays for the JIT).
-        OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, boxes, regionAt, terrains);
-        var leaves = OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.LeavesOf(world);
-        OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, new AcousticGeometry(data.TileMetres).Update(boxes, leaves, terrains), null, new OpeningRoutes.TileCache());
+        OpenFPS.Audio.Acoustics.OpeningGraph.Build(world, boxes, regionAt, terrains);
+        var leaves = OpenFPS.Audio.Acoustics.OpeningGraph.LeavesOf(world);
+        OpenFPS.Audio.Acoustics.OpeningGraph.Build(world, new AcousticGeometry(data.TileMetres).Update(boxes, leaves, terrains), null, new OpeningRoutes.TileCache());
 
         var clock = Stopwatch.StartNew();
-        var old = OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, boxes, regionAt, terrains);
+        var old = OpenFPS.Audio.Acoustics.OpeningGraph.Build(world, boxes, regionAt, terrains);
         double oldMs = clock.Elapsed.TotalMilliseconds;
         var t = old.BuildTimes;
         Console.WriteLine($"  routes, whole from the box list: {old.Openings.Count} openings over {boxes.Count} boxes in {oldMs:F0} ms: index {t.IndexMs:F0}, "
@@ -1711,7 +1712,7 @@ public static class GeometryParitySpike
         var scene = store.Update(boxes, leaves, terrains);
         double storeMs = clock.Elapsed.TotalMilliseconds;
         clock.Restart();
-        var tiled = OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, scene, regionAt, cache);
+        var tiled = OpenFPS.Audio.Acoustics.OpeningGraph.Build(world, scene, regionAt, cache);
         double newMs = clock.Elapsed.TotalMilliseconds;
         t = tiled.BuildTimes;
         Console.WriteLine($"  routes, tile by tile from the store: {tiled.Openings.Count} openings in {newMs:F0} ms (the store itself {storeMs:F0} ms, "
@@ -1731,11 +1732,11 @@ public static class GeometryParitySpike
                     Console.WriteLine($"  leg {V(x)} -> {V(y)}: old {V(old.LegGains(x, y, door.Contents, Array.Empty<int>()))}, "
                                     + $"tiled {V(tiled.LegGains(x, y, tiled.Openings.First(o => o.Id == door.Id).Contents, Array.Empty<int>()))}");
                     OpeningRoutes.ReverseGridOrderForParity = true;
-                    var oldRev = OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, boxes, regionAt, terrains);
+                    var oldRev = OpenFPS.Audio.Acoustics.OpeningGraph.Build(world, boxes, regionAt, terrains);
                     Console.WriteLine($"    old, its boxes met in reverse: {V(oldRev.LegGains(x, y, oldRev.Openings.First(o => o.Id == door.Id).Contents, Array.Empty<int>()))}");
                     OpeningRoutes.ReverseGridOrderForParity = false;
                     var unit = boxes.Select(b => b with { Rotation = b.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : Quaternion.Normalize(b.Rotation) }).ToList();
-                    var oldUnit = OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, unit, regionAt, terrains);
+                    var oldUnit = OpenFPS.Audio.Acoustics.OpeningGraph.Build(world, unit, regionAt, terrains);
                     Console.WriteLine($"    old, its turns made unit length: {V(oldUnit.LegGains(x, y, oldUnit.Openings.First(o => o.Id == door.Id).Contents, Array.Empty<int>()))}");
                     foreach (var (b, g) in old.LegBoxes(x, y)) Console.WriteLine($"    old through {V(b.Center)} {V(b.Size)} {b.Material} leaf {b.IsLeaf} {V(g)}");
                     foreach (var (b, g) in tiled.LegBoxes(x, y)) Console.WriteLine($"    tiled through {V(b.Center)} {V(b.Size)} {b.Material} leaf {b.IsLeaf} {V(g)}");
@@ -1758,11 +1759,11 @@ public static class GeometryParitySpike
         // The map's six-digit turns are not quite unit length: the box path's corners scale by the length
         // squared, the triangles normalise first. Made unit, the box grid should answer as the tiles do.
         var unitBoxes = boxes.Select(b => b with { Rotation = b.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : Quaternion.Normalize(b.Rotation) }).ToList();
-        var gridUnit = OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, unitBoxes, regionAt, terrains);
+        var gridUnit = OpenFPS.Audio.Acoustics.OpeningGraph.Build(world, unitBoxes, regionAt, terrains);
         CompareRoutes("Box grid, turns made unit, against the tiles", gridUnit, tiled, regionAt, new Random(5), n, show, tallies);
         // For scale: the box grid against itself with its boxes met the other way round.
         OpeningRoutes.ReverseGridOrderForParity = true;
-        var reversed = OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, boxes, regionAt, terrains);
+        var reversed = OpenFPS.Audio.Acoustics.OpeningGraph.Build(world, boxes, regionAt, terrains);
         OpeningRoutes.ReverseGridOrderForParity = false;
         CompareRoutes("Control: the box grid against itself, boxes met in reverse", old, reversed, regionAt, new Random(5), n, show, tallies);
 
@@ -1773,24 +1774,24 @@ public static class GeometryParitySpike
         if (moved < 0) moved = 0;
         changed[moved] = changed[moved] with { Center = changed[moved].Center + new Vector3(0.3f, 0, 0) };
         clock.Restart();
-        var oldAfter = OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, changed, null, terrains);
+        var oldAfter = OpenFPS.Audio.Acoustics.OpeningGraph.Build(world, changed, null, terrains);
         double oldOne = clock.Elapsed.TotalMilliseconds;
         clock.Restart();
         var sceneAfter = store.Update(changed, leaves, terrains);
         double storeOne = clock.Elapsed.TotalMilliseconds;
         clock.Restart();
-        var tiledAfter = OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, sceneAfter, null, cache);
+        var tiledAfter = OpenFPS.Audio.Acoustics.OpeningGraph.Build(world, sceneAfter, null, cache);
         double newOne = clock.Elapsed.TotalMilliseconds;
         Console.WriteLine($"  one tile changed: whole build {oldOne:F0} ms (sides not checked, as the worker does after a change); tile build {newOne:F0} ms "
                         + $"({cache.Derived} opening(s) derived again, {cache.Kept} kept) after the store's own {storeOne:F0} ms");
         clock.Restart();
-        OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, sceneAfter, null, cache);
+        OpenFPS.Audio.Acoustics.OpeningGraph.Build(world, sceneAfter, null, cache);
         Console.WriteLine($"  nothing changed: tile build {clock.Elapsed.TotalMilliseconds:F0} ms ({cache.Derived} derived, {cache.Kept} kept)");
         CompareRoutes("Routes through openings (after one tile changed)", oldAfter, tiledAfter, regionAt, new Random(6), n, show, tallies);
         // Kept and rebuilt tile by tile, it must answer as a build from nothing. Both unasked: a graph
         // keeps its legs coarsely by place, so one asked other questions first may answer from a neighbour's.
-        var fresh = OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, new AcousticGeometry(data.TileMetres).Update(changed, leaves, terrains), null, new OpeningRoutes.TileCache());
-        var kept = OpenFPS.Client.AudioEngine.Acoustics.OpeningGraph.Build(world, sceneAfter, null, cache);
+        var fresh = OpenFPS.Audio.Acoustics.OpeningGraph.Build(world, new AcousticGeometry(data.TileMetres).Update(changed, leaves, terrains), null, new OpeningRoutes.TileCache());
+        var kept = OpenFPS.Audio.Acoustics.OpeningGraph.Build(world, sceneAfter, null, cache);
         CompareRoutes("Tile build after a change against a tile build from nothing", fresh, kept, regionAt, new Random(7), n, show, tallies, exact: true);
     }
 

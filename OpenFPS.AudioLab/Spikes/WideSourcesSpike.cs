@@ -1,9 +1,9 @@
 using System.Globalization;
 using System.Numerics;
 using System.Text;
-using OpenFPS.Client.AudioEngine.Acoustics;
-using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Client.AudioEngine.Fmod;
+using OpenFPS.Audio.Acoustics;
+using OpenFPS.Audio.Core;
+using OpenFPS.Audio.Fmod;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Nature;
 using OpenFPS.Client.Core;
@@ -32,7 +32,7 @@ public static class WideSourcesSpike
 
     /// <summary>This instrument's audio world's options (the wide sources, the cabins' paths), from the environment
     /// as the game's mixer starts with, shared with the mixers it makes and set by its own arguments.</summary>
-    private static readonly OpenFPS.Client.AudioEngine.Core.AudioWorldOptions LabOptions = OpenFPS.Client.AudioEngine.Core.AudioWorldOptions.FromEnvironment();
+    private static readonly OpenFPS.Audio.Core.AudioWorldOptions LabOptions = OpenFPS.Audio.Core.AudioWorldOptions.FromEnvironment();
 
     private sealed record Segment(string Name, double Start, double Seconds, double CpuPercent, float MixerLoad, int Voices, double PlacedDb);
 
@@ -307,7 +307,7 @@ public static class WideSourcesSpike
             w.PrecipitationIntensity = 0.5f;
             w.RainRateMmPerHour = Rainfall.ModerateRate;
             w.Precipitation = new Precipitation(PrecipitationKind.Rain, Rainfall.ModerateRate);
-            var field = new OpenFPS.Client.Core.RainField(facade, new SpatialAcoustics()) { OnlySlot = roofOnly ? OpenFPS.Client.Core.RainSurvey.OverheadSlot : -1 };
+            var field = new OpenFPS.Audio.RainField(facade, new SpatialAcoustics()) { OnlySlot = roofOnly ? OpenFPS.Audio.RainSurvey.OverheadSlot : -1 };
             void RainPump(double sec)
             {
                 var until = clock.Elapsed.TotalSeconds + sec;

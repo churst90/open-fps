@@ -1,4 +1,4 @@
-namespace OpenFPS.Client.AudioEngine.Core;
+namespace OpenFPS.Audio.Core;
 
 /// <summary>
 /// The threads that place every sound: the audio update (ClientAudioSystem.Update) and the audio thread

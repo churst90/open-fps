@@ -1,6 +1,6 @@
 using System.Numerics;
 using OpenFPS.Common;
-using OpenFPS.Client.Core.AudioEngine.SteamAudio;
+using OpenFPS.Audio.SteamAudio;
 using OpenFPS.Native.SteamAudio;
 
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
@@ -34,7 +34,7 @@ namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 public static class TailSteadySpike
 {
     private static readonly Quaternion Q = Quaternion.Identity;
-    private const int Fs = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, Block = TracedReverb.TracedFrame;
+    private const int Fs = OpenFPS.Audio.Fmod.MixerQuality.DefaultRate, Block = TracedReverb.TracedFrame;
     private static readonly double[] Octaves = { 125, 250, 500, 1000, 2000, 4000 };
 
     private static bool Velvet;

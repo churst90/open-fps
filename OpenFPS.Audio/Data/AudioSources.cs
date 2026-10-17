@@ -6,7 +6,7 @@ using OpenFPS.Common.Networking;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
 
-namespace OpenFPS.Client.AudioEngine.Data;
+namespace OpenFPS.Audio.Data;
 
 /// <summary>
 /// What a source is, as its host declares it (docs/SOUND_LIBRARY_BOUNDARY.md 7.2, decision 10): open-fps's

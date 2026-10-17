@@ -1,7 +1,7 @@
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Fmod;
-using OpenFPS.Client.Core.AudioEngine.SteamAudio;
-using Box = OpenFPS.Client.Core.AudioEngine.SteamAudio.SteamAudioScene.Box;
+using OpenFPS.Audio.Fmod;
+using OpenFPS.Audio.SteamAudio;
+using Box = OpenFPS.Audio.SteamAudio.SteamAudioScene.Box;
 
 namespace OpenFPS.Tests;
 

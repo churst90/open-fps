@@ -8,7 +8,7 @@ using OpenFPS.Sound.Core.Aircraft;
 using OpenFPS.Sound.Core.Signals;
 using OpenFPS.Sound.Core.Yard;
 
-namespace OpenFPS.Client.AudioEngine.Fmod;
+namespace OpenFPS.Audio.Fmod;
 
 /// <summary>Anything the render pool can keep ahead of the mixer.</summary>
 public interface IRenderedVoice
@@ -137,7 +137,7 @@ public abstract class PhysicalVoiceState : IRenderedVoice, IGuardedUnit
     protected PhysicalVoiceState(float sourceLevelDb, float sampleRate, float headroomDb)
     {
         SampleRate = sampleRate;
-        Ground = new OpenFPS.Client.AudioEngine.Acoustics.GroundReflection(sampleRate);
+        Ground = new OpenFPS.Audio.Acoustics.GroundReflection(sampleRate);
         PascalsAtFullScale = 20e-6f * MathF.Pow(10f, (sourceLevelDb + headroomDb) / 20f);
     }
 
@@ -207,7 +207,7 @@ public abstract class PhysicalVoiceState : IRenderedVoice, IGuardedUnit
 
     /// <summary>The ground between this machine and the listener (see GroundReflection), made with the
     /// voice at its rate.</summary>
-    public readonly OpenFPS.Client.AudioEngine.Acoustics.GroundReflection Ground;
+    public readonly OpenFPS.Audio.Acoustics.GroundReflection Ground;
 
     /// <summary>The mixer's block, out of what the producer has rendered. Mixer thread: nothing here
     /// may block or synthesize.</summary>
@@ -487,7 +487,7 @@ public sealed class SirenVoiceState : PhysicalVoiceState
         : base(spec.SourceLevelDb, sampleRate)
     {
         // The head measures its own chain across a whole wail: 70-100 ms.
-        OpenFPS.Client.AudioEngine.Core.PlacementThread.Heavy("A siren's model");
+        OpenFPS.Audio.Core.PlacementThread.Heavy("A siren's model");
         Siren = new ElectronicSiren(spec, sampleRate);
     }
 
@@ -524,7 +524,7 @@ public sealed class HornVoiceState : PhysicalVoiceState
         : base(Honk.LevelDb(horn, ModelLibrary.Presets), sampleRate)
     {
         // Each horn is blown once in silence to set its level: 10-25 ms.
-        OpenFPS.Client.AudioEngine.Core.PlacementThread.Heavy("A horn's model");
+        OpenFPS.Audio.Core.PlacementThread.Heavy("A horn's model");
         Pattern = pattern;
         int colon = horn.IndexOf(':');
         string kind = colon > 0 ? horn[..colon] : "";
@@ -572,7 +572,7 @@ public sealed class BellVoiceState : PhysicalVoiceState
         : base(spec.ReferenceDb, sampleRate, spec.PeakHeadroomDb)
     {
         // Rung for three seconds in silence to set its level: 13-30 ms.
-        OpenFPS.Client.AudioEngine.Core.PlacementThread.Heavy("A bell's model");
+        OpenFPS.Audio.Core.PlacementThread.Heavy("A bell's model");
         Bell = new StruckBell(spec, sampleRate, seed);
     }
 

@@ -2,7 +2,8 @@ using System.Numerics;
 using MemoryPack;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Nature;
-using OpenFPS.Client.AudioEngine.Fmod;
+using OpenFPS.Audio;
+using OpenFPS.Audio.Fmod;
 using OpenFPS.Client.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
@@ -409,8 +410,8 @@ public class RainTests
         var ear = new Vector3(2.4f, f + 1.6f, 0f);
         var r = new RainSurvey().Run(world, ear, -1, -1);
         _o.WriteLine(r.Describe());
-        var acoustics = new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics();
-        OpenFPS.Client.AudioEngine.Data.AcousticPathData PathFrom(Vector3 at) => acoustics.CalculateAcousticPath(world, -1, ear, at);
+        var acoustics = new OpenFPS.Audio.Acoustics.SpatialAcoustics();
+        OpenFPS.Audio.Data.AcousticPathData PathFrom(Vector3 at) => acoustics.CalculateAcousticPath(world, -1, ear, at);
         int mixed = 0;
         for (int s = 1; s < RainFeeds.Slots; s++)
         {
@@ -422,7 +423,7 @@ public class RainTests
             if (!(sources.Any(p => p.At.Y < 1f) && sources.Any(p => p.At.Y > f))) continue;
             mixed++;
             var middle = PathFrom(r.Centres[s] + new Vector3(0f, 0.3f, 0f));
-            var heard = OpenFPS.Client.Core.RainField.PatchPath(PathFrom, r, s);
+            var heard = OpenFPS.Audio.RainField.PatchPath(PathFrom, r, s);
             static float Db(float g) => 20f * MathF.Log10(MathF.Max(1e-6f, g));
             _o.WriteLine($"{RainSurvey.SlotName(s)}: middle at {r.Centres[s]} {Db(middle.EqMid):F1} dB; from its {sources.Count} surfaces {Db(heard.EqMid):F1} dB");
             Assert.True(r.Centres[s].Y > 1f && r.Centres[s].Y < f + 6f, "the middle of a patch on the street and the roof is between them");

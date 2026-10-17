@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 
-namespace OpenFPS.Client.AudioEngine.Fmod;
+namespace OpenFPS.Audio.Fmod;
 
 /// <summary>
 /// Every take in a bank (a folder of three or more) brought to its bank's median level; a lone file

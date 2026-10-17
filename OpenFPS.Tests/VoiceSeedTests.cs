@@ -1,5 +1,5 @@
 using System.Globalization;
-using OpenFPS.Client.Core;
+using OpenFPS.Audio.Core;
 using OpenFPS.Sound;
 using Xunit.Abstractions;
 

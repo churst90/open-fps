@@ -2,7 +2,7 @@ using System.Numerics;
 using OpenFPS.Acoustics;
 using OpenFPS.Common.Components;
 using OpenFPS.Sound.Core;
-using OpenFPS.Client.Core.AudioEngine.SteamAudio;
+using OpenFPS.Audio.SteamAudio;
 
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 

@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Audio.Core;
 using OpenFPS.Client.Core;
 using OpenFPS.Client.Core.Platform;
 using OpenFPS.Client.Core.Session;
@@ -81,7 +81,7 @@ public class ProbableBugsTests
     {
         const System.Reflection.BindingFlags Any = System.Reflection.BindingFlags.Instance
             | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic;
-        var t = typeof(OpenFPS.Client.AudioEngine.Fmod.EngineVoiceState);
+        var t = typeof(OpenFPS.Audio.Fmod.EngineVoiceState);
         var synthesize = t.GetMethod("Synthesize", Any)!;
         var queue = t.GetMethod("QueueStrikes", Any)!;
         Assert.True(synthesize.MethodImplementationFlags.HasFlag(System.Reflection.MethodImplAttributes.AggressiveOptimization));

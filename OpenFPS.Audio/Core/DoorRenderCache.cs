@@ -3,7 +3,7 @@ using System.Text;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
 
-namespace OpenFPS.Client.AudioEngine.Core;
+namespace OpenFPS.Audio.Core;
 
 /// <summary>
 /// The door models' renders kept on disk. A door, a lock or a car window takes seconds of a core to

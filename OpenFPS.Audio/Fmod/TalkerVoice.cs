@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 
-namespace OpenFPS.Client.AudioEngine.Fmod;
+namespace OpenFPS.Audio.Fmod;
 
 /// <summary>
 /// A talker's codec, as the host has it (open-fps: Opus at 48 kHz in 20 ms frames, VoiceCodec): one frame of

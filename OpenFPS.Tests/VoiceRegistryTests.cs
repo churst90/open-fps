@@ -1,7 +1,7 @@
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Audio.Core;
+using OpenFPS.Audio.Data;
 using OpenFPS.Sound;
-using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.Core;
 using OpenFPS.Common;
 using Xunit.Abstractions;
@@ -170,7 +170,7 @@ public class VoiceRegistryTests
         var ear = new Vector3(0f, 1.7f, 0f);
         var car = new Vector3(9f, 0.8f, 8f);
         // Round a corner: the path arrives from the doorway, straight ahead.
-        var blocked = new OpenFPS.Client.AudioEngine.Data.AcousticPathData(0.95f, new Vector3(0f, 1.2f, 3f), 12f)
+        var blocked = new OpenFPS.Audio.Data.AcousticPathData(0.95f, new Vector3(0f, 1.2f, 3f), 12f)
         {
             SourcePosition = car,
         };
@@ -178,7 +178,7 @@ public class VoiceRegistryTests
         Assert.Equal(Vector3.Distance(ear, car), Vector3.Distance(ear, heard), 3);
         Assert.Equal(0f, Vector3.Normalize(heard - ear).X, 3);
         // In the open, or with no answer yet: from the car.
-        var open = new OpenFPS.Client.AudioEngine.Data.AcousticPathData(0f, car, 12f) { SourcePosition = car };
+        var open = new OpenFPS.Audio.Data.AcousticPathData(0f, car, 12f) { SourcePosition = car };
         Assert.Equal(car, AudioWorld.SirenApparent(open, car, ear));
         Assert.Equal(car, AudioWorld.SirenApparent(default, car, ear));
     }

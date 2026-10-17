@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 using FMOD;
 using OpenFPS.Sound.Hearing;
 
-namespace OpenFPS.Client.AudioEngine.Fmod;
+namespace OpenFPS.Audio.Fmod;
 
 /// <summary>
 /// One world voice's ear stage (docs/EAR_MODEL.md): two shelves set from the ISO 226:2023 contour

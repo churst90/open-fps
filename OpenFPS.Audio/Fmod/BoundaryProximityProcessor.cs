@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 using FMOD;
 using OpenFPS.Sound.Core;
 
-namespace OpenFPS.Client.AudioEngine.Fmod;
+namespace OpenFPS.Audio.Fmod;
 
 /// <summary>
 /// The near-field boundary effect's delay line and reflections. The game thread writes the targets and

@@ -6,6 +6,7 @@ using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using Xunit.Abstractions;
+using OpenFPS.Audio.Core;
 
 namespace OpenFPS.Tests;
 
@@ -96,8 +97,8 @@ public class DrivingSoundsTests
         {
             double now = t0 + f / 60.0;
             var pos = new Vector3(1.5f, 0f, -12f + v * (float)(f / 60.0));
-            var car = new OpenFPS.Client.AudioEngine.Data.AudioSource(77);
-            car.Set(default, new OpenFPS.Client.AudioEngine.Data.SourceState
+            var car = new OpenFPS.Audio.Data.AudioSource(77);
+            car.Set(default, new OpenFPS.Audio.Data.SourceState
             {
                 Position = pos, Rotation = Quaternion.Identity, Velocity = new Vector3(0f, 0f, v),
             });

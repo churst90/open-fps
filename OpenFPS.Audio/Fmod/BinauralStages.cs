@@ -1,6 +1,6 @@
-using ActiveSound = OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.ActiveSound;
+using ActiveSound = OpenFPS.Audio.Fmod.FmodAudioProvider.ActiveSound;
 
-namespace OpenFPS.Client.AudioEngine.Fmod;
+namespace OpenFPS.Audio.Fmod;
 
 /// <summary>
 /// Who gets one of the binaural stages (Steam Audio's HRTF on a voice), by the one rank: how loud a voice is at the ear
@@ -120,7 +120,7 @@ internal static class BinauralStages
     public static float Loudest(List<ActiveSound> sounds)
     {
         float loudest = 0f;
-        foreach (var a in sounds) if (!a.IsReflection && !a.Leaving && a.Type != OpenFPS.Client.AudioEngine.Data.EmitterType.UI) loudest = MathF.Max(loudest, a.Heard);
+        foreach (var a in sounds) if (!a.IsReflection && !a.Leaving && a.Type != OpenFPS.Audio.Data.EmitterType.UI) loudest = MathF.Max(loudest, a.Heard);
         return loudest;
     }
 }

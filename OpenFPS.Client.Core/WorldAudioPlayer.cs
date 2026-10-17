@@ -1,4 +1,5 @@
 using OpenFPS.Common.Networking;
+using OpenFPS.Audio.Core;
 
 namespace OpenFPS.Client.Core;
 

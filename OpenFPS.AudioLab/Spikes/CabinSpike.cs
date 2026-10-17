@@ -1,13 +1,13 @@
 using System.Globalization;
 using System.Numerics;
 using System.Text;
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Audio.Core;
+using OpenFPS.Audio.Fmod;
+using OpenFPS.Audio.SteamAudio;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
 using OpenFPS.Sound.Core.Engine;
-using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Client.Core;
-using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 using OpenFPS.Client.Services;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
@@ -38,7 +38,7 @@ public static class CabinSpike
 
     /// <summary>This instrument's audio world's options (the wide sources, the cabins' paths), from the environment
     /// as the game's mixer starts with, shared with the mixers it makes and set by its own arguments.</summary>
-    private static readonly OpenFPS.Client.AudioEngine.Core.AudioWorldOptions LabOptions = OpenFPS.Client.AudioEngine.Core.AudioWorldOptions.FromEnvironment();
+    private static readonly OpenFPS.Audio.Core.AudioWorldOptions LabOptions = OpenFPS.Audio.Core.AudioWorldOptions.FromEnvironment();
 
     /// <summary>This instrument's mix (cabin= sets its cabin level), shared with the mixer it makes.</summary>
     private static readonly MixSettings LabMix = MixSettings.FromEnvironment();

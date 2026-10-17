@@ -1,6 +1,6 @@
 using System.Text.Json;
 using OpenFPS.Common;
-using OpenFPS.Client.AudioEngine.Fmod;
+using OpenFPS.Audio.Fmod;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Sound;
 
@@ -178,7 +178,7 @@ public class MachineVoiceTests
                     break;
                 case "water":
                     // A tap of a feature, "water:<preset>/<feature>/<tap>", names its preset and a tap it has.
-                    if (OpenFPS.Client.AudioEngine.Fmod.WaterFeatureVoice.ParseKey(id, out string waterPreset, out _, out int tap))
+                    if (OpenFPS.Audio.Fmod.WaterFeatureVoice.ParseKey(id, out string waterPreset, out _, out int tap))
                     {
                         Assert.True(WaterFeatureSpec.Presets.ContainsKey(waterPreset),
                             $"{Path.GetFileName(file)} names water '{waterPreset}', which is not a preset");

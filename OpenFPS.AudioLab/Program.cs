@@ -6,7 +6,7 @@ using Serilog;
 // FMOD's own logging is armed before any mode runs: it does nothing once System::create has run, and
 // placed among the handlers it silently missed every mode above it.
 {
-    string? armed = OpenFPS.Client.Core.AudioEngine.Fmod.FmodDebugLog.ArmFromEnvironment();
+    string? armed = OpenFPS.Audio.Fmod.FmodDebugLog.ArmFromEnvironment();
     if (armed != null) Console.Error.WriteLine(armed);
 }
 
@@ -1291,7 +1291,7 @@ if (args.Contains("--mic"))
         if (a.StartsWith("sec=")) float.TryParse(a[4..], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out micSec);
         if (a.StartsWith("device=")) micDevice = a[7..];
     }
-    var micAudio = new OpenFPS.Client.AudioEngine.Core.AudioEngineFacade();
+    var micAudio = new OpenFPS.Audio.Core.AudioEngineFacade();
     micAudio.Initialize();
     Console.WriteLine($"Input devices: {string.Join(" | ", micAudio.InputDevices())}");
     if (!micAudio.StartRecording(micDevice, out int micRate)) { Console.WriteLine("  the microphone did not open"); Environment.Exit(1); }

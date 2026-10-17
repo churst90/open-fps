@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using System.Numerics;
-using OpenFPS.Client.Core.AudioEngine.SteamAudio;
+using OpenFPS.Audio.SteamAudio;
 using OpenFPS.Native.SteamAudio;
 
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
@@ -20,7 +20,7 @@ namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 /// </summary>
 public static class TailCostSpike
 {
-    private const int Fs = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, Sub = TracedReverb.TracedFrame;
+    private const int Fs = OpenFPS.Audio.Fmod.MixerQuality.DefaultRate, Sub = TracedReverb.TracedFrame;
     /// <summary>The mixer's block (FmodAudioProvider's setDSPBufferSize) in the stage's pieces.</summary>
     private const int MixerPieces = 1024 / Sub;
 

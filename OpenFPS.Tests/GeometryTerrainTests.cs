@@ -274,11 +274,11 @@ public class GeometryTerrainTests
     public void OnRaisedGroundWhatLiesOnItIsOpenGround()
     {
         var c = TerrainTiles.Component(Posts, Spacing, Heights((x, z) => 8f), out float baseY);
-        var terrain = SolidSpec.OfTerrain(1, new Vector3(125f, baseY, 125f), c.Field(baseY), Client.Core.AudioEngine.SteamAudio.SceneTerrain.Surface);
-        var road = new Client.Core.AudioEngine.SteamAudio.SteamAudioScene.Box(new Vector3(100f, 8.05f, 100f), new Vector3(6f, 0.1f, 20f), Quaternion.Identity, "Asphalt", default, 10);
-        var roof = new Client.Core.AudioEngine.SteamAudio.SteamAudioScene.Box(new Vector3(160f, 13f, 100f), new Vector3(10f, 0.2f, 10f), Quaternion.Identity, "Concrete", default, 11);
-        var boxes = new List<Client.Core.AudioEngine.SteamAudio.SteamAudioScene.Box> { road, roof };
-        var world = new Client.Core.AudioEngine.SteamAudio.AcousticGeometry(250f).Update(boxes, null, new[] { terrain });
+        var terrain = SolidSpec.OfTerrain(1, new Vector3(125f, baseY, 125f), c.Field(baseY), Audio.SteamAudio.SceneTerrain.Surface);
+        var road = new Audio.SteamAudio.SteamAudioScene.Box(new Vector3(100f, 8.05f, 100f), new Vector3(6f, 0.1f, 20f), Quaternion.Identity, "Asphalt", default, 10);
+        var roof = new Audio.SteamAudio.SteamAudioScene.Box(new Vector3(160f, 13f, 100f), new Vector3(10f, 0.2f, 10f), Quaternion.Identity, "Concrete", default, 11);
+        var boxes = new List<Audio.SteamAudio.SteamAudioScene.Box> { road, roof };
+        var world = new Audio.SteamAudio.AcousticGeometry(250f).Update(boxes, null, new[] { terrain });
         var all = new AcceptAll();
         Surface Down(float x, float z)
         {
@@ -291,8 +291,8 @@ public class GeometryTerrainTests
         Assert.True(bare.Is(SurfaceFlags.OpenGround), "the ground");
         Assert.Equal("Dirt", bare.Material);
 
-        var ground = new Client.Core.AudioEngine.SteamAudio.GroundHeights(new[] { terrain });
-        var kept = Client.Core.AudioEngine.SteamAudio.SteamAudioScene.WithoutOpenGround(boxes, ground);
+        var ground = new Audio.SteamAudio.GroundHeights(new[] { terrain });
+        var kept = Audio.SteamAudio.SteamAudioScene.WithoutOpenGround(boxes, ground);
         Assert.Equal(new[] { 11 }, kept.Select(b => b.EntityId).ToArray());
     }
 
@@ -462,7 +462,7 @@ public class GeometryTerrainTests
             var verts = new List<Native.SteamAudio.Phonon.IPLVector3>();
             var tris = new List<Native.SteamAudio.Phonon.IPLTriangle>();
             var mats = new List<int>();
-            Client.Core.AudioEngine.SteamAudio.SceneTerrain.Append(spec, Vector3.Zero, verts, tris, mats, (_, _) => 0);
+            Audio.SteamAudio.SceneTerrain.Append(spec, Vector3.Zero, verts, tris, mats, (_, _) => 0);
             Assert.Equal(tris.Count, mats.Count);
             Assert.All(tris, t => Assert.True(t.i0 < verts.Count && t.i1 < verts.Count && t.i2 < verts.Count));
             return tris.Count;

@@ -1,6 +1,6 @@
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Stove;
-using OpenFPS.Client.AudioEngine.Fmod;
+using OpenFPS.Audio.Fmod;
 using OpenFPS.Common;
 using Xunit.Abstractions;
 

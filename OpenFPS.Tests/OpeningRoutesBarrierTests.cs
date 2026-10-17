@@ -1,5 +1,5 @@
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Acoustics;
+using OpenFPS.Audio.Acoustics;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
@@ -416,7 +416,7 @@ public class OpeningRoutesBarrierTests
                 heights[j * posts + i] = z >= -1f ? 0f : z <= -7f ? -3f : (z + 1f) * 0.5f;
             }
         return SolidSpec.OfTerrain(1, Vector3.Zero, new Heightfield(posts, spacing, heights, null, null),
-                                   OpenFPS.Client.Core.AudioEngine.SteamAudio.SceneTerrain.Surface);
+                                   OpenFPS.Audio.SteamAudio.SceneTerrain.Surface);
     }
 
     /// <summary>A wall standing on the ground, the ear behind it and a source down the slope in front: the wall's

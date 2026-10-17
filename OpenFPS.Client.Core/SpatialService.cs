@@ -290,6 +290,6 @@ public static class Zones
     /// <summary>The place a point is in by the boxes alone (a doorway is in none), for naming where the
     /// listener stands, not for sound. A named part of a room (a flight of stairs, a landing) answers
     /// here; it is not a room, so the acoustics' <c>GetRegionAt</c> never does.</summary>
-    public static int GetZoneAt(this OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics acoustics, WorldSnapshot world, Vector3 position)
+    public static int GetZoneAt(this OpenFPS.Audio.Acoustics.SpatialAcoustics acoustics, WorldSnapshot world, Vector3 position)
         => NamedPlaces.At(world, position) ?? acoustics.GetRoomAt(world, position);
 }

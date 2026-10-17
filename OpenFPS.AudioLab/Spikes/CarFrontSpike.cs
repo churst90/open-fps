@@ -3,6 +3,7 @@ using OpenFPS.Common;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 using OpenFPS.Sound;
 using OpenFPS.Native.SteamAudio;
+using OpenFPS.Audio.Fmod;
 
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
@@ -40,7 +41,7 @@ public static class CarFrontSpike
     /// the mixers it makes.</summary>
     private static readonly OpenFPS.Sound.Hearing.HearingSettings LabHearing = OpenFPS.Sound.Hearing.HearingSettings.FromEnvironment();
 
-    const int Rate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate, Block = 512;   // the rate the game runs it at
+    const int Rate = OpenFPS.Audio.Fmod.MixerQuality.DefaultRate, Block = 512;   // the rate the game runs it at
     const float WavScale = 0.1f;
     const float C = 343f;
     /// <summary>bay=X: every voice's engine-bay leak forced to X, to bracket a value before declaring it.</summary>

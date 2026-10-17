@@ -3,7 +3,7 @@ using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Nature;
 using OpenFPS.Common;
 
-namespace OpenFPS.Client.Core;
+namespace OpenFPS.Audio;
 
 /// <summary>
 /// The drops close enough to hear one by one, each where and when it lands.

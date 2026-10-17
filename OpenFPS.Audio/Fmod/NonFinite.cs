@@ -1,4 +1,4 @@
-namespace OpenFPS.Client.AudioEngine.Fmod;
+namespace OpenFPS.Audio.Fmod;
 
 /// <summary>A DSP's state the non-finite guard can name and reset (NonFinite.After).</summary>
 public interface IGuardedUnit

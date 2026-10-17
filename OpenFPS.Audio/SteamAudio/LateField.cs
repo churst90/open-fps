@@ -2,7 +2,7 @@ using System.Numerics;
 using OpenFPS.Sound;
 using OpenFPS.Native.SteamAudio;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.Audio.SteamAudio;
 
 /// <summary>
 /// How much late sound each source raises where the listener stands, and from which way it comes:
@@ -71,7 +71,7 @@ internal sealed class LateField : IDisposable
     public LateField(IntPtr context, int sampleRate = 0, OpenFPS.Sound.IAudioClock? clock = null)
     {
         _clock = clock ?? new OpenFPS.Sound.StopwatchAudioClock();
-        if (sampleRate <= 0) sampleRate = OpenFPS.Client.AudioEngine.Fmod.MixerQuality.DefaultRate;
+        if (sampleRate <= 0) sampleRate = OpenFPS.Audio.Fmod.MixerQuality.DefaultRate;
         Context = context; SampleRate = sampleRate;
         var s = new Phonon.IPLSimulationSettings
         {

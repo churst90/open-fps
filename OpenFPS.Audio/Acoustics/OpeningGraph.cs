@@ -1,8 +1,8 @@
 using System.Numerics;
 using OpenFPS.Acoustics;
-using OpenFPS.Client.Core.AudioEngine.SteamAudio;
+using OpenFPS.Audio.SteamAudio;
 
-namespace OpenFPS.Client.AudioEngine.Acoustics;
+namespace OpenFPS.Audio.Acoustics;
 
 /// <summary>
 /// The world as <see cref="OpeningRoutes"/> wants it: the scene's boxes with the door leaves marked, and

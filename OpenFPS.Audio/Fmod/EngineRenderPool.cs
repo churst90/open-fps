@@ -1,6 +1,6 @@
 using Serilog;
 
-namespace OpenFPS.Client.AudioEngine.Fmod;
+namespace OpenFPS.Audio.Fmod;
 
 /// <summary>
 /// Renders every live engine ahead of the mixer, across cores. One engine is a serial integration

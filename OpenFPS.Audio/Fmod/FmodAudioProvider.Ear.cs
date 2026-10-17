@@ -5,10 +5,10 @@ using FMOD;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
 using OpenFPS.Sound.Hearing;
-using OpenFPS.Client.AudioEngine.Data;
+using OpenFPS.Audio.Data;
 using Serilog;
 
-namespace OpenFPS.Client.AudioEngine.Fmod;
+namespace OpenFPS.Audio.Fmod;
 
 /// <summary>
 /// The ear model on every world voice (docs/EAR_MODEL.md): the law's loudness correction as a gain,

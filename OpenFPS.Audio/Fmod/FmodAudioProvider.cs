@@ -4,15 +4,15 @@ using Serilog;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
 using OpenFPS.Sound.Core.Nature;
-using OpenFPS.Client.AudioEngine.Data;
-using OpenFPS.Client.Core.AudioEngine.SteamAudio;
+using OpenFPS.Audio.Data;
+using OpenFPS.Audio.SteamAudio;
 using OpenFPS.Common;
 using OpenFPS.Native.Platform;
 using OpenFPS.Native.SteamAudio;
 
 using OpenFPS.Acoustics;
 
-namespace OpenFPS.Client.AudioEngine.Fmod;
+namespace OpenFPS.Audio.Fmod;
 
 /// <summary>
 /// How distance attenuates a voice: <see cref="OpenFPS.Sound.Loudness"/>'s <c>RenderedGain</c>, applied
@@ -624,8 +624,8 @@ public partial class FmodAudioProvider : IAudioProvider
         {
             HeadroomGain = e.HeadroomGain;
             EarLevelDb = e.EarLevelDb;
-            RankKey = OpenFPS.Client.AudioEngine.Core.VoiceManager.RankKey(e);
-            Physical = OpenFPS.Client.AudioEngine.Core.VoiceManager.IsPhysical(e);
+            RankKey = OpenFPS.Audio.Core.VoiceManager.RankKey(e);
+            Physical = OpenFPS.Audio.Core.VoiceManager.IsPhysical(e);
         }
         /// <summary>How loud it is at the ear by what it radiates here, the one rank (<see cref="HeardHere"/>),
         /// worked out once an update for every ordering the provider makes.</summary>
@@ -1263,7 +1263,7 @@ public partial class FmodAudioProvider : IAudioProvider
         {
             Context = _saContext, Hrtf = _saHrtf, Effect = effect, FrameSize = _saFrameSize,
             MonoScratch = new float[_saFrameSize], StereoScratch = new float[_saFrameSize * 2],
-            Ground = new OpenFPS.Client.AudioEngine.Acoustics.GroundReflection(SaGroundRate())
+            Ground = new OpenFPS.Audio.Acoustics.GroundReflection(SaGroundRate())
         };
         Phonon.iplAudioBufferAllocate(_saContext, 1, _saFrameSize, ref s.InBuf);
         Phonon.iplAudioBufferAllocate(_saContext, 2, _saFrameSize, ref s.OutBuf);
@@ -1699,8 +1699,8 @@ public partial class FmodAudioProvider : IAudioProvider
     /// the cone swing as a siren passes behind a building, and ranking the echoes on them flickered the trace.
     /// </summary>
     internal static float HeardHere(OpenFPS.Sound.Hearing.HearingSettings hearing, ActiveSound a, Vector3 listener)
-        => OpenFPS.Client.AudioEngine.Core.VoiceManager.HeardLevel(hearing,
-               OpenFPS.Client.AudioEngine.Core.VoiceManager.WithoutHeadroom(a.BaseVolume, a.HeadroomGain), a.MinDistance, a.Range,
+        => OpenFPS.Audio.Core.VoiceManager.HeardLevel(hearing,
+               OpenFPS.Audio.Core.VoiceManager.WithoutHeadroom(a.BaseVolume, a.HeadroomGain), a.MinDistance, a.Range,
                Vector3.Distance(listener, a.Position), 0f, a.EarLevelDb, a.RankKey, a.Physical);
 
     private readonly List<ActiveSound> _leavers = new();
@@ -1762,7 +1762,7 @@ public partial class FmodAudioProvider : IAudioProvider
     /// <summary>This mixer's world's options: how it hears extended sources and whether its cabins are split into
     /// paths. Its voices are made with them; the host places by the same one (AudioEngineFacade.Options). The run's
     /// environment chooses it.</summary>
-    public OpenFPS.Client.AudioEngine.Core.AudioWorldOptions Options { get; init; } = OpenFPS.Client.AudioEngine.Core.AudioWorldOptions.FromEnvironment();
+    public OpenFPS.Audio.Core.AudioWorldOptions Options { get; init; } = OpenFPS.Audio.Core.AudioWorldOptions.FromEnvironment();
 
     /// <summary>A chosen source keeps its trace at least this long, so it does not flicker passing
     /// behind something.</summary>
@@ -3020,10 +3020,10 @@ public partial class FmodAudioProvider : IAudioProvider
     /// <summary>How loud a voice placed so would be at the ear by what it radiates here: the one rank, as
     /// <see cref="HeardHere"/> reads a playing voice.</summary>
     private float HeardOf(in SpatialEmitter e)
-        => OpenFPS.Client.AudioEngine.Core.VoiceManager.HeardLevel(Hearing,
-               OpenFPS.Client.AudioEngine.Core.VoiceManager.WithoutHeadroom(e.Volume, e.HeadroomGain), e.MinDistance, e.Range,
+        => OpenFPS.Audio.Core.VoiceManager.HeardLevel(Hearing,
+               OpenFPS.Audio.Core.VoiceManager.WithoutHeadroom(e.Volume, e.HeadroomGain), e.MinDistance, e.Range,
                Vector3.Distance(_listenerPos, e.Position), 0f, e.EarLevelDb,
-               OpenFPS.Client.AudioEngine.Core.VoiceManager.RankKey(e), OpenFPS.Client.AudioEngine.Core.VoiceManager.IsPhysical(e));
+               OpenFPS.Audio.Core.VoiceManager.RankKey(e), OpenFPS.Audio.Core.VoiceManager.IsPhysical(e));
 
     public void PlaySpatialSound(SpatialEmitter emitter)
     {

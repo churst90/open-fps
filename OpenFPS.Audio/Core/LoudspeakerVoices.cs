@@ -1,11 +1,10 @@
-using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
 using OpenFPS.Sound.Core.Signals;
 using OpenFPS.Common;
 using Serilog;
 
-namespace OpenFPS.Client.Core;
+namespace OpenFPS.Audio.Core;
 
 /// <summary>
 /// Programs played through loudspeakers, each rendered once through its speaker's chain

@@ -1,9 +1,9 @@
 using System.Numerics;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
-using OpenFPS.Client.AudioEngine.Data;
-using OpenFPS.Client.AudioEngine.Fmod;
-using OpenFPS.Client.Core.AudioEngine.SteamAudio;
+using OpenFPS.Audio.Data;
+using OpenFPS.Audio.Fmod;
+using OpenFPS.Audio.SteamAudio;
 using OpenFPS.Common;
 using OpenFPS.Acoustics;
 using OpenFPS.Native.SteamAudio;
@@ -134,7 +134,7 @@ public static class ClapRoomSpike
                     int step = (int)MathF.Round(e.Scattering * 4f);
                     string id = $"synth:clap:lab~wash{step}";
                     if (washIds.Add(id))
-                        provider.RegisterSynthesisedSound(id, TransientSynth.ToPcm16(OpenFPS.Client.Core.OneOffSounds.Diffuse(pcm, step / 4f, 1)), TransientSynth.SampleRate);
+                        provider.RegisterSynthesisedSound(id, TransientSynth.ToPcm16(OpenFPS.Audio.Core.OneOffSounds.Diffuse(pcm, step / 4f, 1)), TransientSynth.SampleRate);
                 }
             if (withCopies)
             {
@@ -153,7 +153,7 @@ public static class ClapRoomSpike
                     var a = e.Arrival;
                     float lowDb = 20f * MathF.Log10(MathF.Max(1e-4f, a.GainLow) / MathF.Max(1e-4f, a.GainMid));
                     float highDb = 20f * MathF.Log10(MathF.Max(1e-4f, a.GainHigh) / MathF.Max(1e-4f, a.GainMid));
-                    var loss = OpenFPS.Client.Core.OneOffSounds.SpecularLoss(a.Scattering, a.Order);
+                    var loss = OpenFPS.Audio.Core.OneOffSounds.SpecularLoss(a.Scattering, a.Order);
                     if (e.WashGain >= ImageSource.MinGain)
                         Copy($"synth:clap:lab~wash{(int)MathF.Round(e.Scattering * 4f)}", a.ImagePosition, e.WashGain, lowDb, highDb);
                     if (e.MirrorGain >= ImageSource.MinGain)

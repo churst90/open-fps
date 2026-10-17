@@ -1,5 +1,5 @@
 using FMOD;
-using OpenFPS.Client.AudioEngine.Fmod;
+using OpenFPS.Audio.Fmod;
 using OpenFPS.Common;
 
 /// <summary>--speech-lines: decodes every shipped voice line through the same FMOD path the client

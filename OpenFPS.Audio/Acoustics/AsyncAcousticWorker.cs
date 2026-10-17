@@ -3,13 +3,13 @@ using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
-using OpenFPS.Client.AudioEngine.Data;
-using OpenFPS.Client.Core.AudioEngine.SteamAudio;
+using OpenFPS.Audio.Data;
+using OpenFPS.Audio.SteamAudio;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
 using OpenFPS.Native.SteamAudio;
 
-namespace OpenFPS.Client.AudioEngine.Acoustics;
+namespace OpenFPS.Audio.Acoustics;
 
 public struct AcousticRequest
 {
@@ -900,7 +900,7 @@ public class AsyncAcousticWorker : IDisposable
 
     /// <summary>The current scene's boxes, for the barrier search. Replaced whole on a rebuild and only
     /// read afterwards, so no lock.</summary>
-    private List<OpenFPS.Client.Core.AudioEngine.SteamAudio.SteamAudioScene.Box> _barrierBoxes = new();
+    private List<OpenFPS.Audio.SteamAudio.SteamAudioScene.Box> _barrierBoxes = new();
 
     // ── Routes by the openings, and what they cost ────────────────────────────────────────────
     //
@@ -1021,7 +1021,7 @@ public class AsyncAcousticWorker : IDisposable
             // for the context's scene type. OPENFPS_EMBREE=0 keeps the default tracer and whole rebuilds;
             // OPENFPS_TILE_SCENES=0 keeps Embree with whole scenes.
             _embree = Environment.GetEnvironmentVariable("OPENFPS_EMBREE") != "0"
-                      && OpenFPS.Client.Core.AudioEngine.SteamAudio.SteamAudioScene.UseEmbree(_saContext);
+                      && OpenFPS.Audio.SteamAudio.SteamAudioScene.UseEmbree(_saContext);
             Console.WriteLine(_embree
                 ? "[AcousticWorker] Steam Audio scenes use Embree: a sub-scene per tile and per door leaf."
                 : "[AcousticWorker] Embree did not start here; Steam Audio scenes use the default tracer and are rebuilt whole.");

@@ -1,6 +1,7 @@
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
 using OpenFPS.Sound.Core.Engine;
+using OpenFPS.Audio.Fmod;
 
 namespace OpenFPS.Client.AudioEngine.Fmod;
 

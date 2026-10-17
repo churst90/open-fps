@@ -3,7 +3,7 @@ using OpenFPS.Geometry;
 using OpenFPS.Native.SteamAudio;
 using PV = OpenFPS.Native.SteamAudio.Phonon.IPLVector3;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.Audio.SteamAudio;
 
 /// <summary>
 /// The ground in the acoustic scene (docs/GEOMETRY.md 2.3 and stage 3): each tile of terrain as triangles

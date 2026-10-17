@@ -2,12 +2,12 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
 using System.Text;
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Audio.Core;
+using OpenFPS.Audio.Data;
+using OpenFPS.Audio.Fmod;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
 using OpenFPS.Sound.Core.Nature;
-using OpenFPS.Client.AudioEngine.Data;
-using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Client.Core;
 using OpenFPS.Client.Services;
 using OpenFPS.Common;
@@ -47,7 +47,7 @@ public static class ExtentWalkSpike
 
     /// <summary>This instrument's audio world's options, from the environment as the game's mixer starts with
     /// (rule= sets the wide sources' rule), shared with the mixers and the client it makes.</summary>
-    private static readonly OpenFPS.Client.AudioEngine.Core.AudioWorldOptions LabOptions = OpenFPS.Client.AudioEngine.Core.AudioWorldOptions.FromEnvironment();
+    private static readonly OpenFPS.Audio.Core.AudioWorldOptions LabOptions = OpenFPS.Audio.Core.AudioWorldOptions.FromEnvironment();
 
     /// <summary>A walk: the feet at every step, the way the walker faces, and which sources it is about.</summary>
     private sealed record Walk(string Name, string Map, string About, List<Vector3> Feet, Vector3 Heading, Func<string, bool> Source,

@@ -2,7 +2,7 @@ using OpenFPS.Common;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Hearing;
 using System.Numerics;
-using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Audio.Core;
 
 namespace OpenFPS.Tests;
 
@@ -240,18 +240,18 @@ public class EarModelTests
     {
         With(Loudness.DefaultCompression, () =>
         {
-            float capped = OpenFPS.Client.AudioEngine.Fmod.EngineVoiceState.LiftDb(Law, 61.5f, 99.5f);
+            float capped = OpenFPS.Audio.Fmod.EngineVoiceState.LiftDb(Law, 61.5f, 99.5f);
             Assert.Equal(20f, capped, 2);
             var speechLike = Timbre.FromBandLevels(Timbre.Speech.ShapeDb, "speech-shaped engine");
-            float plain = OpenFPS.Client.AudioEngine.Fmod.EngineVoiceState.LiftDb(Law, 61.5f, speechLike, 99.5f);
+            float plain = OpenFPS.Audio.Fmod.EngineVoiceState.LiftDb(Law, 61.5f, speechLike, 99.5f);
             Assert.InRange(plain, 20.5f, 23f);
-            float bass = OpenFPS.Client.AudioEngine.Fmod.EngineVoiceState.LiftDb(Law, 61.5f, BassHeavy(), 99.5f);
+            float bass = OpenFPS.Audio.Fmod.EngineVoiceState.LiftDb(Law, 61.5f, BassHeavy(), 99.5f);
             Assert.True(bass > plain + 3f, $"an idle's bass: {bass:F1} dB against {plain:F1}");
             // Silence has no place in the law: the caller holds the lift.
-            Assert.True(float.IsNaN(OpenFPS.Client.AudioEngine.Fmod.EngineVoiceState.LiftDb(Law, -30f, BassHeavy(), 99.5f)));
+            Assert.True(float.IsNaN(OpenFPS.Audio.Fmod.EngineVoiceState.LiftDb(Law, -30f, BassHeavy(), 99.5f)));
             // Off is the unweighted lift with its cap, exactly.
             Law.EarModelOn = false;
-            Assert.Equal(capped, OpenFPS.Client.AudioEngine.Fmod.EngineVoiceState.LiftDb(Law, 61.5f, BassHeavy(), 99.5f));
+            Assert.Equal(capped, OpenFPS.Audio.Fmod.EngineVoiceState.LiftDb(Law, 61.5f, BassHeavy(), 99.5f));
             return 0;
         });
     }
@@ -379,10 +379,10 @@ public class EarModelTests
         finally { Law.EarModelOn = was; }
     }
 
-    private static OpenFPS.Client.AudioEngine.Data.SpatialEmitter Voice(string key, float levelDb, Vector3 at)
+    private static OpenFPS.Audio.Data.SpatialEmitter Voice(string key, float levelDb, Vector3 at)
     {
         var (gain, reference) = Law.Place(levelDb);
-        return new OpenFPS.Client.AudioEngine.Data.SpatialEmitter
+        return new OpenFPS.Audio.Data.SpatialEmitter
         {
             EntityId = 1, SoundId = key, PhysicalKey = key, IsSynth = true, Position = at,
             Mode = OpenFPS.Sound.PlaybackMode.LoopOne, Range = 500f, MinDistance = reference,

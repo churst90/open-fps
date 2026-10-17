@@ -1,6 +1,6 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
-using OpenFPS.Client.AudioEngine.Acoustics;
+using OpenFPS.Audio.Acoustics;
 using OpenFPS.Client.Core;
 using OpenFPS.Native.Platform;
 using OpenFPS.Native.SteamAudio;
@@ -52,7 +52,7 @@ public class DegradationTests
     }
 
     /// <summary>Drives the worker for one source and returns the acoustic paths it publishes.</summary>
-    private static List<OpenFPS.Client.AudioEngine.Data.AcousticPathData> ResolvePaths(
+    private static List<OpenFPS.Audio.Data.AcousticPathData> ResolvePaths(
         Vector3 listener, Vector3 source, int entityId)
     {
         var snapshot = LoadedWorld.Value.GetSnapshot();

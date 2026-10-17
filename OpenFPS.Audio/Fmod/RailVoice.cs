@@ -4,7 +4,7 @@ using OpenFPS.Common;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core.Rail;
 
-namespace OpenFPS.Client.AudioEngine.Fmod;
+namespace OpenFPS.Audio.Fmod;
 
 /// <summary>
 /// A train, heard as a handful of voices however long it is (docs/TRAINS.md, "Voicing a train").
@@ -96,7 +96,7 @@ public sealed class TrainVoiceState
     public TrainVoiceState(string key, TrainProfile p, float sampleRate, int seed, IAudioClock? clock = null)
     {
         // Every bogie calibrates itself: 440 ms for a fifty-wagon freight.
-        OpenFPS.Client.AudioEngine.Core.PlacementThread.Heavy("A train's model");
+        OpenFPS.Audio.Core.PlacementThread.Heavy("A train's model");
         Clock = clock ?? new StopwatchAudioClock();
         Key = key;
         Profile = p;

@@ -1,7 +1,7 @@
 using System.Numerics;
 using OpenFPS.Native.SteamAudio;
 
-namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+namespace OpenFPS.Audio.SteamAudio;
 
 /// <summary>
 /// Which world direction each of Steam Audio's first-order ambisonic channels stands for, and with what

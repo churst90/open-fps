@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 
-namespace OpenFPS.Client.AudioEngine.Acoustics;
+namespace OpenFPS.Audio.Acoustics;
 
 /// <summary>
 /// The ground answering a source that stands on it: the same sound a second time, off the ground
