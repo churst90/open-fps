@@ -536,7 +536,7 @@ public sealed partial class WorldEditor
     private void ApplySpawn(string mapId, Vector3 position, Quaternion rotation, OverlaySpawn? overlay)
     {
         if (!_maps.TryGetMapData(mapId, out var d)) return;
-        d.SpawnPoint = new Transform { Position = position, Rotation = rotation };
+        d.SpawnPoint = new OpenFPS.Server.Repositories.MapPose { Position = position, Rotation = rotation };
         Overlays.Get(mapId).Spawn = overlay;
         Overlays.Save(mapId);
     }

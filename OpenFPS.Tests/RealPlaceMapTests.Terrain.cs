@@ -100,7 +100,7 @@ public partial class RealPlaceMapTests
         var world = ServerWorld(p);
         var survey = new Survey(id, p.Data.Utm!);
         var only = new OnlyOwners(TerrainIds(p.Ecs));
-        var slabs = TerrainBuilder.Slabs(p.Ecs);
+        var slabs = TerrainTiles.Slabs(p.Ecs);
         // The slabs filed by 50 m squares, so each point asks only those near it.
         var near = new Dictionary<(int, int), List<TerrainBuilder.Slab>>();
         foreach (var s in slabs)

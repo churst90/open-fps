@@ -22,7 +22,7 @@ public static class MapTemplates
         Size = new Vector3(100, 40, 100),
         MinBound = new Vector3(-50, 0, -50),
         MaxBound = new Vector3(50, 40, 50),
-        SpawnPoint = new Transform { Position = new Vector3(0, 1, 0), Rotation = Quaternion.Identity },
+        SpawnPoint = new MapPose { Position = new Vector3(0, 1, 0), Rotation = Quaternion.Identity },
         VoxelResolution = 0.5f,
         OcclusionFloor = 0.15f,
         OwnerId = owner,

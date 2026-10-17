@@ -8,6 +8,7 @@ using OpenFPS.Server.Repositories;
 using Parquet;
 using Parquet.Schema;
 using Parquet.Serialization;
+using OpenFPS.Server.Core;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;

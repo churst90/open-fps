@@ -56,6 +56,15 @@ public class EntityData
     public OpenFPS.Common.Geometry.ShapeSpec? Form { get; set; }
 }
 
+/// <summary>Where a map puts a player who arrives: a point, and the way they face. The map format's own, so a
+/// map is read without the entity model; the server makes it a body's Transform (MapManager.GetSpawnPoint).</summary>
+public struct MapPose
+{
+    public MapPose() { Position = Vector3.Zero; Rotation = Quaternion.Identity; }
+    public Vector3 Position { get; set; }
+    public Quaternion Rotation { get; set; }
+}
+
 /// <summary>Where a map made from a real place sits on the Earth: its (0, 0) in degrees, WGS84.</summary>
 public class GeoPoint
 {
@@ -101,7 +110,7 @@ public class MapData
     public Vector3? PlayMax { get; set; }
     [JsonIgnore] public Vector3 WalkMin => PlayMin ?? MinBound;
     [JsonIgnore] public Vector3 WalkMax => PlayMax ?? MaxBound;
-    public Transform SpawnPoint { get; set; } = new();
+    public MapPose SpawnPoint { get; set; } = new();
     public float MinimumY { get; set; } = -10.0f;
     public string Description { get; set; } = string.Empty;
     public float VoxelResolution { get; set; } = 0.5f;

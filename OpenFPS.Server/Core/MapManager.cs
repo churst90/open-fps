@@ -542,9 +542,9 @@ public partial class MapManager
             try
             {
                 var clock = System.Diagnostics.Stopwatch.StartNew();
-                var slabs = TerrainBuilder.Slabs(world);
+                var slabs = TerrainTiles.Slabs(world);
                 var tiles = TerrainBuilder.Lay(m.Elevation, slabs, m.MinBound, m.MaxBound);
-                foreach (var e in TerrainBuilder.Spawn(world, tiles))
+                foreach (var e in TerrainTiles.Spawn(world, tiles))
                 {
                     lookup[e.Id] = e;
                     if (layers != null) layers[e.Id] = "ground";
@@ -825,9 +825,11 @@ public partial class MapManager
         }
     }
 
+    /// <summary>Where a body arrives on a map: its spawn, as a body's Transform.</summary>
     public Transform GetSpawnPoint(string mapId)
     {
-        if (_maps.TryGetValue(mapId, out var data)) return data.data.SpawnPoint;
+        if (_maps.TryGetValue(mapId, out var data))
+            return new Transform { Position = data.data.SpawnPoint.Position, Rotation = data.data.SpawnPoint.Rotation };
         return new Transform { Position = new Vector3(0, 5, 0) };
     }
 

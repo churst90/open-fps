@@ -24,6 +24,24 @@ public static class MapDrainage
     /// layer), as the inside of houses is; a ditch is not heard from the far ring.</summary>
     public const string Layer = "runoff";
 
+    /// <summary>The fixed boxes of a world that could cover its ground, in the order the world holds them, as
+    /// the rain's raster takes them (SurfaceRaster): plain boxes, not formed solids; nothing that moves, no
+    /// player, no region or opening, nothing but a static thing.</summary>
+    public static List<SurfaceRaster.Box> Boxes(World world)
+    {
+        var boxes = new List<SurfaceRaster.Box>();
+        var q = new QueryDescription().WithAll<Transform, ColliderComponent>();
+        world.Query(in q, (Entity e, ref Transform t, ref ColliderComponent c) =>
+        {
+            if (c.Shape != ColliderShape.Box || c.Form != null) return;
+            if (world.Has<Velocity>(e) || world.Has<PlayerComponent>(e) || world.Has<RegionComponent>(e) || world.Has<PortalComponent>(e)) return;
+            if (world.Has<EntityType>(e) && world.Get<EntityType>(e) != EntityType.StaticObject) return;
+            string? material = world.Has<MaterialComponent>(e) ? world.Get<MaterialComponent>(e).Material : null;
+            boxes.Add(new SurfaceRaster.Box(t.Position, t.Rotation, c.Size, c.IsSolid, material));
+        });
+        return boxes;
+    }
+
     /// <summary>The network of a map's laid tiles (TerrainBuilder.Lay), its surfaces read off the map's
     /// things. Null for no tiles.</summary>
     public static DrainageNetwork? Build(World world, IReadOnlyList<TerrainBuilder.Tile> tiles, out TileDrainage[,] perTile,
@@ -45,7 +63,7 @@ public static class MapDrainage
         }
         float x0 = tiles.First(t => t.X == tx0).CornerX, z0 = tiles.First(t => t.Z == tz0).CornerZ;
         int cx = px - 1, cz = pz - 1;
-        var raster = SurfaceRaster.Of(world, x0, z0, cx, cz, spacing);
+        var raster = SurfaceRaster.Of(Boxes(world), x0, z0, cx, cz, spacing);
         var drainage = Drainage.OfGrid(grid, px, pz, cells, spacing, (tx, tz) =>
         {
             var s = new byte[cells * cells];

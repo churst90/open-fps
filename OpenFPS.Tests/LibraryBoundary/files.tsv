@@ -346,6 +346,7 @@ OpenFPS.Sound/DesignedSoundKit.cs	lib	Sound
 OpenFPS.Sound/DoorKnock.cs	lib	Sound	
 OpenFPS.Sound/DoorPhysics.cs	lib	Sound	
 OpenFPS.Sound/Doors.cs	lib	Sound	
+OpenFPS.Sound/Drainage.cs	lib	Sound	
 OpenFPS.Sound/EarWind.cs	lib	Sound	
 OpenFPS.Sound/ElevatorDoor.cs	lib	Sound	
 OpenFPS.Sound/Engines.cs	lib	Sound	

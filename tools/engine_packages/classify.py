@@ -144,6 +144,7 @@ FILE_RULES = [
     ('OpenFPS.Sound/WorldWeather.cs', 'Environment', 'one world\'s weather state'),
     ('OpenFPS.Sound/AirLayers.cs', 'Environment', 'the air\'s layers near the ground'),
     # ── Sound: what things are ──
+    ('OpenFPS.Sound/Drainage.cs', 'Environment', 'one tile\'s drainage from its ground: below World, which keeps it with a tile'),
     ('OpenFPS.Sound/MachinePower.cs', 'Agents', 'how hard a driver works a machine: a notch, a power lever'),
     ('OpenFPS.Sound/AircraftGroundRun.cs', 'Agents', 'an aeroplane driven along its runway'),
     ('OpenFPS.Sound/*', 'Sound', ''),
@@ -176,7 +177,7 @@ FILE_RULES = [
     ('OpenFPS.Client.Core/*', 'game', ''),
 
     # ── Server ──
-    ('OpenFPS.Server/Water/Drainage.cs', 'Environment', 'one tile\'s drainage from its ground'),
+    ('OpenFPS.Server/Water/SurfaceRaster.cs', 'World', 'what covers the ground, as the rain sees it, from boxes'),
     ('OpenFPS.Server/Water/DrainageNetwork.cs', 'Environment', 'a map\'s drainage from its tiles\''),
     ('OpenFPS.Server/Systems/GroundWaterSystem.cs', 'Environment', 'the water on the ground, by map'),
     ('OpenFPS.Server/Systems/VehicleSystem.Following.cs', 'Agents', 'the gap to the car in front (IDM): extract from the partial class'),
@@ -222,6 +223,7 @@ FILE_RULES = [
     ('OpenFPS.Server/Repositories/MapElevation.cs', 'World', ''),
     ('OpenFPS.Server/Repositories/MapRepository.cs', 'World', 'the map file format'),
     ('OpenFPS.Server/Repositories/PrefabTemplate.cs', 'World', 'the prefab format'),
+    ('OpenFPS.Server/Repositories/PrefabLibrary.cs', 'World', 'the prefab files, loaded and checked'),
     ('OpenFPS.Server/Repositories/PrefabValidator.cs', 'World', ''),
     ('OpenFPS.Server/Repositories/CompositeRepository.cs', 'World', 'composite templates and placements: map data'),
     ('OpenFPS.Server/*', 'game', ''),
@@ -237,7 +239,6 @@ TYPE_RULES = {
     'OpenFPS.Server.Systems.ParkingSpot': 'Agents',
     'OpenFPS.Server.Systems.StreetLines': 'Agents',
     'OpenFPS.Server.Systems.SpeechConditions': 'Agents',
-    'OpenFPS.Server.OneWorld.WorldPlace': 'World',
 }
 
 SORTED_PROJECTS = ('OpenFPS.Words', 'OpenFPS.Schema', 'OpenFPS.Native', 'OpenFPS.Geometry', 'OpenFPS.Materials', 'OpenFPS.Astronomy',

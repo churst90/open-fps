@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Text.Json;
 using OpenFPS.Common;
 using OpenFPS.Server.OneWorld;
+using OpenFPS.Server.Core;
 using Xunit.Abstractions;
 
 namespace OpenFPS.Tests;

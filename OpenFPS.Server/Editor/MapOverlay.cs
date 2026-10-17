@@ -237,7 +237,7 @@ public sealed class MapOverlayStore
         if (o.IsEmpty) return;
 
         if (o.Spawn != null)
-            map.SpawnPoint = new Transform { Position = o.Spawn.Position, Rotation = o.Spawn.Rotation };
+            map.SpawnPoint = new MapPose { Position = o.Spawn.Position, Rotation = o.Spawn.Rotation };
         if (o.Settings != null)
             foreach (var (path, value) in o.Settings) MapSettings.Apply(map, path, value);
 

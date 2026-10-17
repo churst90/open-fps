@@ -1,6 +1,4 @@
 using System.Numerics;
-using Arch.Core;
-using OpenFPS.Common.Components;
 using OpenFPS.Server.Repositories;
 
 namespace OpenFPS.Server.Core;
@@ -14,11 +12,17 @@ namespace OpenFPS.Server.Core;
 /// stands on the ground was set into it by the generator.
 ///
 /// <para>Graded over the whole map at once, so the posts on a tile's edge are the same for both tiles.</para>
+///
+/// <para>What is on the ground comes in as slabs and the ground goes out as tiles of heights: the host finds
+/// the slabs among its entities and makes the tiles into entities (TerrainTiles).</para>
 /// </summary>
 public static class TerrainBuilder
 {
     /// <summary>The size of a tile of ground, metres: the streaming tiles'.</summary>
     public const float TileMetres = 250f;
+
+    /// <summary>Post to post, metres (decision 1 of docs/GEOMETRY.md section 8).</summary>
+    public const float Spacing = 2f;
 
     /// <summary>How far round a graded patch the ground is blended back to the survey, metres.</summary>
     public const float SkirtMetres = 4f;
@@ -89,25 +93,6 @@ public static class TerrainBuilder
     /// <summary>One tile of laid ground: its south-west corner and its heights, row by row.</summary>
     public sealed record Tile(int X, int Z, float CornerX, float CornerZ, int Posts, float Spacing, float[] Heights);
 
-    /// <summary>The slabs of a world that could rest on the ground: fixed, solid, boxes or a footprint's outline
-    /// stood up (a prism), thin and level enough to be a floor (at most 0.6 m thick, at least a metre each way,
-    /// tilted under 30 degrees). The prisms are the real places' floors: left out, the ground came up through
-    /// 1,253 rooms' floors on Albany (and footsteps indoors were on dirt).</summary>
-    public static List<Slab> Slabs(World world)
-    {
-        var slabs = new List<Slab>();
-        var q = new QueryDescription().WithAll<Transform, ColliderComponent>();
-        world.Query(in q, (Entity e, ref Transform t, ref ColliderComponent c) =>
-        {
-            if (!c.IsSolid || c.Shape != ColliderShape.Box) return;
-            if (c.Form != null && (c.Form.Kind != OpenFPS.Common.Geometry.ShapeKind.Prism || c.Form.Outline is not { Length: >= 6 })) return;
-            if (world.Has<Velocity>(e) || world.Has<PlayerComponent>(e) || world.Has<DoorComponent>(e)) return;
-            if (world.Has<EntityType>(e) && world.Get<EntityType>(e) != EntityType.StaticObject) return;
-            if (SlabOf(t.Position, t.Rotation, c.Size, c.Form?.Outline) is { } slab) slabs.Add(slab);
-        });
-        return slabs;
-    }
-
     /// <summary>A box as a slab lying on the ground, or null if it is not thin and level enough to be a floor
     /// (at most 0.6 m thick, at least a metre each way, tilted under 30 degrees): a map's slabs, and the roads a
     /// world tile is made with (OneWorld.WorldFeatures).</summary>
@@ -141,7 +126,7 @@ public static class TerrainBuilder
     /// The terrain over [min, max] (x and z), in whole tiles of <see cref="TileMetres"/>: the survey's
     /// heights at every post, graded to <paramref name="slabs"/>.
     /// </summary>
-    public static List<Tile> Lay(MapElevation elevation, IReadOnlyList<Slab> slabs, Vector3 min, Vector3 max, float spacing = TerrainTiles.Spacing)
+    public static List<Tile> Lay(MapElevation elevation, IReadOnlyList<Slab> slabs, Vector3 min, Vector3 max, float spacing = Spacing)
     {
         int perTile = (int)MathF.Round(TileMetres / spacing);
         int tx0 = (int)MathF.Floor(min.X / TileMetres), tx1 = (int)MathF.Floor((max.X - 1e-3f) / TileMetres);
@@ -244,17 +229,5 @@ public static class TerrainBuilder
             }
         });
         return skirt;
-    }
-
-    /// <summary>The tiles as entities of a world: each a tile of ground (TerrainTiles), dirt.</summary>
-    public static List<Entity> Spawn(World world, IEnumerable<Tile> tiles)
-    {
-        var made = new List<Entity>();
-        foreach (var t in tiles)
-        {
-            var c = TerrainTiles.Component(t.Posts, t.Spacing, t.Heights, out float baseY);
-            made.Add(TerrainTiles.Spawn(world, t.CornerX, t.CornerZ, baseY, c));
-        }
-        return made;
     }
 }

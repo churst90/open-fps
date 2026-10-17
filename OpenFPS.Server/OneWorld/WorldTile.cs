@@ -1,7 +1,6 @@
 using System.IO.Compression;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using OpenFPS.Common.Components;
 using OpenFPS.Server.Repositories;
 
 namespace OpenFPS.Server.OneWorld;
@@ -43,7 +42,8 @@ public sealed class WorldTile
     public OpenFPS.Server.Water.TileDrainage? Drainage { get; set; }
 
     /// <summary>A tile of ground: posts a side, spacing, heights in whole centimetres over BaseY (metres over
-    /// the sea), row by row from the south-west, and a material per cell.</summary>
+    /// the sea), row by row from the south-west, and a material per cell. The host makes it the component a
+    /// tile of ground is sent with (TerrainTiles.ToComponent).</summary>
     public sealed class TerrainData
     {
         public int Posts { get; set; }
@@ -52,11 +52,6 @@ public sealed class WorldTile
         public short[] HeightsCm { get; set; } = Array.Empty<short>();
         public byte[] Cells { get; set; } = Array.Empty<byte>();
         public string[] Materials { get; set; } = Array.Empty<string>();
-
-        public TerrainTileComponent ToComponent() => new()
-        {
-            Posts = Posts, Spacing = Spacing, HeightsCm = HeightsCm, Cells = Cells, Materials = Materials,
-        };
     }
 
     /// <summary>A map file's options (vectors and turns spelled as maps spell them), heights in base64,

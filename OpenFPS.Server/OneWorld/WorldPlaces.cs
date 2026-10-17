@@ -103,10 +103,10 @@ public sealed class WorldPlaces
         double e1 = e0 + (e.Columns - 1) * e.Spacing, n1 = n0 + (e.Rows - 1) * e.Spacing;
         p.Min = WorldTileKey.Of(u.Zone, u.North, e0 + 1, n0 + 1);
         p.Max = WorldTileKey.Of(u.Zone, u.North, e1 - 1, n1 - 1);
-        p.Slabs = TerrainBuilder.Slabs(world);
+        p.Slabs = TerrainTiles.Slabs(world);
         // What covers the ground, for the rain: read now, while the map's world is at hand (the tick thread).
         int cellsPerTile = (int)Math.Round(WorldTileKey.TileMetres / WorldTileService.Spacing);
-        p.Surfaces = Water.SurfaceRaster.Of(world, (float)(p.Min.Easting - p.Easting), (float)(p.Min.Northing - p.Northing),
+        p.Surfaces = Water.SurfaceRaster.Of(Water.MapDrainage.Boxes(world), (float)(p.Min.Easting - p.Easting), (float)(p.Min.Northing - p.Northing),
                                             (p.Max.X - p.Min.X + 1) * cellsPerTile, (p.Max.Z - p.Min.Z + 1) * cellsPerTile,
                                             WorldTileService.Spacing);
 

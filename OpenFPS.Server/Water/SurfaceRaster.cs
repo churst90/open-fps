@@ -1,7 +1,5 @@
 using System.Numerics;
-using Arch.Core;
 using OpenFPS.Common;
-using OpenFPS.Common.Components;
 
 namespace OpenFPS.Server.Water;
 
@@ -9,55 +7,62 @@ namespace OpenFPS.Server.Water;
 /// What covers each 2 m cell of a map's ground, as the rain sees it (GroundSurface): the top of the highest
 /// fixed solid thing whose footprint covers the cell's middle (a roof, a road, a drive, a lawn), else the woods
 /// where a canopy volume is over it, else the ground's own material. A cell nothing covers is
-/// <see cref="Uncovered"/>, for the caller to take from the ground.
+/// <see cref="Uncovered"/>, for the caller to take from the ground. The things come in as boxes: the host
+/// says which of its entities are fixed boxes over the ground (MapDrainage.Boxes).
 /// </summary>
 public static class SurfaceRaster
 {
     public const byte Uncovered = 255;
 
+    /// <summary>A fixed box over the ground: its middle, its turn, its size, whether it is solid (a volume that
+    /// is not is a canopy if it is leaves, else nothing to the rain) and its material.</summary>
+    public readonly record struct Box(Vector3 Position, Quaternion Rotation, Vector3 Size, bool IsSolid, string? Material);
+
     /// <summary>
     /// The surfaces of <paramref name="nx"/> by <paramref name="nz"/> cells of <paramref name="cell"/> metres from
-    /// (<paramref name="x0"/>, <paramref name="z0"/>) in the world's own metres, row by row from the south-west.
+    /// (<paramref name="x0"/>, <paramref name="z0"/>) in the world's own metres, row by row from the south-west,
+    /// under <paramref name="boxes"/>; of two tops the same height, the first box's.
     /// </summary>
-    public static byte[] Of(World world, float x0, float z0, int nx, int nz, float cell)
+    public static byte[] Of(IEnumerable<Box> boxes, float x0, float z0, int nx, int nz, float cell)
     {
         var top = new float[nx * nz];
         var surface = new byte[nx * nz];
         Array.Fill(top, float.NegativeInfinity);
         Array.Fill(surface, Uncovered);
         var woods = new bool[nx * nz];
-        var q = new QueryDescription().WithAll<Transform, ColliderComponent>();
-        world.Query(in q, (Entity e, ref Transform t, ref ColliderComponent c) =>
+        foreach (var each in boxes) Lay(each);
+        for (int k = 0; k < surface.Length; k++)
+            if (surface[k] == Uncovered && woods[k]) surface[k] = (byte)GroundSurface.Woods;
+        return surface;
+
+        void Lay(Box box)
         {
-            if (c.Shape != ColliderShape.Box || c.Form != null) return;
-            if (world.Has<Velocity>(e) || world.Has<PlayerComponent>(e) || world.Has<RegionComponent>(e) || world.Has<PortalComponent>(e)) return;
-            if (world.Has<EntityType>(e) && world.Get<EntityType>(e) != EntityType.StaticObject) return;
-            string? material = world.Has<MaterialComponent>(e) ? world.Get<MaterialComponent>(e).Material : null;
-            bool canopy = !c.IsSolid && AcousticRegistry.IsLeaves(material);
-            if (!c.IsSolid && !canopy) return;
-            var s = c.Size;
+            string? material = box.Material;
+            bool canopy = !box.IsSolid && AcousticRegistry.IsLeaves(material);
+            if (!box.IsSolid && !canopy) return;
+            var s = box.Size;
             if (s.X <= 0f || s.Z <= 0f) return;
-            var r = t.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : Quaternion.Normalize(t.Rotation);
+            var r = box.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : Quaternion.Normalize(box.Rotation);
             // The footprint: the box's horizontal axes as they lie (a tilted roof's slope still covers its eaves).
             var ax = Vector3.Transform(new Vector3(s.X * 0.5f, 0f, 0f), r);
             var az = Vector3.Transform(new Vector3(0f, 0f, s.Z * 0.5f), r);
             var ay = Vector3.Transform(new Vector3(0f, s.Y * 0.5f, 0f), r);
-            float boxTop = t.Position.Y + MathF.Abs(ax.Y) + MathF.Abs(ay.Y) + MathF.Abs(az.Y);
+            float boxTop = box.Position.Y + MathF.Abs(ax.Y) + MathF.Abs(ay.Y) + MathF.Abs(az.Y);
             var u = new Vector2(ax.X, ax.Z);
             var w = new Vector2(az.X, az.Z);
             float hx = MathF.Abs(u.X) + MathF.Abs(w.X) + 1e-3f, hz = MathF.Abs(u.Y) + MathF.Abs(w.Y) + 1e-3f;
-            int i0 = Math.Max(0, (int)MathF.Floor((t.Position.X - hx - x0) / cell));
-            int i1 = Math.Min(nx - 1, (int)MathF.Floor((t.Position.X + hx - x0) / cell));
-            int j0 = Math.Max(0, (int)MathF.Floor((t.Position.Z - hz - z0) / cell));
-            int j1 = Math.Min(nz - 1, (int)MathF.Floor((t.Position.Z + hz - z0) / cell));
+            int i0 = Math.Max(0, (int)MathF.Floor((box.Position.X - hx - x0) / cell));
+            int i1 = Math.Min(nx - 1, (int)MathF.Floor((box.Position.X + hx - x0) / cell));
+            int j0 = Math.Max(0, (int)MathF.Floor((box.Position.Z - hz - z0) / cell));
+            int j1 = Math.Min(nz - 1, (int)MathF.Floor((box.Position.Z + hz - z0) / cell));
             if (i0 > i1 || j0 > j1) return;
             float uu = u.LengthSquared(), ww = w.LengthSquared();
             if (uu < 1e-9f || ww < 1e-9f) return;
-            byte made = (byte)GroundHydrology.OfMaterial(material, road: c.IsSolid && s.Y <= 0.6f);
+            byte made = (byte)GroundHydrology.OfMaterial(material, road: box.IsSolid && s.Y <= 0.6f);
             for (int j = j0; j <= j1; j++)
                 for (int i = i0; i <= i1; i++)
                 {
-                    var p = new Vector2(x0 + (i + 0.5f) * cell - t.Position.X, z0 + (j + 0.5f) * cell - t.Position.Z);
+                    var p = new Vector2(x0 + (i + 0.5f) * cell - box.Position.X, z0 + (j + 0.5f) * cell - box.Position.Z);
                     // Inside the parallelogram the two half-axes span (a rectangle unless the box is tilted on both).
                     float a = Vector2.Dot(p, u) / uu, b = Vector2.Dot(p, w) / ww;
                     if (MathF.Abs(a) > 1f || MathF.Abs(b) > 1f) continue;
@@ -67,10 +72,7 @@ public static class SurfaceRaster
                     top[k] = boxTop;
                     surface[k] = made;
                 }
-        });
-        for (int k = 0; k < surface.Length; k++)
-            if (surface[k] == Uncovered && woods[k]) surface[k] = (byte)GroundSurface.Woods;
-        return surface;
+        }
     }
 
     /// <summary>A cell of ground nothing covers: its own material (the land cover on the world's tiles; dirt on

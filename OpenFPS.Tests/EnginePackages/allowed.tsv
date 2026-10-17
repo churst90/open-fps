@@ -20,15 +20,9 @@ OpenFPS.Client.Core/WallBumps.cs	Common	37
 OpenFPS.Client.Core/WallBumps.cs	game	30
 OpenFPS.Common/Messages.cs	Agents	2
 OpenFPS.Common/PhysicsUtils.cs	game	3
-OpenFPS.Server/Core/TerrainBuilder.cs	Common	17
-OpenFPS.Server/Core/TerrainBuilder.cs	game	6
 OpenFPS.Server/Editor/LiveState.cs	game	6
 OpenFPS.Server/Editor/MapOverlay.cs	game	9
-OpenFPS.Server/Editor/ModelCatalog.cs	game	18
-OpenFPS.Server/OneWorld/WorldFeatures.cs	game	2
-OpenFPS.Server/OneWorld/WorldTile.cs	Common	7
-OpenFPS.Server/OneWorld/WorldTileService.cs	game	2
-OpenFPS.Server/Repositories/MapRepository.cs	Common	2
+OpenFPS.Server/Editor/ModelCatalog.cs	game	7
 OpenFPS.Server/Systems/GroundWaterSystem.cs	Sound	6
 OpenFPS.Server/Systems/PedestrianSpeech.cs	Common	4
 OpenFPS.Server/Systems/VehicleSystem.Crosswalks.cs	Common	3

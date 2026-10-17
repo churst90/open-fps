@@ -10,9 +10,6 @@ using OpenFPS.Words;
 
 namespace OpenFPS.Server.OneWorld;
 
-/// <summary>A place in the world a player can arrive at: what it is called and where it is.</summary>
-public sealed record WorldPlace(string Id, string Name, double Lat, double Lon);
-
 /// <summary>
 /// The one world on this server (docs/WORLD_STREAMING.md, stage 2): frames of it as maps, their tiles
 /// loaded as players come near and let go when nobody is near, arrivals at places by name.
@@ -449,7 +446,7 @@ public sealed class WorldMaps
             PlayMax = new Vector3(half, 1500f, half),
             MinimumY = -620f,
             Size = new Vector3(2 * half, 2100f, 2 * half),
-            SpawnPoint = new Transform { Position = new Vector3(125f, 1f, 125f), Rotation = Quaternion.Identity },
+            SpawnPoint = new MapPose { Position = new Vector3(125f, 1f, 125f), Rotation = Quaternion.Identity },
             VoxelResolution = 1f,
             OcclusionFloor = 0.1f,
             IsPublic = true,

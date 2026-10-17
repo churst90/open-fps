@@ -282,7 +282,7 @@ public class MovementSystemTests : IDisposable
         var data = new MapData
         {
             Id = "move",
-            SpawnPoint = new Transform { Position = new Vector3(3f, 1f, 4f), Rotation = Quaternion.Identity },
+            SpawnPoint = new MapPose { Position = new Vector3(3f, 1f, 4f), Rotation = Quaternion.Identity },
         };
         File.WriteAllText(Path.Combine(maps, "move.json"), JsonSerializer.Serialize(data, MapRepository.JsonOptions));
         var manager = new MapManager(new MapRepository(maps), new PrefabRepository(Path.Combine(AppContext.BaseDirectory, "prefabs")));
