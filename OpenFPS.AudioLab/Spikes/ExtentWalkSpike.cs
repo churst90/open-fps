@@ -17,7 +17,7 @@ using OpenFPS.Server.Systems;
 namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
-/// --extent-walk [walks=creek,creek-out,gutter,shore,fountain,fountain-out,fire] [render] [out=DIR] [speed=1]
+/// --extent-walk [walks=creek,creek-out,gutter,shore,fountain,fountain-out,fire,oak,oak-out] [render] [out=DIR] [speed=1]
 ///               [rule=middle|pieces] [rain=60]
 ///
 /// The walks away from a source face across the way they go, so the source is at one side. rule=middle plays the
@@ -74,7 +74,8 @@ public static class ExtentWalkSpike
             if (names.Count == 0) continue;
             if (!OpenFPS.Client.Core.AudioEngine.SteamAudio.WalkPairSpike.Load(map, out var maps)) return 1;
             maps.TryGetMap(map, out var ecs, out _, out var grid, out _);
-            var defs = EntityDefinitionFactory.StaticDefinitions(ecs).Where(d => d.SoundEmitter.IsSynth && d.SoundEmitter.SoundId != null).ToList();
+            var all = EntityDefinitionFactory.StaticDefinitions(ecs);
+            var defs = all.Where(d => d.SoundEmitter.IsSynth && d.SoundEmitter.SoundId != null).ToList();
             float[]? ground = null;
             if (map == "albany_or")
             {
@@ -90,7 +91,7 @@ public static class ExtentWalkSpike
             }
             foreach (string name in names)
             {
-                var walk = Make(name, defs, Floor);
+                var walk = Make(name, defs, all, Floor);
                 if (walk == null) { Console.WriteLine($"FAIL: no {name} walk on {map}"); failures++; continue; }
                 var near = defs.Where(d => walk.Source(d.SoundEmitter.SoundId!) && walk.Feet.Any(f => Vector3.DistanceSquared(f, d.Transform.Position) < 150f * 150f)).ToList();
                 Console.WriteLine();
@@ -103,11 +104,11 @@ public static class ExtentWalkSpike
         return failures;
     }
 
-    private static string MapOf(string walk) => walk is "creek" or "creek-out" or "shore" ? "albany_or" : "city";
+    private static string MapOf(string walk) => walk is "creek" or "creek-out" or "shore" or "oak" or "oak-out" ? "albany_or" : "city";
 
     // ── The walks ───────────────────────────────────────────────────────────────────────────────
 
-    private static Walk? Make(string name, List<EntityDefinition> defs, Func<Vector3, float> floor)
+    private static Walk? Make(string name, List<EntityDefinition> defs, List<EntityDefinition> all, Func<Vector3, float> floor)
     {
         static bool GroundLine(string id) => id.StartsWith("flow:ground/", StringComparison.OrdinalIgnoreCase);
         switch (name)
@@ -135,6 +136,34 @@ public static class ExtentWalkSpike
                     outFeet.Add(p with { Y = floor(p with { Y = mid.Y }) });
                 }
                 return new Walk(name, "albany_or", "straight out from the middle of the same creek, 0.5 to 60 m, facing along it", outFeet, along, GroundLine);
+            }
+            case "oak":
+            case "oak-out":
+            {
+                // Albany's Oak Creek as the map draws it (the water strips tools/gen_osm.py lays along OpenStreetMap's
+                // line): beside its longest run 1.5 m out from its edge, and out from that run's middle. Every running
+                // water near counts, the drainage's lines beside it too.
+                var strips = all.Where(d => d.Identity.Name == "Oak Creek" && d.Material.Material == "Water" && d.Collider.Size.X > 0.5f).ToList();
+                var chain = LongestChain(strips, d => d.Collider.Size.X);
+                if (chain.Count < 3) return null;
+                var line = Polyline(chain);
+                float half = 0.5f * chain.Average(d => d.Collider.Size.Z);
+                static bool Running(string id) => id.StartsWith("flow:", StringComparison.OrdinalIgnoreCase);
+                if (name == "oak")
+                {
+                    var (feet, heading) = Beside(line, half + 1.5f, 60f, floor);
+                    return new Walk(name, "albany_or", $"along Oak Creek as the map draws it ({chain.Count} strips, {LengthOf(line):F0} m, {2f * half:F1} m wide), 1.5 m out from its edge",
+                                    feet, heading, Running);
+                }
+                var (mid, along) = PointAt(line, 0.5f * LengthOf(line));
+                var side = Vector3.Normalize(Vector3.Cross(along, Vector3.UnitY));
+                var outFeet = new List<Vector3>();
+                for (float d = half + 0.5f; d <= 60f + 1e-3f; d += Step)
+                {
+                    var p = mid + side * d;
+                    outFeet.Add(p with { Y = floor(p with { Y = mid.Y }) });
+                }
+                return new Walk(name, "albany_or", "straight out from the middle of the same run of Oak Creek to 60 m from its line, facing along it", outFeet, along, Running);
             }
             case "shore":
             {
@@ -630,7 +659,7 @@ public static class ExtentWalkSpike
         return (deg, ild);
     }
 
-    private static (float[] L, float[] R, int Rate) ReadStereo(string path)
+    internal static (float[] L, float[] R, int Rate) ReadStereo(string path)
     {
         using var br = new BinaryReader(File.OpenRead(path));
         br.ReadBytes(12);

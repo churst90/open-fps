@@ -27,10 +27,13 @@ namespace OpenFPS.AudioLab.Spikes;
 ///        the flows of the lines the renders stand by, every minute through a storm and after it
 ///   --ground-water levels [sec=20]
 ///        each kind of line's level at a metre at its flows and slopes: GroundChannels.LevelDb's table
-///   --ground-water game out=DIR [place=] [sec=30]
+///   --ground-water game out=DIR [place=] [sec=30] [at=X,Z]
 ///        the scenes through the game's own path (as --running-water game): by the creek dry, after ten
 ///        minutes of heavy rain (in it, and with the rain not heard), half an hour after it stops; a ditch
-///        beside a road the same; DIR/capture.post.wav and DIR/segments.csv.
+///        beside a road the same; DIR/capture.post.wav and DIR/segments.csv. at=X,Z (map metres, x east, z
+///        north): instead, stood at that point with every water source of the map within 80 m (the map's own
+///        and its drainage's), dry, after ten minutes of heavy rain with the rain not heard, and half an hour
+///        after; each scene's level from the capture.
 /// </summary>
 public static class GroundWaterSpike
 {
@@ -514,20 +517,84 @@ public static class GroundWaterSpike
             Remove(ids);
         }
 
+        // Stood at a point of the map: every water source of the map within 80 m, the map's own (a mapped
+        // creek, a shore, a fountain) and its drainage's, moved as the drainage's voices are.
+        var atText = Arg(args, "at=")?.Split(',');
+        Vector3? standAt = atText is { Length: >= 2 }
+            && float.TryParse(atText[0], NumberStyles.Float, CultureInfo.InvariantCulture, out float ax)
+            && float.TryParse(atText[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float az) ? new Vector3(ax, 0f, az) : null;
+        int[] MapVoices(Vector3 stand, out string nearest)
+        {
+            var ids = new List<int>();
+            nearest = "none";
+            float best = float.MaxValue;
+            if (!l.Maps.TryGetMap(l.Id, out var ecs, out _, out _, out _)) return Array.Empty<int>();
+            foreach (var d in EntityDefinitionFactory.StaticDefinitions(ecs))
+            {
+                var em = d.SoundEmitter;
+                if (!em.IsSynth || em.SoundId == null
+                    || ModelKindTable.KindOf(em.SoundId)?.Synth is not (ModelSynth.Flow or ModelSynth.Water or ModelSynth.Shore)) continue;
+                float far = WaterReach(d, stand);
+                if (far > 80f) continue;
+                if (far < best)
+                {
+                    best = far;
+                    var parts = em.SoundId.Split('/');
+                    nearest = string.Create(CultureInfo.InvariantCulture, $"{parts[0]}{(parts.Length > 1 ? "/" + parts[1] : "")} \"{d.Identity.Name}\" {far:F1} m");
+                }
+                d.EntityId = nextId++;
+                d.Transform = d.Transform with { Position = d.Transform.Position - stand };
+                world.RegisterDefinition(d);
+                ids.Add(d.EntityId);
+            }
+            return ids.ToArray();
+        }
+        void AtScene(string label, Vector3 point, string state)
+        {
+            // The floor there: the survey's cell, then whatever stands on it a metre up.
+            int cell = l.Net.CellAt(point.X, point.Z);
+            float ground = cell >= 0 ? l.Net.Height(cell) : 0f;
+            float y = l.Maps.TryGetMap(l.Id, out var ecs, out _, out var grid, out _)
+                ? PhysicsUtils.GetGroundHeight(ecs, grid, point with { Y = ground + 1f }, out _) : ground;
+            var stand = point with { Y = y < -900f ? ground : y };
+            Water(state);
+            Weather(0f);
+            var ids = MapVoices(stand, out string nearest);
+            player.Position = Vector3.Zero;
+            player.Yaw = 0f;
+            player.Rotation = Quaternion.Identity;
+            Pump(5.0);
+            Record($"{label} ({ids.Length} water sources within 80 m; nearest {nearest})", sec);
+            Remove(ids);
+        }
+
         try
         {
             Weather(0f);
             Water("dry");
             Pump(2.0);
             Record("silence", 2.0);
-            Scene("creek dry", creek, "dry", false);
-            Scene("creek after 10 min heavy rain, in the rain", creek, "rain10", true);
-            Scene("creek after 10 min heavy rain, rain not heard", creek, "rain10", false);
-            Scene("creek 30 min after the rain", creek, "after30", false);
-            Scene("ditch dry", ditch, "dry", false);
-            Scene("ditch after 10 min heavy rain, in the rain", ditch, "rain10", true);
-            Scene("ditch after 10 min heavy rain, rain not heard", ditch, "rain10", false);
-            Scene("ditch 30 min after the rain", ditch, "after30", false);
+            if (standAt is { } point)
+            {
+                // The sources stand at their own heights about the ear, so no flat ground under them: a creek in its
+                // gully would be under it.
+                world.RemoveEntities(new[] { 1 });
+                string where = string.Create(CultureInfo.InvariantCulture, $"at {point.X:F1}, {point.Z:F1}");
+                AtScene(where + ", dry", point, "dry");
+                AtScene(where + ", after 10 min heavy rain, rain not heard", point, "rain10");
+                AtScene(where + ", 30 min after the rain", point, "after30");
+            }
+            else
+            {
+                Scene("creek dry", creek, "dry", false);
+                Scene("creek after 10 min heavy rain, in the rain", creek, "rain10", true);
+                Scene("creek after 10 min heavy rain, rain not heard", creek, "rain10", false);
+                Scene("creek 30 min after the rain", creek, "after30", false);
+                Scene("ditch dry", ditch, "dry", false);
+                Scene("ditch after 10 min heavy rain, in the rain", ditch, "rain10", true);
+                Scene("ditch after 10 min heavy rain, rain not heard", ditch, "rain10", false);
+                Scene("ditch 30 min after the rain", ditch, "after30", false);
+            }
             Record("silence end", 1.0);
         }
         finally
@@ -540,8 +607,25 @@ public static class GroundWaterSpike
             sb.Append(CultureInfo.InvariantCulture, $"{s.Name.Replace(',', ';')},{s.Start:F3},{s.Seconds:F3},0,0,0\n");
         File.WriteAllText(Path.Combine(outDir, "segments.csv"), sb.ToString());
         File.WriteAllText(Path.Combine(outDir, "scenes.txt"), notes.ToString());
+        // Each scene's level in the capture, both ears, its first and last half second left out.
+        var (cl, cr, rate) = ExtentWalkSpike.ReadStereo(Path.Combine(outDir, "capture.post.wav"));
+        foreach (var s in segments)
+        {
+            int a = Math.Clamp((int)((s.Start + 0.5) * rate), 0, cl.Length), b = Math.Clamp((int)((s.Start + s.Seconds - 0.5) * rate), 0, cl.Length);
+            double e = 0;
+            for (int i = a; i < b; i++) e += cl[i] * (double)cl[i] + cr[i] * (double)cr[i];
+            double db = b > a ? 10 * Math.Log10(Math.Max(1e-30, e / (2.0 * (b - a)))) : double.NaN;
+            Console.WriteLine(string.Create(CultureInfo.InvariantCulture, $"  {db,7:F1} dBFS  {s.Name}"));
+        }
         Console.WriteLine($"Wrote {outDir}/capture.post.wav, segments.csv and scenes.txt ({segments.Count} segments)");
         return 0;
+    }
+
+    /// <summary>How far a water source reaches toward a point on the flat, m: from its middle.</summary>
+    private static float WaterReach(EntityDefinition d, Vector3 to)
+    {
+        var v = d.Transform.Position - to;
+        return MathF.Sqrt(v.X * v.X + v.Z * v.Z);
     }
 
     private static string? Arg(string[] args, string prefix) => args.FirstOrDefault(a => a.StartsWith(prefix, StringComparison.Ordinal))?[prefix.Length..];
