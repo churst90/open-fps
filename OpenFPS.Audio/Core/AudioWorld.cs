@@ -862,7 +862,20 @@ public partial class AudioWorld
     /// shape its collider gives it (FireSpec.KeyForPlaced), so a fire pit scaled up is a bigger fire.
     /// Memoised: asked several times a frame per source.
     /// </summary>
-    private string VoiceKey(in SourceSpec spec) => VoiceKey(spec.SoundId, spec.Shape, spec.Size);
+    private string VoiceKey(in SourceSpec spec)
+    {
+        // A whole shore's outline (its emitter's line, closed): one source as long as the outline (ShoreSpec.OutlineKey).
+        if (spec.Line is { Length: >= 3 } line && OpenFPS.Common.ModelKindTable.Is(spec.SoundId, OpenFPS.Common.ModelSynth.Shore))
+        {
+            if (_outlineKeys.TryGetValue(line, out var known)) return known;
+            float perimeter = 0f;
+            for (int i = 1; i < line.Length; i++) perimeter += Vector3.Distance(line[i - 1], line[i]);
+            if (_outlineKeys.Count > 4096) _outlineKeys.Clear();
+            return _outlineKeys[line] = OpenFPS.Common.ShoreSpec.OutlineKey(spec.SoundId!, perimeter);
+        }
+        return VoiceKey(spec.SoundId, spec.Shape, spec.Size);
+    }
+    private readonly Dictionary<Vector3[], string> _outlineKeys = new(ReferenceEqualityComparer.Instance);
 
     private string VoiceKey(string? soundId, OpenFPS.Common.Components.ColliderShape shape, Vector3 size)
     {
@@ -1236,7 +1249,7 @@ public partial class AudioWorld
         => PhysicalKeyOf(src.Spec.Size, src.State.Rotation, voiceKey);
 
     private static string PhysicalKeyOf(Vector3 size, Quaternion rotation, string voiceKey)
-        => OpenFPS.Common.ModelKindTable.KindOf(voiceKey)?.Synth == OpenFPS.Common.ModelSynth.Shore
+        => OpenFPS.Common.ModelKindTable.KindOf(voiceKey)?.Synth == OpenFPS.Common.ModelSynth.Shore && !OpenFPS.Common.ShoreSpec.TryOutline(voiceKey, out _, out _)
             ? OpenFPS.Common.ShoreSpec.KeyFor(voiceKey, size, rotation)
             : voiceKey;
 
@@ -1810,8 +1823,7 @@ public partial class AudioWorld
             if (!_sources.TryGet(id, out var src)) continue;
             string key = VoiceKey(src.Spec);
             var at = src.Emission;
-            float length = _audio.Options.WideSources.LineLength(key, ModelLibrary.Presets);
-            if (length > 0f && LinePathOf(src, key) is { } path)
+            if (LinePathOf(src, key) is { } path)
             {
                 // A line: as many pieces as the angle it covers here asks for, the rest of it merged.
                 if (!_cutting.TryGetValue(id, out var c)) _cutting[id] = c = new Cutting();
@@ -1861,8 +1873,9 @@ public partial class AudioWorld
     private OpenFPS.Client.AudioEngine.Core.Nature.LinePath? LinePathOf(AudioSource src, string key)
     {
         float length = _audio.Options.WideSources.LineLength(key, ModelLibrary.Presets);
-        if (length <= 0f) return null;
         var line = src.Spec.Line;
+        // Running water along a line (its own, or straight along its x), or a shore's whole outline.
+        if (length <= 0f && !(line is { Length: >= 3 } && _audio.Options.WideSources.IsOutline(key))) return null;
         var at = src.Emission;
         var turn = src.State.Rotation;
         if (_linePaths.TryGetValue(src.Id, out var known) && known.Position == at && known.Rotation == turn
@@ -2015,7 +2028,7 @@ public partial class AudioWorld
         if (c.Cut == null || c.Cut.Count != n || !ReferenceEquals(c.Path, path)
             || n > 1 && Vector3.Distance(eyePos, c.CutAt) > 0.25f * c.Cut.Shortest)
         {
-            c.Cut = n == 1 ? OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Whole(path.Length) : OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Cut(path, eyePos, n);
+            c.Cut = n == 1 ? OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Whole(path) : OpenFPS.Client.AudioEngine.Core.Nature.ExtendedSources.Cut(path, eyePos, n);
             c.CutAt = eyePos;
             _audio.PlanPieces(e.EntityId, c.Cut);
         }
@@ -2111,8 +2124,9 @@ public partial class AudioWorld
     {
         var middle = e;
         if (e.PlaceOfEntity != 0 && !latest.TryGetValue(e.PlaceOfEntity, out middle)) return 0f;
-        if (wide.LineLength(middle.PhysicalKey, ModelLibrary.Presets) > 0f)
-            return pieces.TryGetValue(middle.EntityId, out var cut) ? cut.ShareOfPlace(e.Place) : e.Place == 0 ? 1f : 0f;
+        if (pieces.TryGetValue(middle.EntityId, out var cut)) return cut.ShareOfPlace(e.Place);
+        if (wide.LineLength(middle.PhysicalKey, ModelLibrary.Presets) > 0f || wide.IsOutline(middle.PhysicalKey))
+            return e.Place == 0 ? 1f : 0f;
         var layout = wide.Layout(middle.PhysicalKey, ModelLibrary.Presets);
         if (layout == null) return 1f;
         Span<float> shares = stackalloc float[layout.Length];

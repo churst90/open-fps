@@ -128,6 +128,11 @@ public sealed class WideSources
             ? LinePath.Of(position, rotation, line, width)
             : LinePath.Straight(position, Vector3.Transform(Vector3.UnitX, rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : rotation), length, width);
 
+    /// <summary>A whole shore's outline heard as one source (ShoreSpec.OutlineKey), cut along itself at the ear under
+    /// <see cref="ExtendedSources.PlaceRule.Pieces"/>. False for everything when this world does not spread its sources.</summary>
+    public bool IsOutline(string? physicalKey)
+        => _enabled && _rule == ExtendedSources.PlaceRule.Pieces && ShoreSpec.TryOutline(physicalKey, out _, out _);
+
     /// <summary>How many streams a running-water synth renders: one for each piece a line can be cut into, or
     /// its own places.</summary>
     public int FlowPlaces(string? physicalKey, RunningWaterSpec spec, IPresets presets)

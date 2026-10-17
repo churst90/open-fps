@@ -203,6 +203,43 @@ public sealed record ShoreSpec
         return preset.Length > 0;
     }
 
+    /// <summary>
+    /// The key of a whole outline heard as one source (docs/WAVES_AND_SHORES.md, 2026-10-17): "shore:&lt;preset&gt;/outline/
+    /// &lt;its length round, m&gt;". Its line is its emitter's (SoundEmitterComponent.Line); where the water lies and how far
+    /// it reaches are worked out from the outline itself, piece by piece (ShoreSynth.Cut).
+    /// </summary>
+    public static string OutlineKey(string soundId, float perimeterMetres)
+    {
+        string bare = soundId.Split('/')[0];
+        return string.Create(CultureInfo.InvariantCulture, $"{bare}/outline/{MathF.Round(MathF.Max(1f, perimeterMetres))}");
+    }
+
+    /// <summary>Whether a key is a whole outline's (<see cref="OutlineKey"/>), and its preset and length.</summary>
+    public static bool TryOutline(string? key, out string preset, out float perimeterMetres)
+    {
+        preset = "";
+        perimeterMetres = 0f;
+        if (string.IsNullOrEmpty(key)) return false;
+        string rest = key.StartsWith("shore:", StringComparison.OrdinalIgnoreCase) ? key[6..] : key;
+        var parts = rest.Split('/');
+        if (parts.Length != 3 || parts[1] != "outline"
+            || !float.TryParse(parts[2], NumberStyles.Float, CultureInfo.InvariantCulture, out perimeterMetres)) return false;
+        preset = parts[0];
+        return preset.Length > 0;
+    }
+
+    /// <summary>The spec of a whole outline this long: as loud as its stretches together (its level declared over
+    /// <see cref="LengthMetres"/> of edge), its length the outline's.</summary>
+    public ShoreSpec AlongOutline(float perimeterMetres)
+    {
+        float length = MathF.Max(1f, perimeterMetres);
+        return this with
+        {
+            SourceLevelDb = SourceLevelDb + 10f * MathF.Log10(MathF.Max(1f, length / MathF.Max(1f, LengthMetres))),
+            LengthMetres = length,
+        };
+    }
+
     /// <summary>The spec's own geometry: its fetch, the water to the north, its length.</summary>
     [JsonIgnore]
     public ShoreGeometry DefaultGeometry => new(FetchMetres, 0f, LengthMetres);

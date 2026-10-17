@@ -116,6 +116,8 @@ public static class ExtendedSources
     /// <summary>Waves at an edge: along it, and on its break line (ShoreSynth.Layout), its length the map's.</summary>
     internal static Vector3[]? ShorePlacesOf(string key, IPresets presets)
     {
+        // A whole outline is cut along itself at the ear (WideSources.IsOutline), not laid out.
+        if (ShoreSpec.TryOutline(key, out _, out _)) return null;
         ShoreSpec.ParseKey(key, out string preset, out var geometry);
         var spec = presets.Shore(preset);
         if (spec.TotalPlaces <= 1) return null;
@@ -289,6 +291,10 @@ public static class ExtendedSources
         public int Count => Edges.Length - 1;
         public float Length => Edges[^1] - Edges[0];
 
+        /// <summary>The path it was cut along, when it was cut along one (<see cref="Cut(LinePath, Vector3, int)"/>,
+        /// <see cref="Whole(LinePath)"/>): what a shore's synth reads where its water lies from, piece by piece.</summary>
+        public LinePath? Path { get; init; }
+
         /// <summary>The place (the voice: 0 the source's own) that plays piece <paramref name="piece"/>.</summary>
         public int PlaceOfPiece(int piece) => piece == Middle ? 0 : piece < Middle ? piece + 1 : piece;
 
@@ -333,6 +339,9 @@ public static class ExtendedSources
 
     /// <summary>The whole line as one piece.</summary>
     public static LineCut Whole(float length) => new(new[] { -0.5f * length, 0.5f * length });
+
+    /// <summary>A whole path as one piece.</summary>
+    public static LineCut Whole(LinePath path) => new(new[] { -path.HalfLength, path.HalfLength }) { Path = path };
 
     /// <summary>
     /// The line cut into <paramref name="pieces"/> pieces of equal angle at the ear: small beside it, long far
@@ -421,7 +430,7 @@ public static class ExtendedSources
         var edges = new float[n + 1];
         edges[0] = -half;
         edges[n] = half;
-        if (n == 1) return new LineCut(edges);
+        if (n == 1) return new LineCut(edges) { Path = path };
         int segs = path.Segments;
         Span<double> angle = segs <= 512 ? stackalloc double[segs] : new double[segs];
         double total = 0;
@@ -438,7 +447,7 @@ public static class ExtendedSources
             double t = Math.Clamp(foot + off * Math.Tan(a), 0.0, len);
             edges[i] = Math.Clamp((float)(path.StartOf(seg) + t) - half, edges[i - 1], half);
         }
-        return new LineCut(edges);
+        return new LineCut(edges) { Path = path };
     }
 
     /// <summary>Where a piece of a path is played from (in the world, and m along the path from its middle) and the

@@ -172,6 +172,17 @@ public static class ExtentWalkSpike
             }
             case "shore":
             {
+                // A whole outline heard as one source (2026-10-17): the pond the walks of 2026-10-16 measured, the same
+                // 60 m of it, 2 m inland (its outline runs anticlockwise, the water on its left).
+                var outlines = defs.Where(d => d.SoundEmitter.SoundId!.StartsWith("shore:", StringComparison.OrdinalIgnoreCase) && PointsOf(d) != null).ToList();
+                if (outlines.Count > 0)
+                {
+                    var pond = outlines.MinBy(d => Vector3.Distance(new LinePath(PointsOf(d)!).Nearest(MeasuredShore with { Y = PointsOf(d)![0].Y }, out _) with { Y = 0f }, MeasuredShore))!;
+                    var ring = PointsOf(pond)!.ToList();
+                    var (around, aroundHeading) = Beside(ring, 2f, 60f, floor, AlongOf(ring, MeasuredShore));
+                    return new Walk(name, "albany_or", $"along a pond's shore, its whole outline one source ({LengthOf(ring):F0} m round), 2 m back from the edge",
+                                    around, aroundHeading, id => id.StartsWith("shore:", StringComparison.OrdinalIgnoreCase), WindMetresPerSecond: 8f);
+                }
                 var chain = LongestChain(defs.Where(d => d.SoundEmitter.SoundId!.StartsWith("shore:", StringComparison.OrdinalIgnoreCase)).ToList(),
                                          d => d.Collider.Size.X);
                 if (chain.Count < 3) return null;
@@ -319,6 +330,9 @@ public static class ExtentWalkSpike
     /// <summary>The middle of the creek the extent walks of 2026-10-16 measured on Albany (map metres): the drainage's
     /// creek beside which the stretches rose and fell 10 dB every 20 m.</summary>
     private static readonly Vector3 MeasuredCreek = new(901.9f, 0f, -1281.0f);
+
+    /// <summary>The middle of the pond's shore the walks of 2026-10-16 measured (map metres).</summary>
+    private static readonly Vector3 MeasuredShore = new(-401.7f, 0f, 1344.8f);
 
     /// <summary>The run of parts end to end that passes nearest a point.</summary>
     private static List<EntityDefinition> ChainNear(List<EntityDefinition> parts, Func<EntityDefinition, float> lengthOf, Vector3 near)

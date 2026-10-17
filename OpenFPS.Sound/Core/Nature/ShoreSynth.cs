@@ -219,7 +219,10 @@ public sealed class ShoreSynth
 
     public int Places => _places.Length;
 
-    public ShoreSynth(ShoreSpec spec, float sampleRate, int seed, ShoreGeometry? geometry = null)
+    /// <param name="outlinePlaces">A whole outline heard as one source (ShoreSpec.OutlineKey): this many columns, one
+    /// a piece of its cut (<see cref="Cut"/>), each with the water its own stretch of the outline faces; no break row.
+    /// Zero: the spec's places along a stretch of its geometry.</param>
+    public ShoreSynth(ShoreSpec spec, float sampleRate, int seed, ShoreGeometry? geometry = null, int outlinePlaces = 0)
     {
         Spec = spec;
         Geometry = geometry ?? spec.DefaultGeometry;
@@ -228,8 +231,9 @@ public sealed class ShoreSynth
         _flickDrive = MathF.Sqrt(1f - _flickPole * _flickPole);
         float rho2 = _flickPole * _flickPole;
         _flickA2B = MathF.Sqrt((1f - rho2) * (1f - rho2) * (1f - rho2) / (1f + rho2)) / _flickDrive;
-        _along = Math.Max(1, spec.Places);
-        _rows = spec.BreakRowMetres > 0f ? 2 : 1;
+        _outline = outlinePlaces > 0;
+        _along = _outline ? outlinePlaces : Math.Max(1, spec.Places);
+        _rows = !_outline && spec.BreakRowMetres > 0f ? 2 : 1;
         _places = new EventSum[_along * _rows];
         for (int k = 0; k < _places.Length; k++) _places[k] = new EventSum(sampleRate, seed * 7919 + 5 + k * 15485863);
         _rng = new EventSum(sampleRate, seed * 31 + 77);
@@ -333,6 +337,7 @@ public sealed class ShoreSynth
     /// <summary>The sea following the wind, and the places' shares.</summary>
     public void Control(float dt)
     {
+        if (_outline) { OutlineControl(dt); return; }
         var (hs, tp, onshore) = Spec.WindSea(Geometry, float.IsFinite(WindSpeed) ? WindSpeed : 0f, WindFromDegrees);
         _windSeaTarget = hs;
         _onshore = onshore;
@@ -348,6 +353,114 @@ public sealed class ShoreSynth
             if (_tpTarget > 0f) _tp += (_tpTarget - _tp) * a;
         }
         _toHome = Math.Clamp(Spread, 0f, 1f);
+    }
+
+    // ── A whole outline (2026-10-17) ─────────────────────────────────────────────────────────────
+
+    /// <summary>A whole outline cut at the listener (ExtendedSources.Cut along its own line): each place a column over
+    /// its piece. Set by the voice; null until the client's first cut, and silent until then.</summary>
+    public ExtendedSources.LineCut? Cut;
+    private ExtendedSources.LineCut? _cutBy;
+    private readonly bool _outline;
+
+    /// <summary>A piece is read where its water lies at most this often along it, m, and at most
+    /// <see cref="OutlineSamples"/> times.</summary>
+    private const float OutlineSampleMetres = 10f;
+    private const int OutlineSamples = 8;
+
+    /// <summary>
+    /// Each column's own sea from the stretch of the outline it plays: at points along it, which way its water lies
+    /// (to the left of the outline, which runs round the water anticlockwise) and how far the water reaches straight out
+    /// across the outline to its far side, the fetch; the wind sea each point raises (ShoreSpec.WindSea); the column's
+    /// waves as high as the points' that have any on the mean of their energy, over the length that has them. So a
+    /// piece of the lee shore is still and a piece of the shore the wind blows onto laps, and a long far piece with
+    /// both is as much of each as it holds.
+    /// </summary>
+    private void OutlineControl(float dt)
+    {
+        if (!ReferenceEquals(Cut, _cutBy)) Recut(Cut);
+        float wind = float.IsFinite(WindSpeed) ? WindSpeed : 0f;
+        float most = 0f, mostTp = 1f;
+        foreach (var c in _columns)
+        {
+            if (c.Samples == 0) { c.Width = 0f; c.Hs = 0f; continue; }
+            double energy = 0, period = 0, active = 0, fetch = 0;
+            for (int k = 0; k < c.Samples; k++)
+            {
+                var (hs, tp, _) = Spec.WindSea(new ShoreGeometry(c.Fetch[k], c.Bearing[k], c.Length), wind, WindFromDegrees);
+                fetch += c.Fetch[k] / c.Samples;
+                if (!(hs > 0f)) continue;
+                energy += hs * (double)hs / c.Samples;
+                period += hs * (double)hs * tp / c.Samples;
+                active += 1.0 / c.Samples;
+            }
+            float target = active > 0 ? (float)Math.Sqrt(energy / active) : 0f;
+            float tpTarget = energy > 0 ? (float)(period / energy) : c.Tp;
+            c.Width = c.Length * (float)active;
+            float tau = MathF.Max(10f, WindWaves.GrowthSeconds(MathF.Max(wind, 2f), (float)fetch) / 3f);
+            float a = c.SeaSet ? MathF.Min(1f, dt / tau) : 1f;
+            c.SeaSet = true;
+            c.Hs += (target - c.Hs) * a;
+            if (tpTarget > 0f) c.Tp += (tpTarget - c.Tp) * a;
+            if (c.Hs > most) { most = c.Hs; mostTp = c.Tp; }
+        }
+        _hs = most;
+        _tp = mostTp;
+        _toHome = 1f;
+    }
+
+    /// <summary>For the lab and the tests: each place's column of a whole outline, its sea's significant height (m), the
+    /// length of edge it has waves on (m) and its mean fetch (m).</summary>
+    public IReadOnlyList<(float Hs, float Width, float Fetch)> OutlineColumns
+        => _columns.Select(c => (c.Hs, c.Width, c.Samples > 0 ? c.Fetch.Take(c.Samples).Average() : 0f)).ToList();
+
+    /// <summary>Each column to its piece of a new cut, and where along it its water lies, read at points along it.</summary>
+    private void Recut(ExtendedSources.LineCut? cut)
+    {
+        _cutBy = cut;
+        for (int j = 0; j < _columns.Length; j++)
+        {
+            var c = _columns[j];
+            c.Samples = 0;
+            if (cut?.Path is not { } path || j >= cut.Count) { c.Length = 0f; continue; }
+            int i = cut.PieceOfPlace(j);
+            float from = cut.Edges[i], to = cut.Edges[i + 1], length = to - from;
+            c.Length = length;
+            c.Along = 0.5f * (from + to);
+            int n = Math.Clamp((int)MathF.Ceiling(length / OutlineSampleMetres), 1, OutlineSamples);
+            for (int k = 0; k < n; k++)
+            {
+                float along = from + (k + 0.5f) * length / n;
+                var at = path.PointAt(along);
+                var way = path.DirectionAt(along);
+                var water = new Vector2(-way.Z, way.X);
+                float l = water.Length();
+                water = l > 1e-6f ? water / l : Vector2.UnitY;
+                c.Bearing[k] = (MathF.Atan2(water.X, water.Y) * 180f / MathF.PI + 360f) % 360f;
+                c.Fetch[k] = Across(path, new Vector2(at.X, at.Z), water) ?? Spec.FetchMetres;
+            }
+            c.Samples = n;
+        }
+    }
+
+    /// <summary>How far the water reaches straight out from a point of the outline, m: to where a ray along
+    /// <paramref name="water"/> leaves the outline; null if it never does (an open line, a bank).</summary>
+    private static float? Across(LinePath path, Vector2 from, Vector2 water)
+    {
+        var p = from + 0.1f * water;
+        float? best = null;
+        for (int k = 0; k < path.Segments; k++)
+        {
+            var a = new Vector2(path.Points[k].X, path.Points[k].Z);
+            var b = new Vector2(path.Points[k + 1].X, path.Points[k + 1].Z);
+            var e = b - a;
+            float den = water.X * e.Y - water.Y * e.X;
+            if (MathF.Abs(den) < 1e-9f) continue;
+            float t = ((a.X - p.X) * e.Y - (a.Y - p.Y) * e.X) / den;
+            float u = ((a.X - p.X) * water.Y - (a.Y - p.Y) * water.X) / den;
+            if (t > 0.05f && u >= 0f && u <= 1f && (best == null || t < best)) best = t;
+        }
+        return best;
     }
 
     // ── Samples ──────────────────────────────────────────────────────────────────────────────────
@@ -515,6 +628,11 @@ public sealed class ShoreSynth
     {
         public float Width, Along, SwellDelay, Sweep;
         public int Swash, Break;
+        // A whole outline's (OutlineControl): its piece's length, its own sea, and where its water lies at points along it.
+        public float Length, Hs, Tp = 1f;
+        public bool SeaSet;
+        public int Samples;
+        public readonly float[] Fetch = new float[OutlineSamples], Bearing = new float[OutlineSamples];
         public Train Wind = null!;
         public Train? Eddy;
         public float Prev, Crest = float.MinValue, Trough = float.MaxValue;
@@ -653,6 +771,15 @@ public sealed class ShoreSynth
                      && (Spec.Face != ShoreFace.Beach || WindWaves.Iribarren(MathF.Max(0.005f, Spec.BeachSlope), windHs, 1f / windHz) >= 0.5f);
         foreach (var c in _columns)
         {
+            if (_outline)
+            {
+                // A whole outline: each column its own sea; a column with no piece, or no waves on it, is still.
+                if (c.Width <= 0f) continue;
+                windHs = MathF.Max(0f, c.Hs);
+                windHz = c.Tp > 0f ? 1f / c.Tp : 1f;
+                apart = _swell != null && windHs > 0f
+                        && (Spec.Face != ShoreFace.Beach || WindWaves.Iribarren(MathF.Max(0.005f, Spec.BeachSlope), windHs, 1f / windHz) >= 0.5f);
+            }
             float eta = windHs > 0f ? windHs * c.Wind.Advance(windHz, dt, _rng) : 0f;
             if (apart)
             {
@@ -704,9 +831,10 @@ public sealed class ShoreSynth
         // Out on the water: a steep young sea breaks in whitecaps over the strip in front of the edge. A
         // young sea is short-crested: about one crest a wavelength across and a wavelength apart, each
         // breaking along a third of its length.
-        if (!eddy && _hs > 0f && WhitecapPart > 0f)
+        float seaHs = _outline ? c.Hs : _hs, seaTp = _outline ? c.Tp : _tp;
+        if (!eddy && seaHs > 0f && WhitecapPart > 0f)
         {
-            float b = WindWaves.BreakingProbability(_hs, _tp, WindSpeed);
+            float b = WindWaves.BreakingProbability(seaHs, seaTp, WindSpeed);
             float l = MathF.Max(0.2f, WindWaves.DeepWavelength(period));
             float crestSpeed = WindWaves.Gravity * period / (2f * MathF.PI);
             int n = crestSpeed > AirOnset ? _rng.Poisson(b * (WhitecapStripMetres / l) * (w / l)) : 0;

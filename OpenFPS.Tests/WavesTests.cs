@@ -302,13 +302,14 @@ public class WavesTests
     // ── On the maps ────────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Albany and Magnolia have their ponds' edges as stretches of shore (tools/gen_osm.py): each a model
-    /// this client knows, its box a stretch of about 20 m and a fetch of at least a metre, its +Z turned to
-    /// the water (ten metres out from most of them is a water surface, behind none of them).
+    /// Albany and Magnolia have their ponds' edges as whole outlines of shore (tools/gen_osm.py, 2026-10-17): each a
+    /// model this client knows, its line closed and running round its water anticlockwise, so the water is on its
+    /// left (five metres to the left of half its points or more is a water surface, to the right of none of them), and its
+    /// box the outline's bounds.
     /// </summary>
     [Theory]
-    [InlineData("albany_or", 200)]
-    [InlineData("magnolia_tx", 30)]
+    [InlineData("albany_or", 8)]
+    [InlineData("magnolia_tx", 1)]
     public void A_real_places_ponds_have_their_shores(string id, int atLeast)
     {
         string root = RepoRoot();
@@ -321,7 +322,7 @@ public class WavesTests
         using var map = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "OpenFPS.Server", "maps", "places", id + ".json")));
         static Vector3 V(JsonElement e) => new(e.GetProperty("X").GetSingle(), e.GetProperty("Y").GetSingle(), e.GetProperty("Z").GetSingle());
         var water = new List<(Vector3 At, Quaternion Rot, Vector3 Half)>();
-        var shores = new List<(string Prefab, Vector3 At, Quaternion Rot, Vector3 Scale)>();
+        var shores = new List<(string Prefab, Vector3 At, Vector3 Scale, Vector3[] Line)>();
         foreach (var e in map.RootElement.GetProperty("Entities").EnumerateArray())
         {
             string prefab = e.GetProperty("PrefabId").GetString()!;
@@ -331,30 +332,40 @@ public class WavesTests
                 : Quaternion.Identity;
             var scale = e.TryGetProperty("Scale", out var sc) ? V(sc) : Vector3.One;
             if (prefab == "water_surface") water.Add((at, rot, new Vector3(4f, 0.1f, 4f) * scale / 2f));
-            else if (prefab.StartsWith("shore_", StringComparison.Ordinal)) shores.Add((prefab, at, rot, scale));
+            else if (prefab.StartsWith("shore_", StringComparison.Ordinal))
+            {
+                Assert.True(e.TryGetProperty("Line", out var line), $"a shore at {at} has no line");
+                shores.Add((prefab, at, scale, line.EnumerateArray().Select(p => at + V(p)).ToArray()));
+            }
         }
-        _o.WriteLine($"{id}: {shores.Count} stretches of shore, {water.Count} water boxes");
+        _o.WriteLine($"{id}: {shores.Count} shores, {water.Count} water boxes");
         Assert.True(shores.Count >= atLeast);
-        // The water boxes cover a pond in 8 m cells inside its outline, so a stretch's water is looked for
-        // ten metres out; its land side must never be water.
         bool InWater(Vector3 p) => water.Any(w =>
         {
             var local = Vector3.Transform(p - w.At, Quaternion.Inverse(w.Rot));
             return MathF.Abs(local.X) <= w.Half.X + 0.5f && MathF.Abs(local.Z) <= w.Half.Z + 0.5f;
         });
-        int overWater = 0, overLand = 0;
-        foreach (var (prefab, at, rot, scale) in shores)
+        int left = 0, right = 0, points = 0;
+        foreach (var (prefab, at, scale, line) in shores)
         {
             Assert.True(prefabs.ContainsKey(prefab), prefab);
             string sound = prefabs[prefab].GetProperty("SoundId").GetString()!;
             Assert.True(ModelLibrary.Knows(ModelLibrary.Kinds.Shore, sound[6..]), sound);
-            Assert.InRange(scale.X, 5f, 30f);
-            Assert.True(scale.Z >= 1f);
-            if (InWater(at + Vector3.Transform(new Vector3(0f, 0f, 10f), rot))) overWater++;
-            if (InWater(at + Vector3.Transform(new Vector3(0f, 0f, -10f), rot))) overLand++;
+            Assert.True(Vector3.Distance(line[0], line[^1]) < 0.01f, $"the shore at {at} is not closed");
+            Assert.All(line, p => Assert.True(MathF.Abs(p.X - at.X) <= 0.5f * scale.X + 0.01f && MathF.Abs(p.Z - at.Z) <= 0.5f * scale.Z + 0.01f));
+            var path = new OpenFPS.Client.AudioEngine.Core.Nature.LinePath(line);
+            for (float s = 5f; s < path.Length; s += 10f)
+            {
+                var p = path.PointAt(s - path.HalfLength);
+                var d = path.DirectionAt(s - path.HalfLength);
+                var leftward = Vector3.Normalize(new Vector3(-d.Z, 0f, d.X));
+                points++;
+                if (InWater(p + 5f * leftward)) left++;
+                if (InWater(p - 5f * leftward)) right++;
+            }
         }
-        _o.WriteLine($"  {overWater} of {shores.Count} have water 10 m out on their +Z, {overLand} behind them");
-        Assert.True(overWater >= 0.6 * shores.Count);
-        Assert.Equal(0, overLand);
+        _o.WriteLine($"  of {points} points along them, {left} have water 5 m to their left, {right} to their right");
+        Assert.True(left >= 0.5 * points);
+        Assert.True(right <= 0.02 * points);
     }
 }

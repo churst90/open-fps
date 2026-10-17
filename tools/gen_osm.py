@@ -3734,41 +3734,25 @@ for nm, F, u0, u1, v0, v1, y0, y1, pin in named_places:
 
 # ══ Shores ════════════════════════════════════════════════════════════════════════════════════════
 #
-# Waves lapping at the edge of every pond and lake (ShoreSpec, ShoreSynth; docs/WAVES_AND_SHORES.md).
-# The edge is cut into stretches of about SHORE_STRETCH metres along the real outline, each a source
-# whose box says what the waves at it are made from: X the stretch's length along the edge, Z the
-# fetch, how far the water reaches straight out from it to the far side (the wind blowing straight
-# onshore has that much water to raise waves over), its +Z turned to the water. The client works the
-# fetch at any other wind from it, and the wind is the weather's, so a stretch on the lee side of a pond
-# is still and the one the wind blows onto laps. A swimming pool's edge is a skimmer, not a shore, and a
-# stream's water is the running water's (RunningWaterSpec). Which bank it is: what the land cover says
-# just ashore, a reed bed where WorldCover has herbaceous wetland, a grassed bank otherwise (nothing open
-# says what a pond's edge is made of). Laid after the named places so no other id moves.
+# Waves lapping at the edge of every pond and lake (ShoreSpec, ShoreSynth; docs/WAVES_AND_SHORES.md), heard along
+# its whole outline as one source (2026-10-17, docs/RUNNING_WATER.md 15.7): its Line the real outline, running
+# anticlockwise so the water is on its left. The client cuts it at the ear and works out, piece by piece, which way
+# the water lies and how far it reaches across the outline (the fetch), and the wind is the weather's, so the lee
+# shore is still and the one the wind blows onto laps. A swimming pool's edge is a skimmer, not a shore, and a
+# stream's water is the running water's (RunningWaterSpec). Which bank it is: what the land cover says just ashore
+# along most of it, a reed bed where WorldCover has herbaceous wetland, a grassed bank otherwise (nothing open says
+# what a pond's edge is made of). The stretches of about SHORE_STRETCH metres each outline was cut into until then
+# keep their ids, unused, and the outlines are laid last (lay_shores), so no other id moves.
 SHORE_STRETCH = 20.0
 SHORE_CLASSES = ("pond", "water", "lake", "reservoir", "basin", "lagoon")
 n_shores = 0
+SHORE_RINGS = []                         # (outline anticlockwise, name, preset), laid whole by lay_waterways
 
 
 def ring_ccw(ring):
     """The ring turning anticlockwise (x east, z north), so the water is on the left of the way it runs."""
     a = sum(ring[i - 1][0] * ring[i][1] - ring[i][0] * ring[i - 1][1] for i in range(len(ring)))
     return list(ring) if a > 0 else list(reversed(ring))
-
-
-def fetch_across(ring, x, z, nx, nz):
-    """How far a ray from (x, z) along (nx, nz) runs inside the ring before it leaves, m."""
-    best = None
-    for i in range(len(ring)):
-        (ax, az), (bx, bz) = ring[i - 1], ring[i]
-        ex, ez = bx - ax, bz - az
-        den = nx * ez - nz * ex
-        if abs(den) < 1e-12:
-            continue
-        t = ((ax - x) * ez - (az - z) * ex) / den
-        s = ((ax - x) * nz - (az - z) * nx) / den
-        if t > 0.05 and 0.0 <= s <= 1.0 and (best is None or t < best):
-            best = t
-    return best or 1.0
 
 
 if LEVEL >= 1:
@@ -3786,6 +3770,7 @@ if LEVEL >= 1:
         n = max(1, int(round(perim / SHORE_STRETCH)))
         piece = perim / n
         nm = (wf["name"] or "Pond") + " shore"
+        reeds = banks = 0
         for k in range(n):
             ax, az = point_at(closed, k * piece)
             bx, bz = point_at(closed, (k + 1) * piece)
@@ -3794,13 +3779,15 @@ if LEVEL >= 1:
             nx, nz = -math.sin(a), math.cos(a)            # to the left: the water
             if not in_area(mx, mz):
                 continue
-            fetch = round(fetch_across(ring, mx + 0.1 * nx, mz + 0.1 * nz, nx, nz))
-            ashore = landcover_at(mx - 5.0 * nx, mz - 5.0 * nz)
-            preset = "reed_shore" if ashore == "M" else "pond_bank"
-            e = {"EntityId": new_id(), "PrefabId": "shore_" + preset, "Position": v3(mx, Y_ROAD + 0.06, mz),
-                 "Rotation": yaw(-a), "Scale": v3(round(piece, 2), 1, max(1, fetch))}
-            _finish(e, nm, "water")
-            n_shores += 1
+            if landcover_at(mx - 5.0 * nx, mz - 5.0 * nz) == "M":
+                reeds += 1
+            else:
+                banks += 1
+            # Until 2026-10-17 each stretch was a source of its own; the whole outline is one now (lay_shore, last).
+            # The stretch's id is kept, unused, so no other id moves.
+            new_id()
+        if reeds + banks:
+            SHORE_RINGS.append((ring, nm, "reed_shore" if reeds > banks else "pond_bank"))
 
 
 # ══ Waterways heard ═══════════════════════════════════════════════════════════════════════════════
@@ -3861,12 +3848,50 @@ def water_y(x, z, nx, nz, width):
 
 
 def lay_waterways():
-    """Each waterway's parts, written after every other entity (just before the ground is laid) so no other id moves."""
-    global n_waterways
+    """Each waterway's parts, then each pond's and lake's whole outline and each river's banks, written after every other
+    entity (just before the ground is laid) so no other id moves."""
     for wf in WATER:
         if wf["kind"] == "area":
             continue
         lay_waterway(wf)
+    for ring, nm, preset in SHORE_RINGS:
+        lay_shore(ring + [ring[0]], nm, preset)
+    for wf in WATER:
+        if wf["kind"] != "area" and (wf["class"] in RIVER_CLASSES or waterway_width(wf) >= RIVER_WIDTH):
+            lay_river_banks(wf)
+
+
+# A river's banks (ShoreSpec.RiverBank: the current's eddies off the bank) along both its edges, each heard along its
+# whole length, the water on its left as a pond's outline has it. A stream's banks are its own running water's.
+RIVER_CLASSES = ("river", "canal")
+RIVER_WIDTH = 8.0                        # a waterway this wide or wider is a river whatever it is called, m
+
+
+def lay_shore(points, nm, preset):
+    """One source along a shore's outline or a bank (shore_<preset>), the water on the left of the way its points run, on
+    the ground at the water's edge. Its box is the outline's bounds, so it is sent with every tile it runs through."""
+    global n_shores
+    xs, zs = [p[0] for p in points], [p[1] for p in points]
+    cx, cz = (min(xs) + max(xs)) / 2, (min(zs) + max(zs)) / 2
+    cy = ground(cx, cz) + Y_ROAD + 0.06
+    pts3 = [(x, ground(x, z) + Y_ROAD + 0.06, z) for x, z in points]
+    e = {"EntityId": new_id(), "PrefabId": "shore_" + preset, "Position": v3(cx, cy, cz),
+         "Scale": v3(round(max(1.0, max(xs) - min(xs)), 2), 1, round(max(1.0, max(zs) - min(zs)), 2)),
+         "Line": [v3(x - cx, y - cy, z - cz) for x, y, z in pts3]}
+    _finish(e, nm, "water")
+    e["_pin"] = 0.0
+    n_shores += 1
+
+
+def lay_river_banks(wf):
+    width = waterway_width(wf)
+    nm = (wf["name"] or "River") + " bank"
+    for part in clip_line([P(a, b) for a, b in wf["line"]]):
+        line = simplify(part, WATERWAY_TOL)
+        # The right bank runs with the water, which lies on its left; the left bank runs against it.
+        for bank in (offset_line(line, -width / 2), list(reversed(offset_line(line, width / 2)))):
+            for piece in cut_at_tiles(bank):
+                lay_shore(piece, nm, "river_bank")
 
 
 def lay_waterway(wf):
@@ -4281,7 +4306,7 @@ print(f"  area {XMAX - XMIN:.0f} x {ZMAX - ZMIN:.0f} m; {len(ROADS)} roads, {len
       f"({INTERPOLATED} interpolated from Census ranges), {len(LOTS)} lots, {len(BLD)} buildings")
 print("  buildings: " + ", ".join(f"{k} {STATS[k]}" for k in ("house", "mobile_home", "premises", "church", "building", "garage", "workshop", "barn", "outbuilding", "shed")))
 print(f"  {regions} zones and rooms, {by_prefab['named_place']} named places, {STATS['doors']} outside doors, "
-      f"{n_canopy} canopy volumes, {n_trunks} trunks, {n_crowns} crowns, {n_shores} stretches of shore, {n_waterways} waterways heard, {len(VEHICLES)} vehicles")
+      f"{n_canopy} canopy volumes, {n_trunks} trunks, {n_crowns} crowns, {n_shores} shores and banks heard whole, {n_waterways} waterways heard, {len(VEHICLES)} vehicles")
 print("  by layer: " + ", ".join(f"{k} {v}" for k, v in sorted(COUNT.items())))
 if STATS["kitchens with a corner counter"]:
     print(f"  {STATS['kitchens with a corner counter']} kitchens with no clear stretch of back wall have a short counter in a corner")

@@ -309,9 +309,10 @@ public sealed class PlacedNatureVoice
 
     /// <summary>Waves at an edge (ShoreSynth); fetch, lie and length come from the map's key
     /// (ShoreSpec.KeyFor).</summary>
-    public PlacedNatureVoice(string key, ShoreSpec spec, ShoreGeometry geometry, float sampleRate, int seed, Vector3 position, WorldWeather weather)
-        : this(spec.TotalPlaces, sampleRate, position, spec.SourceLevelDb, spec.PeakHeadroomDb, 10f, weather)
-        => Shore = new ShoreSynth(spec, sampleRate, seed, geometry);
+    public PlacedNatureVoice(string key, ShoreSpec spec, ShoreGeometry? geometry, float sampleRate, int seed, Vector3 position, WorldWeather weather,
+                             int outlinePlaces = 0)
+        : this(outlinePlaces > 0 ? outlinePlaces : spec.TotalPlaces, sampleRate, position, spec.SourceLevelDb, spec.PeakHeadroomDb, 10f, weather)
+        => Shore = new ShoreSynth(spec, sampleRate, seed, geometry, outlinePlaces);
 
     private PlacedNatureVoice(int places, float sampleRate, Vector3 position, float levelDb, float headroomDb, float windHeight,
                               WorldWeather weather)
@@ -419,6 +420,7 @@ public sealed class PlacedNatureVoice
             // too short to raise waves.
             var air = Weather.Wind.At(now);
             Shore.Spread = spread;
+            Shore.Cut = TargetCut;
             Shore.WindSpeed = Running ? air.Speed : 0f;
             Shore.WindFromDegrees = air.FromDegrees;
             Shore.Control(dt);

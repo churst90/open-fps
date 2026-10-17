@@ -469,9 +469,11 @@ public sealed partial class Catalogue : IPresets
     RunningWaterSpec IPresets.Flow(string key)
         => GroundChannels.TryParse(key, out var ground) ? ground : Flow(key);
 
-    // A map's key with its geometry ("shore:lake_sand/300/90/20") names its preset.
+    // A map's key with its geometry ("shore:lake_sand/300/90/20") names its preset; a whole outline's
+    // ("shore:pond_bank/outline/410") is as loud as its stretches together.
     ShoreSpec IPresets.Shore(string key)
     {
+        if (ShoreSpec.TryOutline(key, out string outlined, out float perimeter)) return Shore(outlined).AlongOutline(perimeter);
         ShoreSpec.ParseKey(key, out string preset, out _);
         return Shore(preset);
     }
