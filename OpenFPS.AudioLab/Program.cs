@@ -173,6 +173,9 @@ string[] usage =
     "Rooms, paths and the mixer",
     "  --clap-room [out=] [claps=] [sound=click|WEAPON] [dist=] [bed] [tail=raw] [late=velvet] [copies=0] [early=old] [probe=MS]",
     "  --clap-city [out=DIR] [at=x,y,z] [yaw=] [claps=]: your own clap in Selby House's lobby through the whole client path; the tail's two ears",
+    "  --busy-street [out=DIR] [at=x,z] [yaw=] [sec=40] [warm=10] [rain=10] [every=1] [prerun=20] [rule=old] [all]",
+    "                                                the city's traffic, walkers and rain through the whole client; who holds the binaural pool",
+    "  --busy-street cost [stages=160] | handover    what a binaural stage costs; whether a voice let go of one leaves click-free",
     "                                                a clap in Marlow flat 01F through the whole mixer",
     "  --room-walk [seconds= speed= out=] [cone|reverb|boundary|steps|megaphone=off] [still] [echo=on] [clock]",
     "                                                the wood room walked with the megaphone on, captured",
@@ -880,6 +883,10 @@ if (args.Contains("--presence-sounds"))
 if (args.Contains("--room-echoes"))
 {
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.RoomEchoesSpike.Run(args));
+}
+if (args.Contains("--busy-street"))
+{
+    Environment.Exit(OpenFPS.AudioLab.Spikes.BusyStreetSpike.Run(args));
 }
 if (args.Contains("--clap-city"))
 {

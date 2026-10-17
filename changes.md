@@ -4,6 +4,17 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-17
 
+- The binaural pool goes by how loud a voice is at the ear, not who asked first (docs/CLIENT_NOTES.md "The binaural
+  pool"). On a busy street other people's footsteps 140 to 180 m off held up to 70 of its 160 stages while a horn,
+  the raindrops at your feet, birds and nearer steps were refused and never played, the budgets gave up machines
+  and borrowed cars for want of stages, and every reverb bus kept a head while four at most were heard. Now a
+  one-shot more than 40 dB under the loudest voice playing is not started, a voice takes a stage only while it is
+  louder than the quietest holding one once the pool runs low, the quietest are let go (faded over 80 ms, then
+  stopped) to keep 24 free, and a reverb bus holds its head only while heard, before any voice. Measured with
+  AudioLab `--busy-street` (the city's own traffic, walkers and trains through the whole client; `rule=old` for
+  before): refused 307 to 0, free at least 0 to 27, the mixer 91 % to 71 %, the budgets no longer shed for the pool.
+  `--busy-street cost`: a stage costs 22 us a block (0.1 % of the mixer). `--busy-street handover`: a voice let go
+  ends with no step. The wire hash does not change.
 - Your own room's reverberation is binaural again after walking in from a busy street. A room's reverb bus takes
   a binaural voice for its head only above the direct sounds' reserve; made while traffic and rain held the rest
   (Selby House's lobby), it had none and stayed 3D, and FMOD's panner folds a 3D bus's two channels into one even

@@ -322,6 +322,13 @@ The rest were fixed and merged (246a4e1c, 7a9b6c85).
 ### Listen in the game (Cody)
 Built and measured, not heard in the game. Restart the server and update the client first. The /tp spots
 here are checked to stand on (docs/LISTENING_SPOTS.md).
+- The binaural pool by rank (2026-10-17, docs/CLIENT_NOTES.md "The binaural pool"). On Main Street in traffic,
+  `/weather rain heavy`, at `/tp 7.0 121.0 0.2`: cars passing close are outside the head, left to right with no
+  jump inside or above it; the rain is wide all round; a bus's horn and the drops at your feet always sound; no
+  clicks or dropouts as cars come and go (a voice let go fades over 80 ms). Far walkers' steps you could not make
+  out under the traffic are no longer played; the near ones are. The log's "Mixer load" line should read
+  "0 refused for want of one". Then walk into Selby House's lobby (`/tp 15.2 157.1 0.1`) and clap: the tail wide,
+  not the same in both ears.
 - The wind's direction (2026-10-16, docs/CLIENT_NOTES.md "Where the wind comes from"). In Elm Park among the
   trees (`/tp -375.0 195.0 0.2`), `/weather wind 5 west gusty`, stand facing north: the wind in the left ear,
   swinging a little toward the face and the back over tens of seconds, never from the right; turn to face west

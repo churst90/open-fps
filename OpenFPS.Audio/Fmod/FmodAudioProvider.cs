@@ -585,6 +585,16 @@ public partial class FmodAudioProvider : IAudioProvider
         public float FadeGain = 1f;
         public float FadeTarget = 1f;
 
+        /// <summary>Your own steps and speech (SpatialEmitter.Essential): never let go of a binaural stage.</summary>
+        public bool Essential;
+        /// <summary>A one-shot (SpatialEmitter.IsEvent).</summary>
+        public bool OneShot;
+        /// <summary>Let go by the binaural pool's rank (BinauralStages): fading out whatever its budget asks, and stopped
+        /// once silent, so its stage goes to a louder voice. When its fade reached silence, provider clock; negative
+        /// before.</summary>
+        public bool StageLeaving;
+        public double SilentSince = -1;
+
         public Vector3 Position; 
         public Vector3 ApparentPosition; 
         public Vector3 CurrentApparentPosition; 
@@ -941,11 +951,11 @@ public partial class FmodAudioProvider : IAudioProvider
     /// passing close, fell to FMOD's panner with no interaural time difference: "anything that passes
     /// close to me is inverted".
     /// </summary>
-    private const int SaPoolSize = 160;
+    internal const int SaPoolSize = 160;
 
-    /// <summary>Binaural voices only a direct sound may take: an echo or reverb return without HRTF is
-    /// not heard as wrong, a passing car is.</summary>
-    private const int SaDirectReserve = 24;
+    /// <summary>What a reflection leaves in the pool (BinauralStages.ReflectionLeaves): an echo without HRTF is not
+    /// heard as wrong, a passing car is.</summary>
+    private const int SaDirectReserve = BinauralStages.ReflectionLeaves;
 
     /// <summary>What is left of the binaural pool. See IAudioProvider.SpatialVoicesFree.</summary>
     public int SpatialVoicesFree { get { lock (_saPool) return _saPool.Count; } }
@@ -1686,6 +1696,24 @@ public partial class FmodAudioProvider : IAudioProvider
                OpenFPS.Client.AudioEngine.Core.VoiceManager.WithoutHeadroom(a.BaseVolume, a.HeadroomGain), a.MinDistance, a.Range,
                Vector3.Distance(listener, a.Position), 0f, a.EarLevelDb, a.RankKey, a.Physical);
 
+    private readonly List<ActiveSound> _leavers = new();
+
+    /// <summary>
+    /// The binaural pool by the one rank (BinauralStages), once an update after the voices are ranked: the loudest voice
+    /// playing and the floor a voice must outrank for a stage, and the quietest voices let go until the pool has its
+    /// headroom again. Under the active-sound lock.
+    /// </summary>
+    private void RankStages(double now)
+    {
+        if (!_steamAudioEnabled || _lab.FirstComeStages) return;
+        int free = SpatialVoicesFree;
+        _loudestHeard = BinauralStages.Loudest(_activeSounds);
+        _stageFloor = BinauralStages.Floor(_activeSounds, free);
+        BinauralStages.ChooseLeavers(_activeSounds, free, _leavers);
+        foreach (var a in _leavers) a.StageLeaving = true;
+        _leavers.Clear();
+    }
+
     /// <summary>Every voice's <see cref="ActiveSound.Heard"/>, once an update, before the orderings that read it.</summary>
     internal static void RankVoices(OpenFPS.Common.Hearing.HearingSettings hearing, List<ActiveSound> sounds, Vector3 listener)
     {
@@ -2422,19 +2450,22 @@ public partial class FmodAudioProvider : IAudioProvider
         _system.getMasterChannelGroup(out var master);
         master.addGroup(bus);
 
-        TryAttachReverbHead(regionId, bus);
+        // Your own room's at once; another room's when it is heard (SetReverbDirection).
+        if (initialVol > 0f || _lab.FirstComeStages) TryAttachReverbHead(regionId, bus);
     }
 
     /// <summary>
     /// An HRTF voice at a reverb bus's head (its output end, so it places the finished tail): for a listener
     /// outside, the room's reverberation comes from its doorway; inside, it passes the stereo through. The bus
-    /// goes 2D so FMOD does not collapse the binaural pair. Held for the bus's life. Taken from the pool only
-    /// above the direct sounds' reserve, so a bus made on a busy street has none, and asks again while it is
-    /// heard (SetReverbDirection).
+    /// goes 2D so FMOD does not collapse the binaural pair. Held while the bus is heard, and given back once it is
+    /// silent and not one of the rooms heard (ReleaseReverbHead). Taken before any voice: the direct sounds leave the
+    /// heads their reserve (BinauralStages.HeadReserve, one for each bus heard at once), so a bus heard has its head
+    /// however busy the street; one made without (the pool held for the lab) asks again while it is heard
+    /// (SetReverbDirection).
     /// </summary>
     private bool TryAttachReverbHead(int regionId, FMOD.ChannelGroup bus)
     {
-        if (!_steamAudioEnabled || !TryCreateSteamAudioVoice(out var rvState, out var rvDsp, out var rvHandle, SaDirectReserve))
+        if (!_steamAudioEnabled || !TryCreateSteamAudioVoice(out var rvState, out var rvDsp, out var rvHandle, _lab.FirstComeStages ? SaDirectReserve : 0))
             return false;
         rvState!.GuardName = "(a reverb bus's head)";
         SetBusPanning(bus, threeD: false);
@@ -2445,6 +2476,27 @@ public partial class FmodAudioProvider : IAudioProvider
         _reverbSaVoices[regionId] = new SaVoice { State = rvState!, Dsp = rvDsp, Handle = rvHandle };
         return true;
     }
+
+    /// <summary>
+    /// Gives a silent bus's head back to the pool: a bus that is not one of the rooms heard and has faded under
+    /// <see cref="HeadSilentVolume"/>. On the street, twenty-four buses each held a head while four at most were heard
+    /// (AudioLab --busy-street). Taken off the bus first, as a voice's stage is: a stage in two graphs is the crash
+    /// Detach describes.
+    /// </summary>
+    private void ReleaseReverbHead(int regionId, FMOD.ChannelGroup bus)
+    {
+        if (!_reverbSaVoices.TryGetValue(regionId, out var v)) return;
+        bool off = !v.Dsp.hasHandle() || (bus.hasHandle() && bus.removeDSP(v.Dsp) == RESULT.OK) || v.Dsp.disconnectAll(true, true) == RESULT.OK;
+        if (off) { lock (_saPool) { _saPool.Push(v); } }
+        else _failedDetaches++;
+        _reverbSaVoices.Remove(regionId);
+    }
+
+    /// <summary>A bus's level under which its head is given back: 60 dB down, where nothing it carries is heard.</summary>
+    internal const float HeadSilentVolume = 1e-3f;
+
+    /// <summary>Whether a bus keeps its head: while it is one of the rooms heard, or still above silence.</summary>
+    internal static bool KeepsHead(bool candidate, float volume) => candidate || volume >= HeadSilentVolume;
 
     /// <summary>
     /// Whether a reverb bus is placed by FMOD's own 3D panner: only one with no binaural head, heard from
@@ -2796,6 +2848,27 @@ public partial class FmodAudioProvider : IAudioProvider
         return _traced.TryGetValue(regionId, out var t) ? (t.State.InEnergy, t.State.OutEnergy, t.State.ChannelEnergy, t.State.Channels, blend) : (0, 0, 0, 0, blend);
     }
 
+    /// <summary>The lab: one voice playing, whether it holds a binaural stage, how loud it is at the ear (the one
+    /// rank) and how far.</summary>
+    internal readonly record struct StageHolder(int Id, string Sound, bool Stage, bool Reflection, float Heard, float Distance);
+
+    /// <summary>The lab: every voice playing, for a census of who holds the binaural pool.</summary>
+    internal List<StageHolder> StagesForLab()
+    {
+        var list = new List<StageHolder>();
+        lock (_lock)
+            foreach (var a in _activeSounds)
+                list.Add(new StageHolder(a.EntityId, a.SoundId, a.SaState != null, a.IsReflection, a.Heard, Vector3.Distance(_listenerPos, a.Position)));
+        return list;
+    }
+
+    /// <summary>The lab: reverb buses, and how many have their binaural head.</summary>
+    internal (int Buses, int Heads) ReverbHeadsForLab { get { lock (_lock) return (_reverbBuses.Count, _reverbSaVoices.Count); } }
+
+    /// <summary>The lab: told of each voice not started for want of a binaural stage, with how loud it would have
+    /// been at the ear and why (BinauralStages.Answer). Null in the game.</summary>
+    internal Action<SpatialEmitter, float, BinauralStages.Answer>? RefusedForLab { get; set; }
+
     /// <summary>The lab: binaural voices taken out of the pool, as a busy street holds them.</summary>
     private readonly List<SaVoice> _heldForLab = new();
 
@@ -2883,10 +2956,50 @@ public partial class FmodAudioProvider : IAudioProvider
     /// <summary>Ids a voice has been replaced under, each logged once.</summary>
     private readonly HashSet<int> _replacedLogged = new();
 
-    /// <summary>Whether a world voice would be refused for want of a binaural voice (PlaySpatialSound).</summary>
+    /// <summary>The loudest voice playing at the ear and the level a voice must outrank to take a binaural stage, as
+    /// the last update found them (BinauralStages).</summary>
+    private float _loudestHeard, _stageFloor;
+
+    /// <summary>One-shots not started because they would not be heard against the loudest voice playing, and voices
+    /// not started because they were no louder than the quietest holding a stage, since the start (BinauralStages).</summary>
+    private int _unheard, _lastUnheard, _outranked, _lastOutranked;
+
+    /// <summary>Voices let go of their stage for a louder one, since the start.</summary>
+    private int _stagesLetGo, _lastStagesLetGo;
+
+    /// <summary>Whether a world voice is not started for want of a binaural stage (PlaySpatialSound), by the pool's
+    /// rank (BinauralStages.Ask), counted by why. Your own steps and speech and a reflection play without one.</summary>
     private bool RefusedForHrtf(in SpatialEmitter emitter)
-        => _steamAudioEnabled && emitter.Type is EmitterType.EntityAttached or EmitterType.WorldLocked
-           && !emitter.IsReflection && !emitter.Essential && SpatialVoicesFree == 0;
+    {
+        if (!_steamAudioEnabled || emitter.Type is not (EmitterType.EntityAttached or EmitterType.WorldLocked)) return false;
+        if (_lab.FirstComeStages)
+        {
+            if (emitter.IsReflection || emitter.Essential || SpatialVoicesFree > 0) return false;
+            _refusedForHrtf++;
+            RefusedForLab?.Invoke(emitter, HeardOf(emitter), BinauralStages.Answer.Short);
+            return true;
+        }
+        float heard = HeardOf(emitter);
+        var answer = BinauralStages.Ask(SpatialVoicesFree, emitter.Essential, emitter.IsReflection, emitter.IsEvent,
+                                        heard, _loudestHeard, _stageFloor);
+        switch (answer)
+        {
+            case BinauralStages.Answer.Unheard: _unheard++; break;
+            case BinauralStages.Answer.Outranked: _outranked++; break;
+            case BinauralStages.Answer.Short: _refusedForHrtf++; break;
+            default: return false;
+        }
+        RefusedForLab?.Invoke(emitter, heard, answer);
+        return true;
+    }
+
+    /// <summary>How loud a voice placed so would be at the ear by what it radiates here: the one rank, as
+    /// <see cref="HeardHere"/> reads a playing voice.</summary>
+    private float HeardOf(in SpatialEmitter e)
+        => OpenFPS.Client.AudioEngine.Core.VoiceManager.HeardLevel(Hearing,
+               OpenFPS.Client.AudioEngine.Core.VoiceManager.WithoutHeadroom(e.Volume, e.HeadroomGain), e.MinDistance, e.Range,
+               Vector3.Distance(_listenerPos, e.Position), 0f, e.EarLevelDb,
+               OpenFPS.Client.AudioEngine.Core.VoiceManager.RankKey(e), OpenFPS.Client.AudioEngine.Core.VoiceManager.IsPhysical(e));
 
     public void PlaySpatialSound(SpatialEmitter emitter)
     {
@@ -2910,11 +3023,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 if (!emitter.IsGranular && !emitter.IsSynth && currentSound.hasHandle() && active.SoundId == emitter.SoundId) { UpdateSpatialAttributes(emitter); return; }
                 // Another voice under this id. The pool is asked first: the old voice's binaural slot comes back
                 // only once the mixer is done with it, so stopped and then refused, the id fell silent.
-                if (RefusedForHrtf(emitter))
-                {
-                    _refusedForHrtf++;
-                    return;
-                }
+                if (RefusedForHrtf(emitter)) return;
                 if (_replacedLogged.Add(emitter.EntityId))
                     Log.Warning("Voice {Id}: {Old} replaced by {New} under one id. Every voice has an id of its own "
                               + "(VoiceRegistry), so one start replacing another is a fault in whoever started it.",
@@ -2923,15 +3032,10 @@ public partial class FmodAudioProvider : IAudioProvider
             }
         }
 
-        // No binaural voice left: not started, rather than played without HRTF, flat and in the middle of
-        // the head. The budgets see it not playing and give voices up when the pool runs low
-        // (ClientAudioSystem.HrtfLowWater). Your own steps and speech (Essential) still play; a reflection
-        // is refused by the pool's reserve already.
-        if (RefusedForHrtf(emitter))
-        {
-            _refusedForHrtf++;
-            return;
-        }
+        // No binaural stage for it by the pool's rank (BinauralStages): not started, rather than played without HRTF,
+        // flat and in the middle of the head. Your own steps and speech (Essential) still play; a reflection without a
+        // stage is placed by FMOD.
+        if (RefusedForHrtf(emitter)) return;
         
         FMOD.ChannelGroup targetGroup = emitter.IsReflection ? _reflectionGroup : default;
         FMOD.Channel channel;
@@ -3278,7 +3382,8 @@ public partial class FmodAudioProvider : IAudioProvider
                 channel.addDSP(CHANNELCONTROL_DSP_INDEX.TAIL, diffractionDsp);
             }
             if (_steamAudioEnabled && TryCreateSteamAudioVoice(out saState, out saDsp, out saHandle,
-                                                               emitter.IsReflection ? SaDirectReserve : 0))
+                                                               emitter.IsReflection ? SaDirectReserve
+                                                               : emitter.Essential || _lab.FirstComeStages ? 0 : BinauralStages.HeadReserve))
             {
                 saState!.GuardName = emitter.SoundId;
                 channel.addDSP(CHANNELCONTROL_DSP_INDEX.TAIL, saDsp);
@@ -3426,6 +3531,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 TargetMid = emitter.EqMid, CurrentMid = emitter.EqMid,
                 TargetHigh = emitter.EqHigh, CurrentHigh = emitter.EqHigh,
                 TargetRegionId = emitter.TargetRegionId, IsReflection = emitter.IsReflection,
+                Essential = emitter.Essential, OneShot = emitter.IsEvent,
                 FollowsListener = emitter.FollowsListener, ListenerOffset = emitter.ListenerOffset,
                 InsideListenersVehicle = emitter.InsideListenersVehicle,
                 RoomGain = emitter.RoomGain,
@@ -3853,11 +3959,13 @@ public partial class FmodAudioProvider : IAudioProvider
         _system.getChannelsPlaying(out int playing, out int real);
         Log.Information("Mixer load: dsp {Dsp:F1}%, update {Update:F1}%, stream {Stream:F1}% — "
                       + "{Engines} engine/echo voice(s) of {Total} active, {Real}/{Playing} real channel(s), "
-                      + "{NoHrtf} direct voice(s) without HRTF ({Misses} new since last, {SaFree} binaural free, {Refused} refused for want of one), {Starve} starve(s), "
+                      + "{NoHrtf} direct voice(s) without HRTF ({Misses} new since last, {SaFree} binaural free, {Refused} refused for want of one; "
+                      + "{Unheard} one-shot(s) not heard against the loudest, {Outranked} outranked, {LetGo} let go for a louder one), {Starve} starve(s), "
                       + "gc {Gen2} gen2 / {Pause:F0} ms paused, {Late} DSP(s) cut loose after their channel went, {Detach} stuck, "
                       + "{WrongBus} send drop(s) on the wrong bus; render pool {Pool:P0} busy",
                         cpu.dsp, cpu.update, cpu.stream, voices, _activeSounds.Count, real, playing,
                         noHrtf, _saPoolMisses - _lastSaPoolMisses, SpatialVoicesFree, _refusedForHrtf - _lastRefusedForHrtf,
+                        _unheard - _lastUnheard, _outranked - _lastOutranked, _stagesLetGo - _lastStagesLetGo,
                         starves - _lastStarves, gen2 - _lastGen2, pauseMs - _lastPauseMs,
                         _lateDetaches - _lastLateDetaches, _failedDetaches - _lastFailedDetaches,
                         _sendDropsOnWrongBus, _enginePool?.TakeBusy() ?? 0f);
@@ -3867,6 +3975,7 @@ public partial class FmodAudioProvider : IAudioProvider
                         ours * 100f, profile, Math.Max(0f, cpu.dsp - ours * 100f));
         _lastSaPoolMisses = _saPoolMisses; _lastFailedDetaches = _failedDetaches;
         _lastRefusedForHrtf = _refusedForHrtf;
+        _lastUnheard = _unheard; _lastOutranked = _outranked; _lastStagesLetGo = _stagesLetGo;
         _lastLateDetaches = _lateDetaches;
         _lastStarves = starves; _lastGen2 = gen2; _lastPauseMs = pauseMs;
 
@@ -3960,6 +4069,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 UpdateActiveReverbs(lPosVec);
                 UpdateTracedStages();
                 RankVoices(Hearing, _activeSounds, lPosVec);
+                RankStages(Clock.Now);
                 UpdateTracedEchoes();
                 ChooseEngineDetail(_activeSounds, lPosVec, Mix.ReducedFarEngines);
                 UpdateLateField();
@@ -3969,6 +4079,13 @@ public partial class FmodAudioProvider : IAudioProvider
                 {
                     var active = _activeSounds[i];
                     active.Channel.isPlaying(out bool isPlaying);
+                    // Let go of its stage, and silent long enough that the channel's ramp is at zero: stopped.
+                    if (isPlaying && BinauralStages.StopsNow(active, Clock.Now))
+                    {
+                        active.Channel.stop();
+                        isPlaying = false;
+                        _stagesLetGo++;
+                    }
                     if (!isPlaying) {
                         // Out of the voices now, its units taken off later (ReleaseRetired).
                         RemoveActiveAt(i);
@@ -4474,8 +4591,7 @@ public partial class FmodAudioProvider : IAudioProvider
 
         // The budget's fade, here because this pass owns the voice's gain: long enough that no step
         // survives it, short enough that a voice gone does not linger.
-        float fadeStep = dt / VoiceFadeSeconds;
-        active.FadeGain += Math.Clamp(active.FadeTarget - active.FadeGain, -fadeStep, fadeStep);
+        BinauralStages.Fade(active, dt, VoiceFadeSeconds, Clock.Now);
 
         active.LastVolume = active.BaseVolume * finalVolFactor * roomGainBonus * distAtten * coneAtten
                             * active.FadeGain * (active.OverloadExempt || active.IsReflection ? 1f : _overloadGain)
@@ -4599,7 +4715,7 @@ public partial class FmodAudioProvider : IAudioProvider
     }
 
     /// <summary>How many region reverb buses may be audible at once; the rest fade to silence.</summary>
-    private const int MaxActiveReverbBuses = 4;
+    internal const int MaxActiveReverbBuses = 4;
 
     /// <summary>Each room's reverberation time as last measured from inside it, seconds.</summary>
     private readonly Dictionary<int, float> _regionDecaySeconds = new();
@@ -4687,6 +4803,7 @@ public partial class FmodAudioProvider : IAudioProvider
             float dtBus = _attributeDt > 0f ? _attributeDt : 0.004f;
             _reverbVolumes[regionId] = current + (targetVol - current) * (1f - MathF.Exp(-dtBus / MathF.Max(0.01f, tau)));
             bus.setVolume(BusVolume(regionId, _reverbVolumes[regionId]));
+            if (!_lab.FirstComeStages && !KeepsHead(candidateIds.Contains(regionId), _reverbVolumes[regionId])) ReleaseReverbHead(regionId, bus);
 
             if (_audioDebug && _dbgFrame % 60 == 0)
             {
@@ -5130,7 +5247,7 @@ public partial class FmodAudioProvider : IAudioProvider
     }
 
     /// <summary>How long the budget's fade takes, seconds. See ActiveSound.FadeGain.</summary>
-    private const float VoiceFadeSeconds = 0.08f;
+    internal const float VoiceFadeSeconds = 0.08f;
 
     public bool FadeOutVoice(int entityId)
     {

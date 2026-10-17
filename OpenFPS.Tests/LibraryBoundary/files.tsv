@@ -77,6 +77,7 @@ OpenFPS.Audio/Core/VoiceRegistry.cs	lib	Audio
 OpenFPS.Audio/Data/AcousticPathData.cs	lib	Audio	
 OpenFPS.Audio/Data/AudioSources.cs	lib	Audio	
 OpenFPS.Audio/Data/SpatialEmitter.cs	lib	Audio	
+OpenFPS.Audio/Fmod/BinauralStages.cs	lib	Audio	
 OpenFPS.Audio/Fmod/BoundaryProximityProcessor.cs	lib	Audio	
 OpenFPS.Audio/Fmod/DspFault.cs	lib	Audio	
 OpenFPS.Audio/Fmod/EarStage.cs	lib	Audio	

@@ -580,7 +580,48 @@ settles rather than churning at the ceiling. The machine budget counts voices (2
 fountain is five voices and a train up to six.
 
 A voice the binaural pool has no stage for is not started (FmodAudioProvider.PlaySpatialSound),
-rather than played flat in the middle of the head; the budgets see it not playing and give voices up.
+rather than played flat in the middle of the head. Who gets a stage is the next section's.
+
+## The binaural pool
+
+Every direct sound in the world is placed by its own binaural stage: Steam Audio's HRTF on the voice, and a
+second one for its ground image. There are 160 (FmodAudioProvider.SaPoolSize), made once at start. A stage costs
+the mixer 22 us a block of 1024 at 48 kHz (both HRTFs; 9 us without the ground), about 0.1 % of its real time,
+so all 160 take 16 % of the mixer's core (AudioLab `--busy-street cost`; Cody's log of 2026-10-17 has binaural at
+16 % of the mixer with about 150 stages in use). On the busy street the mixer is near its ceiling already, so the
+pool is not made bigger: it is given by rank.
+
+Until 2026-10-17 it was first come, first served. On Main Street in traffic and rain (Cody's log, and
+`--busy-street rule=old`, which runs the city's own traffic, walkers and trains through the whole client) the pool
+sat at 0 to 20 free. Other people's footsteps 140 to 180 m off, down to 55 dB under the loudest voice playing,
+held 25 to 70 stages at any moment; each reverb bus made held a head for its life, 24 of them with four at most
+heard. Meanwhile a horn 9 dB under the loudest voice, raindrops at your feet, birds and nearer steps were refused
+and never played (100 to 300 every few seconds), and the budgets, told the pool was short, gave up machines,
+places and borrowed cars, whose stages the far steps then took. A reverb bus made then got no head and went mono
+(134bfa85).
+
+The rule now (BinauralStages), one rank for every voice, the one the budgets use (VoiceManager.HeardLevel):
+
+- A one-shot more than 40 dB under the loudest voice playing at the ear is not heard against it and is not started.
+- A voice takes a stage while the pool has one above the reverb heads' reserve (4, one for each bus heard at once).
+- Once the pool is down to twice its headroom (44 free), only a voice louder than the quietest holding a stage
+  (by 2 dB) takes one; once it is under its headroom (24 free), the quietest voices holding one are let go until
+  it is back. A voice let go fades over the budget's 80 ms and is stopped two mixer blocks after it is silent.
+- A reverb bus takes its head before any voice, while it is heard, and gives it back once it is silent and not
+  one of the rooms heard.
+- A stage is a voice's for its life. A voice is never handed between the HRTF and FMOD's panner: without a stage
+  it is flat, in the middle of the head, and the mode change is a step. Your own steps and speech, and a
+  reflection without a stage, still play panned, as before.
+
+Measured with `--busy-street` (Release, 40 s at Cody's spot, rain 10 mm/h): refused for want of a stage, 307 to
+0; binaural free at least 0 to at least 27; reverb heads 24 to 2; the mixer's binaural share 20 % to 13 % and its
+load 91 % to 71 %; the budgets kept 32 engines, 14 machine voices and 12 borrowed cars where they had been taken
+down to 23, 6 and 4. About 50 steps a second are not started, all more than 40 dB under the loudest voice; the
+nearer ones keep their stages. A voice let go (`--busy-street handover`) falls over 70 ms with no step at its end
+(its second difference 11 dB under the tone's own); the same tone stopped outright is a 46 dB click.
+
+The log's "Mixer load" line says, beside the free stages, how many were refused for want of one (should stay 0),
+how many one-shots were not heard against the loudest, how many voices were outranked and how many let go.
 
 ## Why an echo is smeared
 

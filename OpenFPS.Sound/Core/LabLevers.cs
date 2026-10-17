@@ -73,4 +73,8 @@ public sealed class LabLevers
     /// <summary>The rain on the roof of the vehicle you ride in left in the world rather than riding with your head,
     /// to tell what riding with it does (RainField).</summary>
     public bool RainRoofInTheWorld { get; set; }
+
+    /// <summary>The binaural pool first come, first served, as before 2026-10-17 (BinauralStages): a voice refused only
+    /// when no stage is left, every reverb bus holding a head for its life.</summary>
+    public bool FirstComeStages { get; set; }
 }
