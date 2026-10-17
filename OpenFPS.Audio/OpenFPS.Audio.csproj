@@ -1,14 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- The sound library's runtime (docs/SOUND_LIBRARY_BOUNDARY.md, stage 6): the FMOD mixer and its voices
+  <!-- The sound library's runtime (docs/SOUND_LIBRARY_BOUNDARY.md, stages 6 and 7): the FMOD mixer and its voices
        (Fmod/), Steam Audio's scenes, tracing and binaural stages (SteamAudio/), the acoustic worker and the
-       paths it answers (Acoustics/), the source description the host fills (Data/), the facade, the voice
-       manager, the bank, the door render cache and the placing thread (Core/), and the rain heard round the
-       listener (RainField, NearDrops). It reads the world through IAcousticWorld and names nothing of the game:
-       Client.Core is its host.
+       paths it answers (Acoustics/), the sources and the listener the host fills (Data/), the audio world and its
+       voice registry, the host's interface, the facade, the voice manager, the bank, the door render cache and the
+       placing thread (Core/), and the rain heard round the listener (RainField, NearDrops). It reads the world
+       through IAcousticWorld and IAudioSources and names nothing of the game: Client.Core is its host
+       (ClientAudioSystem).
 
        Namespaces are those the files had in Client.Core (decision 6): OpenFPS.Client.AudioEngine.* and
-       OpenFPS.Client.Core.AudioEngine.SteamAudio, and OpenFPS.Client.Core for the rain. -->
+       OpenFPS.Client.Core.AudioEngine.SteamAudio, and OpenFPS.Client.Core for the rain, the audio world
+       (ClientAudioSystem's body) and the voice registry. -->
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -36,11 +38,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- The host, until stage 7 splits its audio system, reaches the worker's and the rain's hooks (the worker's
-         manual mode and traced set, the rain's ear speed and survey), the voice manager's heard level and the
-         voices' starve count. The tests and the lab's spikes reach its internals directly: that is what a
-         spike is. -->
-    <InternalsVisibleTo Include="OpenFPS.Client.Core" />
+    <!-- The tests and the lab's spikes reach its internals directly: that is what a spike is. The host does not
+         (stage 7): open-fps's client reaches the audio world through AudioWorld, IAudioHost and the source table. -->
     <InternalsVisibleTo Include="OpenFPS.Tests" />
     <InternalsVisibleTo Include="OpenFPS.AudioLab" />
   </ItemGroup>
