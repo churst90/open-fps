@@ -6,6 +6,11 @@ tag (docs/SOUND_LIBRARY_BOUNDARY.md, stage 8 and decision 8) and references the 
 
 ## Unreleased
 
+- A fire and a wood are cut at the ear like running water (changes.md, 2026-10-18; docs/FIRE.md 12.13): new
+  `ExtendedSources` members for it (`CutPoints`, `PlacePoints`, `FireOutline`, `FlamesFor` and their kin),
+  `ExtendedSources.CutArea` gains optional `fire`, `flames`, `rise`, `origin` and `turn` parameters (a recompile
+  binds them; a host calling it for an open water changes nothing), and `WideSources` gains `IsFire`, `IsWood`,
+  `IsArea` and `IsCut`. A host using `AudioWorld` need do nothing.
 - A 16-bit buffer registered with `RegisterSynthesisedSound` and played as a loop loops; it played once. A host need
   do nothing.
 - Speakers sharing a program keep one track clock (Resonance's 3.3; changes.md, 2026-10-17). A loudspeaker's program

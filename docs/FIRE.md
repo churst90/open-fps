@@ -923,3 +923,44 @@ thread. Its sound would be hundreds of emitters, which is why aggregation is fir
 - Tohidi, Kaye, Bridges 2015. Statistical description of firebrand size and shape distribution from coniferous trees. Fire Safety J. 77, 21-35 [recalled].
 - Van Wagner 1977. Conditions for the start and spread of crown fire. Can. J. For. Res. 7, 23-34 [recalled].
 - Johnson, Anderson, Yedinak 2025; Trelles and Pagni 1997; Viegas et al. 2008: section 11.
+
+### 12.13 Fires and woods cut at the ear (2026-10-18)
+
+Step 5 of the extended sources (docs/RUNNING_WATER.md 15.5): a fire and a wood are heard from their whole extent by
+the same cut as running water, rather than spread over places laid out round their middle.
+
+- **A fire.** Its burning area is cut at the ear by the angle each piece covers (`ExtendedSources.CutArea` over
+  `ExtendedSources.FireOutline`). Each body of fire is heard from the pieces its own ground lies in
+  (`FireSynth.Recut`). The roar, under 500 Hz where the two ears hear a fire in front of them nearly alike
+  (7.2), is a few voices over runs of the pieces: one for every three pieces, at most three (`FlamesFor`). The
+  crackle and every event are the pieces'. A fire's places and flames together are at most twelve voices
+  (`ExtendedSources.MaxPlaces`).
+- **Recutting a fire.** It is cut again when the ear has moved an eighth of its shortest piece, at least 2 cm.
+  Beside a small fire a bearing swings fastest where its pieces are thinnest; an open water keeps its quarter of
+  the way to its shore. A fire of one body is sampled on a 32 by 32 grid, each point jittered within its cell, so
+  a thin piece's share is not biased by a grid row falling to one side of its bearing.
+- **A wood** (`WoodChorus`) is cut by the bearings its crowns lie on (`ExtendedSources.CutPoints`), each piece its
+  crowns' share at the tree's own reference. The six boughs stand over runs of the pieces and read the wind
+  there, so a gust crosses the wood piece by piece (`FoliageSynth`). A wood's middle takes its place in the voice
+  budget, and when the budget holds it back its pieces are held with it: a wood is heard whole or not at all.
+- **What it costs.** Measured in a Debug build, one cut of the pit or the burning car takes 21 µs, and the fire
+  synth's redistribution after it 80 µs. Walking round the pit at 1.5 m it recuts up to 70 times a second:
+  about 0.1 ms a frame, on the placement thread.
+
+Measured with AudioLab `--extent-walk walks=fire,fire-round,car,car-out,big,wood`, headless (each voice by the
+mixer's law), `rule=middle` for before and the default for after, from one build:
+
+| walk | level swing, before → after | width | most voices | `ClientAudioSystem.Update`, 99th |
+|---|---|---|---|---|
+| fire: away from 58 Alder Street's pit, 1.5 to 30 m | 23.9 → 24.3 dB | 0 to 20° either way | 12 → 10 | 0.04 → 0.06 ms |
+| fire-round: round the pit at 1.5 m | 0.0 → 0.0 dB | 19 to 21° → 19 to 20° | 12 → 10 | 0.04 → 0.08 ms |
+| car: round a burning car on Foundry Street at 4 m | 0.0 → 1.5 dB | 15 to 36° → 20 to 34° | 12 | 0.03 → 0.08 ms |
+| car-out: away from its side, 2 to 40 m | 25.1 → 24.0 dB | 1 to 64° → 3 to 61° | 12 | 0.04 → 0.10 ms |
+| big: 60 m along a 15 m stand burning in Elm Park | 7.7 → 7.6 dB | 15 to 45° → 14 to 44° | 12 | 0.04 → 0.09 ms |
+| wood: 120 m through Magnolia's thickest wood | 1.9 → 1.9 dB | 135 to 146° → 135 to 147° | 59 → 44 | 0.67 → 0.65 ms |
+
+What is heard to change: going round the burning car it is now louder from its long side than its end (a 1.5 dB
+swing, where the old places held it level), and walking away from it its places fall off with the angle it
+covers, 12 voices at 10 m to 4 at 38 m. A wood is heard over its whole crown with 15 fewer voices. The fire's
+level and width elsewhere are within a decibel and a few degrees of the old spread. The renders (`render`) are not
+made yet: the fire's approved sound is meant to stand, and a render of it is the check.

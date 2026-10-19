@@ -1093,8 +1093,8 @@ the city's gutter in rain, /tp 44.5 122.2 0.2 east to /tp 74.0 122.2 0.2, its mi
 
 ### 15.5 What the rest of the rule needs
 
-The order is the survey's; todo.md carries it. Steps 2 to 4 are built (2026-10-17, 15.6 to 15.8); 15.9 is what is
-left.
+The order is the survey's; todo.md carries it. Steps 2 to 4 are built (2026-10-17, 15.6 to 15.8), and step 5
+(2026-10-18, docs/FIRE.md 12.13); 15.9 is what is left.
 
 2. **Voice the mapped streams.** OSM waterways are laid only as water surfaces (`tools/gen_osm.py`), and the
    drainage network places no voice on water cells, so Oak Creek's 3.3 km in Albany is silent where the map
@@ -1225,11 +1225,11 @@ octaves within 1.7 dB of before (250 and 500 Hz up 1.6 and 1.7 dB, 1 kHz down 1.
 
 ### 15.9 What is left
 
-5 to 8 as in 15.5 (fire and woods on the cut, crowds, far traffic, a path per near piece), and from these steps: a far
-piece of a line is a few loud events, not a texture; river banks heard on a map with a river; mapped waterways in the
-one world's tiles keep their dry placeholder (the world builds its drainage per frame, and `VoiceWaterways` runs at a
-map's load only); a shore partly of reeds takes the preset of most of it. The banks as their own flow and the
-whitecaps over open water are built (15.10, 15.11).
+6 to 8 as in 15.5 (crowds, far traffic, a path per near piece; fire and woods on the cut are built, docs/FIRE.md
+12.13), and from these steps: a far piece of a line is a few loud events, not a texture; river banks heard on a map
+with a river; mapped waterways in the one world's tiles keep their dry placeholder (the world builds its drainage
+per frame, and `VoiceWaterways` runs at a map's load only); a shore partly of reeds takes the preset of most of it.
+The banks as their own flow and the whitecaps over open water are built (15.10, 15.11).
 
 ### 15.10 A wide bed's banks as their own flow (2026-10-17)
 

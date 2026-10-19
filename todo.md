@@ -91,7 +91,8 @@ fingerprint changed too, so the door renders are made again once.
    - stage 6, vehicles in full.
 10. A source heard from the whole of itself, steps 5 to 8 (Cody, 2026-10-16: "a river should sound like a flowing
    river the entire width and length of the river"; docs/RUNNING_WATER.md 15.9):
-   - 5: fire and woods on the same cut (FIRE.md 12.8), the wood's ring replaced by pieces of its crowns;
+   - 5: fire and woods on the same cut: DONE 2026-10-18, unheard (docs/FIRE.md 12.13). Renders of the fire still to
+     make, to check its approved sound stands;
    - 6: crowds, the seat blocks as geometry with decorrelated applause per piece;
    - 7: far traffic along the roads;
    - 8: a path per near piece (today every piece is heard through its source's middle's path).

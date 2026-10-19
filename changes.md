@@ -2,6 +2,21 @@
 
 Recent work, newest first. `git log` has the rest.
 
+## 2026-10-18
+
+- A fire and a wood are heard from their whole extent, cut at the ear as running water is (step 5 of the extended
+  sources; docs/FIRE.md 12.13). A fire's burning area is cut by the angle each piece covers, each body of fire
+  heard from the pieces its ground lies in, with its roar as at most three voices over runs of the pieces and a
+  fire's voices at most twelve. A wood is cut by the bearings its crowns lie on, its six boughs over runs of the
+  pieces reading the wind there. A wood's middle takes a place in the voice budget and its pieces are held with
+  it, so a wood is heard whole or not at all. Measured with AudioLab `--extent-walk` (new walks fire-round, car,
+  car-out, big, wood), before and after from one build: level and width within 0.8 dB and 5 degrees of the old
+  spread on every walk except round the burning car, which is now 1.5 dB louder from its long side than its end;
+  most voices 12 to 10 for the fire pit and 59 to 44 for Magnolia's thickest wood; walking away from the car, 12
+  places at 10 m and 4 at 38 m. Placement's 99th percentile at most 0.10 ms. Guards: `FireAndWoodCutTests`. No
+  wire change and no door fingerprint change. Built with DeepSeek through OpenCode, reviewed and finished here.
+  The fire's renders are not made yet; its approved sound is meant to stand, and a render is the check.
+
 ## 2026-10-17
 
 - A 16-bit sound made in memory and asked for as a loop loops (`FmodResourceManager.RegisterPcm`; Resonance's
