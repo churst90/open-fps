@@ -10,6 +10,9 @@ OpenFPS.Accessibility/ListMenu.cs	Accessibility
 OpenFPS.Accessibility/ListeningCalibration.cs	Accessibility	
 OpenFPS.Accessibility/NamedPlaces.cs	Accessibility	
 OpenFPS.Accessibility/PlayerCoordinates.cs	Accessibility	
+OpenFPS.Accessibility/SightKinds.cs	Accessibility	
+OpenFPS.Accessibility/SightRays.cs	Accessibility	
+OpenFPS.Accessibility/Sightline.cs	Accessibility	
 OpenFPS.Accessibility/Speech/ISpeechOutput.cs	Accessibility	
 OpenFPS.Accessibility/Speech/SpeechDispatcherOutput.cs	Accessibility	
 OpenFPS.Accessibility/Speech/SpeechLog.cs	Accessibility	
@@ -175,9 +178,8 @@ OpenFPS.Client.Core/Session/ClientGameSession.Tracker.cs	game
 OpenFPS.Client.Core/Session/ClientGameSession.cs	game	
 OpenFPS.Client.Core/Session/ConnectRetry.cs	game	
 OpenFPS.Client.Core/SettingsFolder.cs	game	
-OpenFPS.Client.Core/SightGrid.cs	Accessibility	
+OpenFPS.Client.Core/SightGrid.cs	game	
 OpenFPS.Client.Core/SightWatch.cs	Accessibility	
-OpenFPS.Client.Core/Sightline.cs	Accessibility	
 OpenFPS.Client.Core/SnapshotSources.cs	game	
 OpenFPS.Client.Core/SpatialService.cs	game	
 OpenFPS.Client.Core/StrideAccumulator.cs	game	

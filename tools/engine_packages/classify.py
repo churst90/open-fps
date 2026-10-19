@@ -132,9 +132,8 @@ FILE_RULES = [
     ('OpenFPS.Client.Core/WorldAudioPlayer.cs', 'game', 'the wire\'s one-off sounds decoded for the audio world\'s OneOffSounds'),
     ('OpenFPS.Client.Core/BeaconAids.cs', 'Accessibility', ''),
     ('OpenFPS.Client.Core/DrivingAids.cs', 'Accessibility', ''),
-    ('OpenFPS.Client.Core/Sightline.cs', 'Accessibility', ''),
-    ('OpenFPS.Client.Core/SightGrid.cs', 'Accessibility', ''),
     ('OpenFPS.Client.Core/SightWatch.cs', 'Accessibility', ''),
+
     ('OpenFPS.Client.Core/UiSounds.cs', 'Accessibility', ''),
     ('OpenFPS.Client.Core/WallBumps.cs', 'Accessibility', ''),
     ('OpenFPS.Client.Core/MapTracker.cs', 'Accessibility', ''),

@@ -362,14 +362,14 @@ public class WallBumpAndNarrationTests
         for (int k = 0; k < 8; k++)
         {
             float yaw = k * MathF.PI / 4f;
-            var seen = Sightline.AheadLevel(spatial, world, new Vector3(x, feet, z), yaw, 1.7f, -1);
+            var seen = Sightline.AheadLevel(world, new Vector3(x, feet, z), yaw, 1.7f, -1);
             string line = Sightline.NarrationLine(seen, $"{k * 45} degrees");
             _o.WriteLine($"({x}, {feet:F2}, {z}) facing {k * 45}: {line}");
             if (seen is not { } s) continue;
-            string prefab = s.Entity.Definition.Identity.PrefabId ?? "";
+            string prefab = s.Body.Prefab ?? "";
             if (prefab.EndsWith("_floor") || prefab.EndsWith("_road"))
             {
-                var (min, max) = Sightline.WorldBounds(s.Entity);
+                var (min, max) = Sightline.WorldBounds(s.Body);
                 Assert.True(max.Y - min.Y > MathF.Min(max.X - min.X, max.Z - min.Z) && max.Y > feet + 1.8f,
                     $"named the {prefab} '{s.Name}' ({min} to {max}) facing {k * 45} from feet at {feet:F2}");
             }
@@ -428,8 +428,8 @@ public class WallBumpAndNarrationTests
         Vector3 eye = new(0, 1.7f, 0);
         var down = Vector3.Normalize(new Vector3(0, -1f, 1f));
         ReadOnlySpan<Vector3> origin = stackalloc Vector3[] { eye };
-        Assert.Null(Sightline.Ahead(spatial, world, origin, down, 20f, 0f, 1.7f, 999));
-        Assert.Null(Sightline.AheadLevel(spatial, world, Vector3.Zero, 0f, 1.7f, 999));
+        Assert.Null(Sightline.Ahead(world, origin, down, 20f, 0f, 1.7f, 999));
+        Assert.Null(Sightline.AheadLevel(world, Vector3.Zero, 0f, 1.7f, 999));
     }
 
     [Fact]
@@ -442,7 +442,7 @@ public class WallBumpAndNarrationTests
             float top = (i + 1) * rise;
             boxes.Add(Box(100 + i, new Vector3(0, top / 2f, 2f + going * (i + 0.5f)), new Vector3(1.2f, top, going), "Concrete Floor", "Concrete"));
         }
-        var seen = Sightline.AheadLevel(new SpatialService(), World(boxes.ToArray()), Vector3.Zero, 0f, 1.7f, 999);
+        var seen = Sightline.AheadLevel(World(boxes.ToArray()), Vector3.Zero, 0f, 1.7f, 999);
         Assert.True(seen == null, $"named '{seen?.Name}' at {seen?.Distance:F1} m");
     }
 
@@ -451,15 +451,15 @@ public class WallBumpAndNarrationTests
     {
         var world = World(new[] { Floor() }.Concat(WallAlongX(10, 8.2f, -3f, 3, "Brandt Court front entrance")).ToArray());
         var spatial = new SpatialService();
-        var seen = Sightline.AheadLevel(spatial, world, Vector3.Zero, 0f, 1.7f, 999);
+        var seen = Sightline.AheadLevel(world, Vector3.Zero, 0f, 1.7f, 999);
         Assert.Equal("Brandt Court front entrance, 8 metres", Sightline.NarrationLine(seen, "North"));
         // Turned away from it, nothing in twenty metres: which way is open.
-        var away = Sightline.AheadLevel(spatial, world, Vector3.Zero, MathF.PI, 1.7f, 999);
+        var away = Sightline.AheadLevel(world, Vector3.Zero, MathF.PI, 1.7f, 999);
         Assert.Equal("Open, South", Sightline.NarrationLine(away, "South"));
         // A car's height is found at chest level although it is under the eyes.
         var car = Box(40, new Vector3(0, 0.7f, 5f), new Vector3(1.8f, 1.4f, 4.5f), "a hatchback", "Metal");
         var withCar = World(new[] { Floor(), car }.Concat(WallAlongX(10, 15f, -3f, 3, "Partition Wall")).ToArray());
-        Assert.Equal("a hatchback", Sightline.AheadLevel(spatial, withCar, Vector3.Zero, 0f, 1.7f, 999)?.Name);
+        Assert.Equal("a hatchback", Sightline.AheadLevel(withCar, Vector3.Zero, 0f, 1.7f, 999)?.Name);
         Assert.Equal("0.6 metres", Sightline.SpokenDistance(0.62f));
         Assert.Equal("1 metre", Sightline.SpokenDistance(1.2f));
     }

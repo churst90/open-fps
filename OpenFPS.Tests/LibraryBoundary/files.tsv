@@ -10,6 +10,9 @@ OpenFPS.Accessibility/ListMenu.cs	host
 OpenFPS.Accessibility/ListeningCalibration.cs	host		
 OpenFPS.Accessibility/NamedPlaces.cs	host		
 OpenFPS.Accessibility/PlayerCoordinates.cs	host		
+OpenFPS.Accessibility/SightKinds.cs	host		
+OpenFPS.Accessibility/SightRays.cs	host		
+OpenFPS.Accessibility/Sightline.cs	host		
 OpenFPS.Accessibility/Speech/ISpeechOutput.cs	host		
 OpenFPS.Accessibility/Speech/SpeechDispatcherOutput.cs	host		
 OpenFPS.Accessibility/Speech/SpeechLog.cs	host		
@@ -171,7 +174,6 @@ OpenFPS.Client.Core/Session/ConnectRetry.cs	host
 OpenFPS.Client.Core/SettingsFolder.cs	host		
 OpenFPS.Client.Core/SightGrid.cs	host		
 OpenFPS.Client.Core/SightWatch.cs	host		
-OpenFPS.Client.Core/Sightline.cs	host		
 OpenFPS.Client.Core/SnapshotSources.cs	host		
 OpenFPS.Client.Core/SpatialService.cs	host		
 OpenFPS.Client.Core/StrideAccumulator.cs	host		

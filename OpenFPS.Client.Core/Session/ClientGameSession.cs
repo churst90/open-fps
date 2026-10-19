@@ -1187,10 +1187,10 @@ public sealed partial class ClientGameSession : IDisposable
         // The ground is never the answer: Z says where you stand. A floor you are looking down at
         // hides whatever is under it, so it is "nothing ahead" rather than the floor. See Sightline.
         ReadOnlySpan<Vector3> eye = stackalloc Vector3[] { eyePos };
-        if (Sightline.Ahead(_physics.Spatial, snapshot, eye, forward, Sightline.NarrationRange,
+        if (Sightline.Ahead(snapshot, eye, forward, Sightline.NarrationRange,
                             feet.Y, eyePos.Y, _ownEntityId) is { } seen)
         {
-            string material = seen.Entity.Definition.Material.Material;
+            string material = seen.Body.Material;
             string made = string.IsNullOrEmpty(material) || material is "Generic" or "None" ? "" : $", {material.ToLowerInvariant()}";
             Say($"{seen.Name}{made}, {seen.Distance:F1} metres ahead.");
         }
@@ -1251,7 +1251,7 @@ public sealed partial class ClientGameSession : IDisposable
         var struck = first is { } f && f.EntityId == hit.EntityId ? firstStruck : secondStruck;
         if (!NavigationAids.WallBumps) return;
 
-        string name = Sightline.NameOf(struck);
+        string name = Sightline.NameOf(EntityAcoustics.BodyOf(struck));
         Vector3 where = WallBumps.TouchPoint(struck, hit);
         var sounds = WallBumps.Sound(struck, hit, where, input.Sprint, unchecked(_bumpSeed + 1));
         Serilog.Log.Information("[BUMP] '{Name}' e{Id} {Material} at {Pos}, intent {Intent:F2}, {Count} sounds {Db:F0} dB",

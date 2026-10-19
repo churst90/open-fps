@@ -8,9 +8,6 @@ using OpenFPS.Models;
 
 namespace OpenFPS.Client.Core;
 
-/// <summary>What a scope can pick out: somebody, or something with an engine.</summary>
-public enum SightKind { Person, Player, Vehicle, Aircraft, Train }
-
 /// <summary>
 /// One thing seen through the scope: what it is, where it is against the crosshair, and how it is
 /// moving. <see cref="Right"/> and <see cref="Up"/> are radians from the crosshair to its aim point
@@ -30,37 +27,17 @@ public static class ScopeView
     /// <summary>A person's chest above their feet: where the crosshair is put on somebody.</summary>
     public const float ChestHeight = 1.2f;
 
-    /// <summary>What an entity is, to a scope, or null for anything it does not pick out.</summary>
+    /// <summary>What an entity is, to a scope, or null for anything it does not pick out
+    /// (<see cref="SightKinds.Classify"/>: one policy, the view's bodies' to answer).</summary>
     public static SightKind? Classify(in EntitySnapshot e)
-    {
-        var def = e.Definition;
-        var body = ModelKindTable.BodyOf(def.SoundEmitter.SoundId);
-        if (body == ModelBody.Rolls) return SightKind.Vehicle;
-        if (body == ModelBody.Flies) return SightKind.Aircraft;
-        if (body == ModelBody.Rails) return SightKind.Train;
-        if (def.Type == EntityType.Player) return SightKind.Player;
-        // A walker is an NPC with no model in it. A machine is not picked out, the push mower included,
-        // though its body walks (docs/SPECIAL_CASES_AUDIT.md, P2: the open choice).
-        if (def.Type == EntityType.NPC && body == null) return SightKind.Person;
-        return null;
-    }
+        => SightKinds.Classify(EntityAcoustics.BodyOf(e));
 
     private static bool IsBody(SightKind k) => k is SightKind.Person or SightKind.Player;
 
-    /// <summary>The words for what something is: "person", a player's name, a vehicle's name.</summary>
+    /// <summary>The words for what something is: "person", a player's name, a vehicle's name
+    /// (<see cref="SightKinds.NameOf"/>).</summary>
     public static string NameOf(in EntitySnapshot e, SightKind kind)
-    {
-        string name = e.Definition.Identity.Name ?? "";
-        return kind switch
-        {
-            // A person with a name of their own is called by it, as a player is (IdentityComponent.Named).
-            SightKind.Person => e.Definition.Identity.Named && !string.IsNullOrWhiteSpace(name) ? name.Trim() : "person",
-            SightKind.Player => string.IsNullOrWhiteSpace(name) ? "a player" : name,
-            SightKind.Aircraft => string.IsNullOrWhiteSpace(name) ? "aircraft" : name,
-            SightKind.Train => "train",
-            _ => string.IsNullOrWhiteSpace(name) ? "vehicle" : name,
-        };
-    }
+        => SightKinds.NameOf(EntityAcoustics.BodyOf(e), kind);
 
     /// <summary>
     /// Everything in view, left to right. <paramref name="eye"/> and the yaw and pitch are the

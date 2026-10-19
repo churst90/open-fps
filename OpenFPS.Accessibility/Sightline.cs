@@ -1,13 +1,14 @@
 using System.Numerics;
-using OpenFPS.Common;
-using OpenFPS.Common.Components;
+using OpenFPS.Acoustics;
 using OpenFPS.Physics;
 
 namespace OpenFPS.Client.Core;
 
 /// <summary>
 /// What is in front of you, and what is merely the ground: one answer for P (look ahead), the turn
-/// narration and the bump when you walk into something.
+/// narration and the bump when you walk into something. It reads the scene view
+/// (<see cref="IAcousticWorld"/>) — the wings' world — and nothing of the game's snapshots
+/// (stage 9, docs/ENGINE_PACKAGES.md).
 ///
 /// <para>The ground is never named: Z says where you stand, and "Concrete Floor" on every look down
 /// buries the name that matters. Ground is decided from geometry, not names (those are the author's and
@@ -24,29 +25,29 @@ public static class Sightline
     public const float FloorThickness = 0.35f;
 
     /// <summary>What a ray stopped at, and how far away.</summary>
-    public readonly record struct Sighting(EntitySnapshot Entity, float Distance)
+    public readonly record struct Sighting(AcousticBody Body, float Distance)
     {
-        public string Name => NameOf(Entity);
+        public string Name => NameOf(Body);
     }
 
-    /// <summary>The axis-aligned box round an entity's collider, in the world.</summary>
-    public static (Vector3 Min, Vector3 Max) WorldBounds(in EntitySnapshot e)
+    /// <summary>The axis-aligned box round a body's collider, in the world.</summary>
+    public static (Vector3 Min, Vector3 Max) WorldBounds(in AcousticBody body)
     {
-        var half = e.Definition.Collider.Size * 0.5f;
-        var r = Matrix4x4.CreateFromQuaternion(e.Transform.Rotation);
+        var half = body.Size * 0.5f;
+        var r = Matrix4x4.CreateFromQuaternion(body.Rotation);
         var ext = new Vector3(
             MathF.Abs(r.M11) * half.X + MathF.Abs(r.M21) * half.Y + MathF.Abs(r.M31) * half.Z,
             MathF.Abs(r.M12) * half.X + MathF.Abs(r.M22) * half.Y + MathF.Abs(r.M32) * half.Z,
             MathF.Abs(r.M13) * half.X + MathF.Abs(r.M23) * half.Y + MathF.Abs(r.M33) * half.Z);
-        var c = e.Transform.Position;
+        var c = body.Position;
         return (c - ext, c + ext);
     }
 
     /// <summary>Whether this is ground to a body with feet at <paramref name="feetY"/> and eyes at
     /// <paramref name="eyeY"/>. See the class summary.</summary>
-    public static bool IsGround(in EntitySnapshot e, float feetY, float eyeY)
+    public static bool IsGround(in AcousticBody body, float feetY, float eyeY)
     {
-        var (min, max) = WorldBounds(e);
+        var (min, max) = WorldBounds(body);
         float height = max.Y - min.Y;
         float span = MathF.Min(max.X - min.X, max.Z - min.Z);
         if (height > span) return false;                       // taller than it is wide: a wall, a post
@@ -66,42 +67,42 @@ public static class Sightline
     /// steps up just under its top; this keeps them from being named as you turn. A wall's top is too
     /// thin to stand on, so grazing it is still meeting a wall.
     /// </summary>
-    public static bool IsGroundAt(in EntitySnapshot e, float hitY, float feetY, float eyeY)
+    public static bool IsGroundAt(in AcousticBody body, float hitY, float feetY, float eyeY)
     {
-        if (IsGround(e, feetY, eyeY)) return true;
-        var (min, max) = WorldBounds(e);
+        if (IsGround(body, feetY, eyeY)) return true;
+        var (min, max) = WorldBounds(body);
         bool standable = MathF.Min(max.X - min.X, max.Z - min.Z) >= StandableDepth;
         return standable && max.Y - hitY <= NoseMetres && max.Y <= eyeY + NoseMetres;
     }
 
     /// <summary>What a thing is called: its name, or failing that what it is made of. A named NPC (a
     /// vehicle, a passer-by) is called by what it is (<see cref="KindOf"/>).</summary>
-    public static string NameOf(in EntitySnapshot e)
+    public static string NameOf(in AcousticBody body)
     {
-        string name = e.Definition.Identity.Name;
-        if (e.Definition.Type == EntityType.NPC && !string.IsNullOrWhiteSpace(name)) return KindOf(e);
+        string name = body.Name ?? "";
+        if (body.Kind == BodyKind.Npc && !string.IsNullOrWhiteSpace(name)) return KindOf(body);
         if (!string.IsNullOrWhiteSpace(name)) return name.Trim();
-        if (IsPerson(e)) return "someone";
-        string material = e.Definition.Material.Material;
+        if (IsPerson(body)) return "someone";
+        string material = body.Material ?? "";
         if (!string.IsNullOrEmpty(material) && material is not ("Generic" or "None"))
             return $"something {material.ToLowerInvariant()}";
         return "something";
     }
 
-    /// <summary>A player, or a person in the street: somebody, not something (<see cref="ScopeView.Classify"/>).</summary>
-    public static bool IsPerson(in EntitySnapshot e)
-        => e.Definition.Type == EntityType.Player || ScopeView.Classify(e) == SightKind.Person;
+    /// <summary>A player, or a person in the street: somebody, not something (<see cref="SightKinds.Classify"/>).</summary>
+    public static bool IsPerson(in AcousticBody body)
+        => SightKinds.Classify(body) is SightKind.Person or SightKind.Player;
 
     /// <summary>
     /// What a moving thing is: a player by their name; anything else by its name up to the first comma,
     /// without the map's number ("Hatchback 1" a hatchback, "Pedestrian, Main Street, west side 14" a
     /// pedestrian).
     /// </summary>
-    public static string KindOf(in EntitySnapshot e)
+    public static string KindOf(in AcousticBody body)
     {
-        string name = (e.Definition.Identity.Name ?? "").Trim();
+        string name = (body.Name ?? "").Trim();
         if (name.Length == 0) return "something";
-        if (e.Definition.Type == EntityType.Player) return name;
+        if (body.Kind == BodyKind.Player) return name;
         int comma = name.IndexOf(',');
         if (comma > 0) name = name[..comma].TrimEnd();
         int end = name.Length;
@@ -113,9 +114,9 @@ public static class Sightline
     /// <summary>A person or a vehicle faster than <see cref="MovingMetresPerSecond"/>. The sight line
     /// can look through these: one crossing in front is said as passing (<see cref="PassingWatch"/>),
     /// not as what is ahead.</summary>
-    public static bool IsOnTheMove(in EntitySnapshot e)
-        => e.Definition.Type is EntityType.NPC or EntityType.Player
-           && e.Velocity.X * e.Velocity.X + e.Velocity.Z * e.Velocity.Z > MovingMetresPerSecond * MovingMetresPerSecond;
+    public static bool IsOnTheMove(in AcousticBody body)
+        => body.Kind is BodyKind.Npc or BodyKind.Player
+           && body.Velocity.X * body.Velocity.X + body.Velocity.Z * body.Velocity.Z > MovingMetresPerSecond * MovingMetresPerSecond;
 
     /// <summary>Slower than a stroll is standing: half a metre a second.</summary>
     public const float MovingMetresPerSecond = 0.5f;
@@ -123,26 +124,26 @@ public static class Sightline
     /// <summary>Whether a ray should stop at this at all: things you can walk into, and things the
     /// server says are worth naming (items, people, beacons). Region volumes, portals and your own body
     /// are looked straight through.</summary>
-    public static bool Stops(in EntitySnapshot e, int ownEntityId)
-        => e.Id != ownEntityId && (e.Definition.Collider.IsSolid || e.Definition.Identity.Announce);
+    public static bool Stops(in AcousticBody body, int ownEntityId)
+        => body.Id != ownEntityId && (body.Solid || body.Announce);
 
     /// <summary>
     /// The nearest first non-ground hit along the rays; null when they meet nothing within
     /// <paramref name="range"/> or meet the ground first (a floor hides what is under it and is not
     /// itself an answer).
     /// </summary>
-    public static Sighting? Ahead(SpatialService spatial, WorldSnapshot world, ReadOnlySpan<Vector3> origins, Vector3 dir,
+    public static Sighting? Ahead(IAcousticWorld world, ReadOnlySpan<Vector3> origins, Vector3 dir,
                                   float range, float feetY, float eyeY, int ownEntityId, bool throughMoving = false)
     {
         if (dir.LengthSquared() < 1e-8f) return null;
         dir = Vector3.Normalize(dir);
         Sighting? best = null;
-        Func<EntitySnapshot, bool> stops = throughMoving
-            ? e => Stops(e, ownEntityId) && !IsOnTheMove(e)
-            : e => Stops(e, ownEntityId);
+        Func<AcousticBody, bool> stops = throughMoving
+            ? b => Stops(b, ownEntityId) && !IsOnTheMove(b)
+            : b => Stops(b, ownEntityId);
         foreach (var origin in origins)
         {
-            if (!spatial.RaycastSingle(world, origin, dir, range, stops, out var hit, out float dist)) continue;
+            if (!SightRays.RaycastSingle(world, origin, dir, range, stops, out var hit, out float dist)) continue;
             if (IsGroundAt(hit, origin.Y + dir.Y * dist, feetY, eyeY)) continue;
             if (best == null || dist < best.Value.Distance) best = new Sighting(hit, dist);
         }
@@ -151,7 +152,7 @@ public static class Sightline
 
     /// <summary>What the turn narration looks along: level, the way you face, at knee, chest and eye
     /// height, so a bench or a low wall is found as well as a wall at head height.</summary>
-    public static Sighting? AheadLevel(SpatialService spatial, WorldSnapshot world, Vector3 feet, float yaw, float eyeHeight, int ownEntityId,
+    public static Sighting? AheadLevel(IAcousticWorld world, Vector3 feet, float yaw, float eyeHeight, int ownEntityId,
                                        bool throughMoving = false)
     {
         Vector3 forward = Vector3.Transform(Vector3.UnitZ, Quaternion.CreateFromYawPitchRoll(yaw, 0f, 0f));
@@ -161,7 +162,7 @@ public static class Sightline
             feet + new Vector3(0, 1.1f, 0),
             feet + new Vector3(0, eyeHeight, 0),
         };
-        return Ahead(spatial, world, origins, forward, NarrationRange, feet.Y, feet.Y + eyeHeight, ownEntityId, throughMoving);
+        return Ahead(world, origins, forward, NarrationRange, feet.Y, feet.Y + eyeHeight, ownEntityId, throughMoving);
     }
 
     /// <summary>"8 metres", "1 metre", "0.6 metres": whole metres past one, tenths under it.</summary>
