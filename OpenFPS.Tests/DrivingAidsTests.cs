@@ -62,8 +62,8 @@ public class DrivingAidsTests
         var said = new List<string>();
         var aids = new DrivingAids(new AudioEngineFacade());      // never initialised: every sound is a no-op
         aids.Announce += said.Add;
-        var state = new LocalPlayerState { RidingEntityId = CarId, RidingControls = true };
-        aids.Update(client.GetSnapshot(), state, 1.0);
+        aids.Update(client.GetSnapshot(), new DrivingAids.Rider(Vector3.Zero, LocalPlayerState.SeatedEyeHeight,
+                                                                true, true, CarId), 1.0);
         return (said, aids);
     }
 
@@ -152,11 +152,11 @@ public class DrivingAidsTests
         car.SoundEmitter.SoundId = "engine:i4_economy";
         client.RegisterDefinition(car);
         var aids = new DrivingAids(facade);
-        var state = new LocalPlayerState { RidingEntityId = CarId, RidingControls = true, Position = at };
+        var rider = new DrivingAids.Rider(at, LocalPlayerState.SeatedEyeHeight, true, true, CarId);
         facade.UpdateListener(at + new Vector3(0f, 1f, 0f), Quaternion.Identity, Vector3.Zero, -1);
         for (int i = 0; i < 5; i++)
         {
-            aids.Update(client.GetSnapshot(), state, 1.0 + i);
+            aids.Update(client.GetSnapshot(), rider, 1.0 + i);
             for (int k = 0; k < 3; k++) facade.PumpForTest();
         }
         _o.WriteLine("played: " + string.Join(", ", provider.PlayedSounds));

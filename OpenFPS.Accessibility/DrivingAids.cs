@@ -1,6 +1,7 @@
 using System.Numerics;
 using OpenFPS.Audio.Core;
 using OpenFPS.Audio.Data;
+using OpenFPS.Acoustics;
 using OpenFPS.Common;
 using Serilog;
 using OpenFPS.Words;
@@ -178,12 +179,16 @@ public sealed class DrivingAids
     private bool _announcedCrossingClosed;
     private JunctionData? _announcedTurnAt;
 
-    public void Update(WorldSnapshot world, LocalPlayerState state, double now)
+    /// <summary>Where the driver is: the body's smoothed position, the ear above it, whether they are in
+    /// the driving seat, and the car's id in the view.</summary>
+    public readonly record struct Rider(Vector3 Feet, float EyeHeight, bool Riding, bool Controls, int CarId);
+
+    public void Update(IAcousticWorld world, Rider rider, double now)
     {
         _now = now;
-        _ear = state.VisualPosition + new Vector3(0f, state.EyeHeight, 0f);
-        if (!state.IsRiding || !state.RidingControls
-            || !world.Entities.TryGetValue(state.RidingEntityId, out var car))
+        _ear = rider.Feet + new Vector3(0f, rider.EyeHeight, 0f);
+        if (!rider.Riding || !rider.Controls
+            || !world.TryGetBody(rider.CarId, out var car))
         {
             Silence();
             Readout = null;
@@ -198,13 +203,13 @@ public sealed class DrivingAids
         }
         EnsureSounds();
 
-        var at = car.Transform.Position;
-        var forward = Flat(Vector3.Transform(Vector3.UnitZ, car.Transform.Rotation));
+        var at = car.Position;
+        var forward = Flat(Vector3.Transform(Vector3.UnitZ, car.Rotation));
         float speed = car.Velocity.Length();
 
         float halfWidth = 0.95f;
         VehicleProfile? profile = null;
-        if (ModelKindTable.Vehicle(car.Definition.SoundEmitter.SoundId) is { } known)
+        if (ModelKindTable.Vehicle(car.SoundId) is { } known)
         {
             profile = known;
             halfWidth = profile.WidthMetres * 0.5f;
@@ -306,7 +311,7 @@ public sealed class DrivingAids
         if (AssistEnabled && speed > 1.5f && MathF.Abs(offRoadLine) < AssistWithinDegrees)
         {
             // The preset's wheelbase and lock; an unknown car gets the default chassis.
-            var chassis = ModelKindTable.Vehicle(car.Definition.SoundEmitter.SoundId)?.Running;
+            var chassis = ModelKindTable.Vehicle(car.SoundId)?.Running;
             float wheelbase = chassis != null ? MathF.Max(0.5f, chassis.Wheelbase) : DefaultWheelbase;
             float fullLock = chassis?.MaxSteerAngleRad ?? DefaultLockRadians;
             float alpha = SignedDegrees(forward, aim) * MathF.PI / 180f;
@@ -337,7 +342,7 @@ public sealed class DrivingAids
 
     // ── What is said ─────────────────────────────────────────────────────────────────────────
 
-    private void Speak(WorldSnapshot world, Vector3 at, Vector3 forward, Vector3 right, float speed,
+    private void Speak(IAcousticWorld world, Vector3 at, Vector3 forward, Vector3 right, float speed,
                        bool onRoad, string name, bool junction, int roadId)
     {
         if (!onRoad)
@@ -397,7 +402,7 @@ public sealed class DrivingAids
     }
 
     /// <summary>Which ways lead out of a junction, and what they are called, from the way you enter it.</summary>
-    private static string Exits(WorldSnapshot world, LaneGuide.Road j, Vector3 forward, Vector3 right, string current)
+    private string Exits(IAcousticWorld world, LaneGuide.Road j, Vector3 forward, Vector3 right, string current)
     {
         float half = MathF.Max(j.Size.X, j.Size.Z) * 0.5f;
         var ways = new List<string>();
@@ -419,27 +424,25 @@ public sealed class DrivingAids
 
     /// <summary>The nearest point of road within 60 m, two metres in from its edge: which road, how far,
     /// and where. A junction counts, and is called "a junction".</summary>
-    private static bool NearestRoad(WorldSnapshot world, Vector3 at, out Vector3 point, out string name, out float distance)
+    private bool NearestRoad(IAcousticWorld world, Vector3 at, out Vector3 point, out string name, out float distance)
     {
         point = at; name = ""; distance = float.MaxValue;
-        if (world.StaticGrid == null) return false;
-        foreach (int eid in world.StaticGrid.GetItemsInRadius(at, 60f))
+        if (!world.Near(at, 60f, staticOnly: true, _near)) return false;
+        foreach (var e in _near)
         {
-            if (!world.Entities.TryGetValue(eid, out var e)) continue;
-            var def = e.Definition;
-            if (!AcousticRegistry.IsCarriageway(def.Material.Material)) continue;
-            var inv = Quaternion.Inverse(e.Transform.Rotation);
-            var local = Vector3.Transform(at - e.Transform.Position, inv);
-            var half = def.Collider.Size * 0.5f;
+            if (!AcousticRegistry.IsCarriageway(e.Material)) continue;
+            var inv = Quaternion.Inverse(e.Rotation);
+            var local = Vector3.Transform(at - e.Position, inv);
+            var half = e.Size * 0.5f;
             var inset = new Vector3(MathF.Max(0f, half.X - 2f), 0f, MathF.Max(0f, half.Z - 2f));
             var clamped = new Vector3(Math.Clamp(local.X, -inset.X, inset.X), 0f, Math.Clamp(local.Z, -inset.Z, inset.Z));
-            var world_ = e.Transform.Position + Vector3.Transform(clamped, e.Transform.Rotation);
+            var world_ = e.Position + Vector3.Transform(clamped, e.Rotation);
             world_.Y = at.Y;
             float d = Vector3.Distance(at, world_);
             if (d >= distance) continue;
             distance = d; point = world_;
-            string n = def.Identity.Name ?? "";
-            name = IsJunction(def.Collider.Size, n) ? "a junction" : Clean(n);
+            string n = e.Name ?? "";
+            name = IsJunction(e.Size, n) ? "a junction" : Clean(n);
         }
         return distance < float.MaxValue;
     }
@@ -540,7 +543,7 @@ public sealed class DrivingAids
 
     /// <summary>Where every aid's voice is given its id and declared: ClientAudioSystem's registry, or one of
     /// its own on its own. In the head, no path.</summary>
-    internal VoiceRegistry Voices { get; set; }
+    public VoiceRegistry Voices { get; set; }
 
     /// <summary>The id of an aid's voice, the <paramref name="n"/>th of its kind.</summary>
     private int Id(AidVoice aid, int n = 0) => Voices.IdFor(VoiceKind.Aid, (int)aid, n);
@@ -656,35 +659,37 @@ public sealed class DrivingAids
 
     /// <summary>
     /// What the tyres can give on this road now, m/s²: the car's peak grip, less what the water under
-    /// its wheels takes (RoadGripLaw.GripFactor), the worst wheel. Without wheels on the wire, dry.
+    /// its worst wheel takes (RoadGripLaw.GripFactor). The view carries the surface and water of the
+    /// wheel with the most water on it; without wheels on the wire, dry.
     /// </summary>
-    private static float AvailableDecel(EntitySnapshot car, VehicleProfile? profile, float speed)
+    private static float AvailableDecel(in AcousticBody car, VehicleProfile? profile, float speed)
     {
         float grip = (profile?.Tyres.PeakGripG ?? 0.95f) * Earth.StandardGravity;
         float factor = 1f;
-        if (car.Wheels is { Length: > 0 } wheels && profile != null)
-            foreach (var w in wheels)
-                factor = MathF.Min(factor, RoadGripLaw.GripFactor(w.Surface, w.WaterMm, speed,
-                                                                     profile.Tyres.InflationKPa, profile.Tyres.TreadDepthMm));
+        if (car.HasWheels && profile != null)
+            factor = RoadGripLaw.GripFactor(car.WheelSurface, car.WheelWaterMm, speed,
+                                             profile.Tyres.InflationKPa, profile.Tyres.TreadDepthMm);
         return grip * factor;
     }
 
     /// <summary>Whether a crossing's bells are ringing: its bell is an emitter above the crossing whose
     /// SynthRunning the server sets while it is closed (CrossingSystem).</summary>
-    private static bool CrossingClosed(WorldSnapshot world, CrossingRails c)
+    private bool CrossingClosed(IAcousticWorld world, CrossingRails c)
     {
-        if (world.StaticGrid == null) return false;
-        foreach (int id in world.StaticGrid.GetItemsInRadius(c.Centre, 12f))
-        {
-            if (!world.Entities.TryGetValue(id, out var e)) continue;
-            var em = e.Definition.SoundEmitter;
-            if (ModelKindTable.Is(em.SoundId, ModelSynth.Bell)
-                && Vector3.DistanceSquared(new Vector3(e.Transform.Position.X, 0f, e.Transform.Position.Z),
+        if (!world.Near(c.Centre, 12f, staticOnly: true, _crossingNear)) return false;
+        foreach (var b in _crossingNear)
+            if (ModelKindTable.Is(b.SoundId, ModelSynth.Bell)
+                && Vector3.DistanceSquared(new Vector3(b.Position.X, 0f, b.Position.Z),
                                            new Vector3(c.Centre.X, 0f, c.Centre.Z)) < 100f)
-                return em.SynthRunning;
-        }
+                return b.SynthRunning;
         return false;
     }
+
+    /// <summary>A list reused by the view's near query, which clears it: one allocation for the aid's life.</summary>
+    private readonly List<AcousticBody> _crossingNear = new();
+
+    /// <summary>The near query's list for the road under and ahead of the car.</summary>
+    private readonly List<AcousticBody> _near = new();
 
     /// <summary>The flasher, and the indicator throwing itself off after the turn.</summary>
     private void Indicators(float heading, float speed)
@@ -887,26 +892,24 @@ public sealed class DrivingAids
     /// and a junction overlap, the junction wins — it is the part of the road with no lanes — and
     /// where two carriageways overlap, the one running the way you are pointing.
     /// </summary>
-    private static bool TryRoadAt(WorldSnapshot world, Vector3 at, Vector3 forward, out LaneGuide.Road road,
-                                  out string name, out bool junction, out int id)
+    private bool TryRoadAt(IAcousticWorld world, Vector3 at, Vector3 forward, out LaneGuide.Road road,
+                           out string name, out bool junction, out int id)
     {
         road = default; name = ""; junction = false; id = int.MinValue;
-        if (world.StaticGrid == null) return false;
+        if (!world.Near(at, 30f, staticOnly: true, _near)) return false;
         float bestScore = -1f;
-        foreach (int eid in world.StaticGrid.GetItemsInRadius(at, 30f))
+        foreach (var e in _near)
         {
-            if (!world.Entities.TryGetValue(eid, out var e)) continue;
-            var def = e.Definition;
-            if (!AcousticRegistry.IsCarriageway(def.Material.Material)) continue;
-            var candidate = new LaneGuide.Road(e.Transform.Position, def.Collider.Size, e.Transform.Rotation);
+            if (!AcousticRegistry.IsCarriageway(e.Material)) continue;
+            var candidate = new LaneGuide.Road(e.Position, e.Size, e.Rotation);
             if (!LaneGuide.Locate(candidate, at, forward, out _)) continue;
-            string n = def.Identity.Name ?? "";
-            bool isJunction = IsJunction(def.Collider.Size, n);
+            string n = e.Name ?? "";
+            bool isJunction = IsJunction(e.Size, n);
             float score = (isJunction ? 2f : 0f)
                         + MathF.Abs(Vector3.Dot(candidate.Axes().Along, forward));
             if (score > bestScore)
             {
-                bestScore = score; road = candidate; id = eid; junction = isJunction;
+                bestScore = score; road = candidate; id = e.Id; junction = isJunction;
                 name = isJunction ? "" : Clean(n);
             }
         }

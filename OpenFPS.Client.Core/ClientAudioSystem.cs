@@ -237,7 +237,8 @@ public sealed class ClientAudioSystem : IAudioHost
         var world = _sources.World;
         _beacons.EarSpeed = earSpeed;
         _beacons.Update(world, ear, _now(), OwnEntityId);
-        _drivingAids.Update(world, _state, _now());
+        _drivingAids.Update(world, new DrivingAids.Rider(_state.VisualPosition, _state.EyeHeight,
+                                                        _state.IsRiding, _state.RidingControls, _state.RidingEntityId), _now());
     }
 
     /// <summary>Once the rooms are set: the rooms that moved (unless the map is new) and the place's name.</summary>

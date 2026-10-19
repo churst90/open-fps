@@ -1,8 +1,10 @@
 file	package	why
 OpenFPS.Accessibility/BeaconAids.cs	Accessibility	
 OpenFPS.Accessibility/Beacons.cs	Accessibility	
+OpenFPS.Accessibility/DrivingAids.cs	Accessibility	
 OpenFPS.Accessibility/DrivingCuePlanner.cs	Accessibility	
 OpenFPS.Accessibility/DrivingCueSounds.cs	Accessibility	
+OpenFPS.Accessibility/DrivingCues.cs	Accessibility	
 OpenFPS.Accessibility/IUiCues.cs	Accessibility	
 OpenFPS.Accessibility/Keys/GameKey.cs	Accessibility	
 OpenFPS.Accessibility/Keys/KeyModifiers.cs	Accessibility	
@@ -155,7 +157,6 @@ OpenFPS.Client.Core/ClientPhysicsSystem.cs	game
 OpenFPS.Client.Core/ClientSettings.cs	game	
 OpenFPS.Client.Core/ClientWorldState.cs	game	
 OpenFPS.Client.Core/DiagnosticSwitches.cs	game	
-OpenFPS.Client.Core/DrivingAids.cs	Accessibility	
 OpenFPS.Client.Core/Input/InputCommandMapper.cs	game	
 OpenFPS.Client.Core/Input/InputStateBuffer.cs	game	
 OpenFPS.Client.Core/LocalPlayerController.cs	game	

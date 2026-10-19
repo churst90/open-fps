@@ -1,8 +1,10 @@
 file	group	projects	library_types
 OpenFPS.Accessibility/BeaconAids.cs	host		
 OpenFPS.Accessibility/Beacons.cs	host		
+OpenFPS.Accessibility/DrivingAids.cs	host		
 OpenFPS.Accessibility/DrivingCuePlanner.cs	host		
 OpenFPS.Accessibility/DrivingCueSounds.cs	host		
+OpenFPS.Accessibility/DrivingCues.cs	host		
 OpenFPS.Accessibility/IUiCues.cs	host		
 OpenFPS.Accessibility/Keys/GameKey.cs	host		
 OpenFPS.Accessibility/Keys/KeyModifiers.cs	host		
@@ -149,7 +151,6 @@ OpenFPS.Client.Core/ClientPhysicsSystem.cs	host
 OpenFPS.Client.Core/ClientSettings.cs	host		
 OpenFPS.Client.Core/ClientWorldState.cs	host		
 OpenFPS.Client.Core/DiagnosticSwitches.cs	host		
-OpenFPS.Client.Core/DrivingAids.cs	host		
 OpenFPS.Client.Core/Input/InputCommandMapper.cs	host		
 OpenFPS.Client.Core/Input/InputStateBuffer.cs	host		
 OpenFPS.Client.Core/LocalPlayerController.cs	host		
