@@ -13,7 +13,12 @@ tag (docs/SOUND_LIBRARY_BOUNDARY.md, stage 8 and decision 8) and references the 
   must add `Markers` (clearing the list is enough if it has none). The audio reads none of the new fields, so
   nothing heard changes. The body also says `SynthRunning` (a world synth's switch) and, for a vehicle, the
   surface and water under its worst wheel (`WheelSurface`, `WheelWaterMm`), all `init` properties that default to
-  false or 0; a host need do nothing, and the audio reads none of them.
+  false or 0; a host need do nothing, and the audio reads none of them. The body also says where the host's
+  triangle world holds it (`Geometry`, the new `BodyGeometry` enum: `None`, `Static`, `SightOnly`, `Mover` or
+  `Unindexed`), its own region's name and whether it is indoors (`RegionName`, `RegionIndoor`), and the two
+  regions a portal joins (`RegionAId`, `RegionBId`), all `init` properties that default to `BodyGeometry.None`,
+  empty or 0. A host that implements `IAcousticWorld` may leave them unfilled: the audio and the aids then see
+  every fixed thing as a box and no regions, as before. `EntityAcoustics` fills them for open-fps.
 - A fire and a wood are cut at the ear like running water (changes.md, 2026-10-18; docs/FIRE.md 12.13): new
   `ExtendedSources` members for it (`CutPoints`, `PlacePoints`, `FireOutline`, `FlamesFor` and their kin),
   `ExtendedSources.CutArea` gains optional `fire`, `flames`, `rise`, `origin` and `turn` parameters (a recompile

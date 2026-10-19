@@ -1282,12 +1282,18 @@ unchanged line for line, `EmitterStreamReplayTests` unregenerated, and `tools/en
 ratchet committed lower. The widening fills `WorldSnapshot` and `EntityAcoustics` (Common, hashed), so the wire hash
 changes with it, once; moving an aid does not touch it. The server and the Windows client deploy together then.
 
-**Built so far (2026-10-18, by DeepSeek through OpenCode, reviewed here).** Four widening slices: `Markers`, `Name`,
-`Prefab`, `Beacon`; `Kind`, `Named`, `Announce`; `HasWheels`; `Team`. Seven aids moved: `NamedPlaces`, `StairCues`,
-`Sightline` (with the sight rays over the view, `SightRays` and `SightKinds`), `WallBumps` (with `BodyContact`),
-`UiSounds` (the chat and presence mapping stays the game's, `ChatCues`), and `BeaconAids` (with `BeaconPreferences`,
-`SettingsFolder` and `TrackCategory`). The packages ratchet fell from 692 crossings to 290. Left: `DrivingAids`
-(its settings first become Accessibility's own options), `SightWatch`, `SightGrid` and `MapTracker`.
+**Built (2026-10-18 and 2026-10-19, by DeepSeek through OpenCode).** Four widening slices: `Markers`, `Name`,
+`Prefab`, `Beacon`; `Kind`, `Named`, `Announce`; `HasWheels`; `Team`; then `SynthRunning` and the worst wheel, the
+geometry role (`BodyGeometry`), and the regions (`RegionName`, `RegionIndoor`, `RegionAId`, `RegionBId`). Ten aids
+moved: `NamedPlaces`, `StairCues`, `Sightline` (with the sight rays over the view, `SightRays` and `SightKinds`),
+`WallBumps` (with `BodyContact`), `UiSounds` (the chat and presence mapping stays the game's, `ChatCues`),
+`BeaconAids` (with `BeaconPreferences`, `SettingsFolder` and `TrackCategory`), `DrivingAids` (with `DrivingCues`),
+`SightWatch` and `SightGrid` (one index: the grid takes the marks the index builds, so the two moved in one commit
+although the plan listed them apart), and `MapTracker` (its categories from `SightKinds`; it walks every body for a
+region name, so `IAcousticWorld` gained no separate `Regions` list). The packages ratchet fell from 692 crossings to
+10, the last ten being the game's own `SoundMappingService` and `VehicleSystem.Parking`. The wire hash changed three
+times as the view widened (a0961ca3e778 to 823a38c98c82 to 7d8b8a186ad5 to 57dbfa93d7d0), so the server and the
+Windows client deploy together; the door fingerprint did not change.
 
 ### Stage 10: Agents, the people (2 to 3 sessions)
 
