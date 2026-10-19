@@ -1211,6 +1211,13 @@ unchanged line for line, `EmitterStreamReplayTests` unregenerated, and `tools/en
 ratchet committed lower. The widening fills `WorldSnapshot` and `EntityAcoustics` (Common, hashed), so the wire hash
 changes with it, once; moving an aid does not touch it. The server and the Windows client deploy together then.
 
+**Built so far (2026-10-18, by DeepSeek through OpenCode, reviewed here).** Four widening slices: `Markers`, `Name`,
+`Prefab`, `Beacon`; `Kind`, `Named`, `Announce`; `HasWheels`; `Team`. Seven aids moved: `NamedPlaces`, `StairCues`,
+`Sightline` (with the sight rays over the view, `SightRays` and `SightKinds`), `WallBumps` (with `BodyContact`),
+`UiSounds` (the chat and presence mapping stays the game's, `ChatCues`), and `BeaconAids` (with `BeaconPreferences`,
+`SettingsFolder` and `TrackCategory`). The packages ratchet fell from 692 crossings to 290. Left: `DrivingAids`
+(its settings first become Accessibility's own options), `SightWatch`, `SightGrid` and `MapTracker`.
+
 ### Stage 10: Agents, the people (2 to 3 sessions)
 
 - After physics stage 3 (`IPhysicsWorld`). Haunts, door manners, the pavement graph, Alex's day and the pedestrians'

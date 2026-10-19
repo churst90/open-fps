@@ -6,6 +6,12 @@ tag (docs/SOUND_LIBRARY_BOUNDARY.md, stage 8 and decision 8) and references the 
 
 ## Unreleased
 
+- The scene view says more about each body, for the accessibility aids (open-fps's engine packages stage 9):
+  `AcousticBody` gains `Name`, `Prefab`, `Beacon`, `Team`, `Kind` (the new `BodyKind`), `Named`, `Announce` and
+  `HasWheels`, all `init` properties that default to empty, false or `BodyKind.None`. `IAcousticWorld` gains
+  `Markers(List<AcousticBody>)`, the fixed named markers that are not solid. A host that implements `IAcousticWorld`
+  must add `Markers` (clearing the list is enough if it has none). The audio reads none of the new fields, so
+  nothing heard changes.
 - A fire and a wood are cut at the ear like running water (changes.md, 2026-10-18; docs/FIRE.md 12.13): new
   `ExtendedSources` members for it (`CutPoints`, `PlacePoints`, `FireOutline`, `FlamesFor` and their kin),
   `ExtendedSources.CutArea` gains optional `fire`, `flames`, `rise`, `origin` and `turn` parameters (a recompile

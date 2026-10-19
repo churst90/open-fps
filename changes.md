@@ -4,6 +4,14 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-18
 
+- Seven of the accessibility aids read the scene view and moved to `OpenFPS.Accessibility` (engine packages stage 9,
+  part one; docs/ENGINE_PACKAGES.md): named places, stair cues, sight lines, wall bumps, UI sounds and beacon aids.
+  To serve them, the view's bodies now carry their names, prefab, beacon category, team, kind and whether they roll
+  on wheels, and the view lists its markers. Nothing spoken or heard changes. The spoken-lines and emitter-stream
+  replays are unchanged and were not regenerated. The packages ratchet fell from 692 crossings to 290. The wire hash
+  changes (babee8b45790 to 96f14841d86e), so the server and the Windows client deploy together. The door fingerprint is unchanged. Four aids are
+  left: driving aids, the sight watch, the sight grid and the map tracker. Built by DeepSeek through OpenCode,
+  reviewed here.
 - A fire and a wood are heard from their whole extent, cut at the ear as running water is (step 5 of the extended
   sources; docs/FIRE.md 12.13). A fire's burning area is cut by the angle each piece covers, each body of fire heard
   from the pieces its ground lies in, with its roar as at most three voices over runs of the pieces and a fire's
