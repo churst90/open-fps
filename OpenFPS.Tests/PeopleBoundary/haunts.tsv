@@ -1,0 +1,16 @@
+# name	kind	stand x,y,z	facing deg	door	access x,z	edge
+the bus stop, Main Street northbound, by the shelter	BusStop	8.45,0.12,-60.00	-90	-1	7.75,-60	169
+the bus stop, Main Street southbound, by the shelter	BusStop	-8.45,0.12,86.00	90	-1	-7.75,86	180
+outside Brandt Court front entrance	Doorway	-9.13,0.12,153.83	90	3128	-7.75,153.83	182
+outside Kestrel House front entrance	Doorway	9.13,0.12,-99.87	-90	1146	7.75,-99.87	169
+outside Marlow Tower front entrance	Doorway	-9.13,0.12,-105.97	90	157	-7.75,-105.97	178
+outside Selby House front entrance	Doorway	9.13,0.12,160.73	-90	3875	7.75,160.73	173
+outside Terminal front entrance	Doorway	195.65,0.05,63.90	-90	5225	190,7.75	123
+outside Union Building front entrance	Doorway	9.13,0.12,31.33	-90	1902	7.75,31.33	171
+the lobby of Brandt Court	Lobby	-11.98,0.05,157.08	90	3128	-7.75,157.08	182
+the lobby of Kestrel House	Lobby	11.98,0.05,-103.12	-90	1146	7.75,-103.12	169
+the lobby of Marlow Tower	Lobby	-11.98,0.05,-102.72	90	157	-7.75,-102.72	178
+the lobby of Selby House	Lobby	11.98,0.05,157.48	-90	3875	7.75,157.48	173
+the lobby of Union Building	Lobby	11.98,0.05,28.08	-90	1902	7.75,28.08	171
+Elm Park	Square	-325.00,0.35,231.00	0	-1	-300.4,133.3	43
+Market Square	Square	-76.38,0.10,190.00	0	-1	-122.25,190	191
