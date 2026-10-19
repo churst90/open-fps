@@ -1090,6 +1090,39 @@ A session is one working session of an agent, as in docs/GEOMETRY.md.
   LiteNetLib references (the server and the client keep theirs). Rename or not (decision 9).
 - Check: every project builds; every guard unchanged.
 
+- **Plan (2026-10-18).** The survey of the files Common holds beyond 3.8's list, each home and its reason. Nothing
+  heard moves: every step builds Tests, Server, Client.Gtk, AudioLab and the Windows client at 0 warnings, the two
+  replays pass unregenerated, and the surveys' ratchets follow. The wire hash is read from the build and stated
+  before and after every step that changes it; any move out of Common changes it.
+  - **To `OpenFPS.Server/Core/`, namespaces kept.** `GroundProbeMemo` (3.8: "the server's"; physics 4.2: host, a
+    server cache) and `MoverPoses` (3.8; only ServerGeometry, DoorSystem and ParentSystem read or write it).
+    `GroundProbeMemo`'s reader and writer is `PhysicsUtils`' memo overload, and its callers are the server's alone
+    (`MovementSystem`, `HotPathTests`, `PhysicsWorldViewTests`; no client), so the overload moves onto the type
+    there: `GroundProbeMemo.GetGroundHeight(world, grid, pos, own, ref memo, out material)`. The plain World probe
+    and the snapshot probe stay in Common as physics 4.2 says.
+  - **Stay in Common, per the plans.** `PhysicsConstants` (physics 4.2: "the tick and input integrity stay with the
+    network in Common"; its body half left for `BodyConstants` in physics stage 2, and Common's own wire files read
+    it). `PhysicsUtils` (4.2: "the World and WorldSnapshot overloads stay in Common as adapters"). `PhysicsViews`
+    (physics 17.2: "both in `OpenFPS.Common/PhysicsViews.cs`"; one view both sides fill, and no shared game project
+    sits above Common to hold it). `EntityEmission` (3.8's `AudioEmission` adapter under its new name, renamed when
+    library stage 6 moved the sound's `AudioEmission` to Sound).
+  - **`Scopes` (`ScopeMath`, `ScopeSway`) stays in Common for now, a choice written out, not picked.** The server
+    aims and faces with the same maths the client looks through (`CombatService.cs:508`, `:797-798`,
+    `Program.cs:2199`, `CommandHandler.Doors.cs:102` against `Scope.cs`, `ClientGameSession.Scope.cs`; `ScopeSway`
+    is the client's alone), stage 2's built note left them in Common, and the game has no shared project. The
+    classifier calls the file game. Recommendation: leave it; the alternatives (a game project both reference, or
+    splitting the words to Words) are Cody's to choose.
+  - **References.** LiteNetLib goes from Common's csproj now: no file of Common uses it. The server (five files) and
+    Client.Core (four) use it, and have been reaching it through Common transitively; both gain the explicit
+    `PackageReference` in the same commit. Arch stays: `PhysicsConstants.GravityOf`, `PhysicsUtils` and
+    `PhysicsViews` use it, and 3.8's "used only by `PhysicsUtils.cs`" is older than both. It goes when those files
+    do, which the physics plan does not ask for yet.
+  - **Checks.** Each step builds the five projects; the code commits run `SpokenLinesReplayTests` and
+    `EmitterStreamReplayTests` and name their counts; after each move both surveys run
+    (`tools/engine_packages/run.sh`, `tools/sound_boundary/run.sh`) and their file lists and the lower ratchets are
+    committed with the move; before the report, the guard list of CLAUDE.md, the replays one by one, and the
+    replays again with `DOTNET_PROCESSOR_COUNT=4`.
+
 ### Stage 7: Accessibility, the clean half (1 to 1.5 sessions)
 
 - Create `OpenFPS.Accessibility`. Move the twelve clean files, the keys (`GameKey`, `KeyModifiers`) and the speech
