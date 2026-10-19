@@ -19,6 +19,7 @@ OpenFPS.Accessibility/Speech/SpeechLog.cs	host
 OpenFPS.Accessibility/StairCues.cs	host		
 OpenFPS.Accessibility/TurnNarration.cs	host		
 OpenFPS.Accessibility/UiCue.cs	host		
+OpenFPS.Accessibility/UiSounds.cs	host		
 OpenFPS.Accessibility/WallBumps.cs	host		
 OpenFPS.Accessibility/ZoneSettle.cs	host		
 OpenFPS.Acoustics/AcousticConstants.cs	lib	Acoustics	
@@ -137,6 +138,7 @@ OpenFPS.Audio/SteamAudio/TracedReverb.cs	lib	Audio
 OpenFPS.Audio/SteamAudio/TracedReverbDsp.cs	lib	Audio	
 OpenFPS.Client.Core/AudioDiagnostics.cs	host		
 OpenFPS.Client.Core/BeaconAids.cs	host		
+OpenFPS.Client.Core/ChatCues.cs	host		
 OpenFPS.Client.Core/ClientAudioPaths.cs	host		
 OpenFPS.Client.Core/ClientAudioSystem.cs	host		
 OpenFPS.Client.Core/ClientGeometry.cs	host		
@@ -178,7 +180,6 @@ OpenFPS.Client.Core/SightWatch.cs	host
 OpenFPS.Client.Core/SnapshotSources.cs	host		
 OpenFPS.Client.Core/SpatialService.cs	host		
 OpenFPS.Client.Core/StrideAccumulator.cs	host		
-OpenFPS.Client.Core/UiSounds.cs	host		
 OpenFPS.Client.Core/WorldAudioPlayer.cs	host		
 OpenFPS.Common/AudioEvents.cs	host		
 OpenFPS.Common/Components.cs	host		

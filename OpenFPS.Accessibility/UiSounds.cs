@@ -1,5 +1,4 @@
 using OpenFPS.Audio.Core;
-using OpenFPS.Common.Networking;
 
 namespace OpenFPS.Client.Core;
 
@@ -8,6 +7,9 @@ namespace OpenFPS.Client.Core;
 /// they never compete with the world or speech. Each cue is a distinct shape (a tick, a rise, a fall, a
 /// chord), not just a pitch, since shape survives being heard a hundred times. Shared by every head;
 /// the head decides when.
+///
+/// <para>What a wire message is heard as (a chat line, a presence notice) is the game's mapping and stays
+/// with it (<c>ChatCues</c>): the wire's own types may not enter this layer.</para>
 /// </summary>
 public sealed class UiSounds : IUiCues
 {
@@ -33,44 +35,6 @@ public sealed class UiSounds : IUiCues
     {
         if (!Enabled) return;
         _audio.PlayUiSound("ui:" + cue, () => Render(cue, SampleRate), SampleRate, Volume);
-    }
-
-    /// <summary>
-    /// The sound a line of chat is heard with, or none. The channel decides, whoever talks: an admin's
-    /// map chat is map chat, and the admin cue is for staff's server announcements. A reply to a command
-    /// (no sender) is only spoken. A presence notice has its own sound or none, never the chat sound:
-    /// nobody said anything.
-    /// </summary>
-    public static UiCue? CueFor(ChatMessage msg, bool presenceSounds)
-    {
-        if (msg.Presence != PresenceKind.None)
-        {
-            if (!presenceSounds) return null;
-            return msg.Presence switch
-            {
-                PresenceKind.LoggedIn => UiCue.PresenceOnline,
-                PresenceKind.LoggedOut => UiCue.PresenceLoggedOut,
-                PresenceKind.WentOffline => UiCue.PresenceConnectionLost,
-                PresenceKind.Away => UiCue.PresenceAway,
-                PresenceKind.Back => UiCue.PresenceBack,
-                _ => null,
-            };
-        }
-        if (msg.Channel == ChatChannel.Server && msg.Sender.Length == 0) return null;
-        return msg.Channel switch
-        {
-            ChatChannel.Private => UiCue.ChatPrivate,
-            ChatChannel.Team => UiCue.ChatTeam,
-            ChatChannel.All => UiCue.ChatAll,
-            ChatChannel.Server => msg.FromStaff ? UiCue.ChatAdmin : UiCue.ChatServer,
-            _ => UiCue.ChatMap,
-        };
-    }
-
-    /// <summary>Plays the sound for a line of chat, if it has one.</summary>
-    public void PlayChat(ChatMessage msg)
-    {
-        if (CueFor(msg, PresenceEnabled) is { } cue) Play(cue);
     }
 
     /// <summary>How many steps the loading tone has between empty and full.</summary>

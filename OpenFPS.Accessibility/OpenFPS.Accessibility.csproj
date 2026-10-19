@@ -11,8 +11,9 @@
        It uses Models (the calibration's reference voice, Speech), Sound (the hearing it sets), World (the
        roads the driving cues plan on), Agents (the racing line they plan with, stage 5), Acoustics (the
        scene view the aids read, stage 9), Geometry (the boxes and triangles over it, and the sight rays
-       built on them), Materials (what a ray met, glass) and Physics (the step height the ground answers
-       use); its layer may reference the packages below it, never OpenFPS.Common. The client and the server
+       built on them), Materials (what a ray met, glass), Physics (the step height the ground answers
+       use) and Audio (the interface sounds' engine); its layer may reference the packages below it, never
+       OpenFPS.Common. The client and the server
        read it; it is not in the wire hash (decision 11). Namespaces are those the files had, as for the
        other moves. -->
 
@@ -31,6 +32,7 @@
     <ProjectReference Include="..\OpenFPS.Geometry\OpenFPS.Geometry.csproj" />
     <ProjectReference Include="..\OpenFPS.Materials\OpenFPS.Materials.csproj" />
     <ProjectReference Include="..\OpenFPS.Physics\OpenFPS.Physics.csproj" />
+    <ProjectReference Include="..\OpenFPS.Audio\OpenFPS.Audio.csproj" />
   </ItemGroup>
 
   <ItemGroup>

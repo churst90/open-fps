@@ -170,9 +170,9 @@ public sealed partial class ClientGameSession : IDisposable
         _listening = new ListeningCalibration(audioEngine.Hearing, _speech, Ui,
             (id, gainDb) => _audioSystem.PlayReferenceVoice(id, gainDb), _audioSystem.StopReferenceVoice,
             SaveHearing);
-        // Each kind of chat has its own sound, heard before the words: UiSounds.CueFor says which,
+        // Each kind of chat has its own sound, heard before the words: ChatCues says which,
         // and that somebody coming or going has its own, which a setting can turn off.
-        _chat.Incoming += Ui.PlayChat;
+        _chat.Incoming += m => ChatCues.Play(Ui, m);
 
         _sounds.Initialize();
         // Your own feet ride with your head (see ClientAudioSystem.OnOwnFootstep); everybody

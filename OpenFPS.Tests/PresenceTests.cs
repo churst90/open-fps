@@ -219,16 +219,16 @@ public class PresenceTests : IDisposable
     public void EachPresenceKindHasItsOwnSoundAndNoneWhenTurnedOff()
     {
         var kinds = Enum.GetValues<PresenceKind>().Where(k => k != PresenceKind.None).ToList();
-        var cues = kinds.Select(k => UiSounds.CueFor(Notice(k), presenceSounds: true)).ToList();
+        var cues = kinds.Select(k => ChatCues.For(Notice(k), presenceSounds: true)).ToList();
         Assert.DoesNotContain(null, cues);
         Assert.Equal(kinds.Count, cues.Distinct().Count());
         // Not the chat sound, nor any other cue that was there before.
         Assert.DoesNotContain(UiCue.ChatAll, cues);
         foreach (var cue in cues) Assert.StartsWith("Presence", cue.ToString());
 
-        foreach (var k in kinds) Assert.Null(UiSounds.CueFor(Notice(k), presenceSounds: false));
+        foreach (var k in kinds) Assert.Null(ChatCues.For(Notice(k), presenceSounds: false));
         // Turning them off leaves somebody talking to everyone as it was.
-        Assert.Equal(UiCue.ChatAll, UiSounds.CueFor(new ChatMessage { Sender = "bob", Text = "hi", Channel = ChatChannel.All }, presenceSounds: false));
+        Assert.Equal(UiCue.ChatAll, ChatCues.For(new ChatMessage { Sender = "bob", Text = "hi", Channel = ChatChannel.All }, presenceSounds: false));
 
         static ChatMessage Notice(PresenceKind k) => new() { Sender = "bob", Text = "bob ...", Channel = ChatChannel.All, Presence = k };
     }
