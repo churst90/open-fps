@@ -179,8 +179,24 @@ public static class EntityAcoustics
             Name = def.Identity.Name,
             Prefab = def.Identity.PrefabId,
             Beacon = def.Identity.BeaconCategory,
+            Kind = KindOf(def.Type),
+            Named = def.Identity.Named,
+            Announce = def.Identity.Announce,
         };
     }
+
+    /// <summary>The host's entity type as the view's own (<see cref="BodyKind"/>).</summary>
+    private static BodyKind KindOf(EntityType type) => type switch
+    {
+        EntityType.Player => BodyKind.Player,
+        EntityType.NPC => BodyKind.Npc,
+        EntityType.Beacon => BodyKind.Beacon,
+        EntityType.StaticObject => BodyKind.StaticObject,
+        EntityType.Item => BodyKind.Item,
+        EntityType.Projectile => BodyKind.Projectile,
+        EntityType.Trigger => BodyKind.Trigger,
+        _ => BodyKind.None,
+    };
 
     /// <summary>A door leaf where it stands, with its doorway: the pose the server recorded for it shut; an older
     /// definition carries the pose it was defined in, which is shut at load.</summary>

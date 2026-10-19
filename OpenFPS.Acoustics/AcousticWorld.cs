@@ -80,6 +80,10 @@ public readonly record struct AirState(float Celsius, float Humidity, float Pres
     public static readonly AirState Standard = new(20f, 0.5f, 1013.25f, 1f);
 }
 
+/// <summary>What a body is, as its host's types name them (open-fps: EntityType; None for an entity with no
+/// definition). The aids that name people read it.</summary>
+public enum BodyKind : byte { None = 0, Player, Npc, Beacon, StaticObject, Item, Projectile, Trigger }
+
 /// <summary>
 /// A thing in the world with a box, as the sound meets it: a wall, a door leaf, a tree's leaves, a car. The
 /// host fills it from what it holds (open-fps: an entity's collider, material, acoustics and emitter).
@@ -134,6 +138,14 @@ public readonly struct AcousticBody
     /// <summary>Its beacon category (open-fps: <c>Identity.BeaconCategory</c>, "door", "item", "stairs"...),
     /// or null or empty: it is not one.</summary>
     public string? Beacon { get; init; }
+
+    /// <summary>What it is (open-fps: the entity's type), for naming somebody as somebody.</summary>
+    public BodyKind Kind { get; init; }
+    /// <summary>A person with a name of their own (open-fps: <c>Identity.Named</c>).</summary>
+    public bool Named { get; init; }
+    /// <summary>Whether a look should name it even though it is not solid (open-fps:
+    /// <c>Identity.Announce</c>: items, people and beacons as the prefab sets it).</summary>
+    public bool Announce { get; init; }
 }
 
 /// <summary>A door leaf where it stands now, and the doorway it shuts: its pose when shut, its size, the two

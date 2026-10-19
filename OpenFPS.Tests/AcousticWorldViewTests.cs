@@ -78,7 +78,7 @@ public class AcousticWorldViewTests
         sb.Append($"air {view.Air} version {view.GeometryVersion} tiles {view.TileMetres} rooms {view.Rooms?.GetHashCode()} bodies {view.BodyCount}\n");
         var all = new List<AcousticBody>();
         view.AllBodies(all);
-        foreach (var b in all) sb.Append($"body {b.Id} {b.Name} {b.Prefab} {b.Beacon} {b.Position} {b.Rotation} {b.Size} {b.Material} {b.Solid} {b.DoorLeaf}\n");
+        foreach (var b in all) sb.Append($"body {b.Id} {b.Name} {b.Prefab} {b.Beacon} {b.Kind} {b.Named} {b.Announce} {b.Position} {b.Rotation} {b.Size} {b.Material} {b.Solid} {b.DoorLeaf}\n");
         for (int i = 0; i < view.MovingCount; i++) sb.Append($"moving {view.MovingAt(i).Id} {view.MovingAt(i).Position}\n");
         var leaves = new List<DoorLeaf>();
         view.DoorLeaves(leaves);
@@ -131,9 +131,11 @@ public class AcousticWorldViewTests
         var markers = new List<AcousticBody>();
         view.Markers(markers);
         Assert.Equal(new[] { StairId, PlaceId }, markers.Select(m => m.Id).OrderBy(i => i));
-        Assert.Contains(markers, m => m.Id == StairId && m.Name == "Stairs up, 12 steps, to floor 1" && m.Beacon == "stairs");
+        Assert.Contains(markers, m => m.Id == StairId && m.Name == "Stairs up, 12 steps, to floor 1"
+                                      && m.Beacon == "stairs" && m.Kind == BodyKind.StaticObject);
         Assert.Contains(markers, m => m.Id == PlaceId && m.Name == "Landing" && m.Prefab == "named_place");
         Assert.DoesNotContain(markers, m => m.Id == WallId || m.Id == BusId);
+        Assert.True(view.TryGetBody(BusId, out var bus) && bus.Kind == BodyKind.Npc);
     }
 
     /// <summary>
