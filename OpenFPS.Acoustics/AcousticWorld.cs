@@ -141,6 +141,9 @@ public readonly struct AcousticBody
     /// <summary>Its beacon category (open-fps: <c>Identity.BeaconCategory</c>, "door", "item", "stairs"...),
     /// or null or empty: it is not one.</summary>
     public string? Beacon { get; init; }
+    /// <summary>The team it says it is in (open-fps: <c>EntityDefinition.Team</c>), or empty: none. A
+    /// teammate answers to their own call (<c>BeaconAids.SoundFor</c>).</summary>
+    public string? Team { get; init; }
 
     /// <summary>What it is (open-fps: the entity's type), for naming somebody as somebody.</summary>
     public BodyKind Kind { get; init; }

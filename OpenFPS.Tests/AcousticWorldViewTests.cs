@@ -49,7 +49,7 @@ public class AcousticWorldViewTests
         // A bus off to the west.
         w.RegisterDefinition(new EntityDefinition
         {
-            EntityId = BusId, Type = EntityType.NPC, Moves = true, Transform = At(new Vector3(-40f, 0f, 0f)),
+            EntityId = BusId, Type = EntityType.NPC, Moves = true, Team = "north", Transform = At(new Vector3(-40f, 0f, 0f)),
             Collider = new ColliderComponent { Shape = ColliderShape.Box, Size = new Vector3(2.5f, 3.2f, 12f), IsSolid = true },
             Material = new MaterialComponent { Material = "Metal" },
         });
@@ -79,7 +79,7 @@ public class AcousticWorldViewTests
         sb.Append($"air {view.Air} version {view.GeometryVersion} tiles {view.TileMetres} rooms {view.Rooms?.GetHashCode()} bodies {view.BodyCount}\n");
         var all = new List<AcousticBody>();
         view.AllBodies(all);
-        foreach (var b in all) sb.Append($"body {b.Id} {b.Name} {b.Prefab} {b.Beacon} {b.Kind} {b.Named} {b.Announce} {b.HasWheels} {b.Position} {b.Rotation} {b.Size} {b.Material} {b.Solid} {b.DoorLeaf}\n");
+        foreach (var b in all) sb.Append($"body {b.Id} {b.Name} {b.Prefab} {b.Beacon} {b.Team} {b.Kind} {b.Named} {b.Announce} {b.HasWheels} {b.Position} {b.Rotation} {b.Size} {b.Material} {b.Solid} {b.DoorLeaf}\n");
         for (int i = 0; i < view.MovingCount; i++) sb.Append($"moving {view.MovingAt(i).Id} {view.MovingAt(i).Position}\n");
         var leaves = new List<DoorLeaf>();
         view.DoorLeaves(leaves);
@@ -138,6 +138,7 @@ public class AcousticWorldViewTests
         Assert.DoesNotContain(markers, m => m.Id == WallId || m.Id == BusId);
         Assert.True(view.TryGetBody(BusId, out var bus) && bus.Kind == BodyKind.Npc);
         Assert.False(bus.HasWheels);
+        Assert.Equal("north", bus.Team);
         Assert.True(EntityAcoustics.BodyOf(new EntitySnapshot { Id = 9007, Wheels = new OpenFPS.Physics.WheelState[4] }).HasWheels);
     }
 

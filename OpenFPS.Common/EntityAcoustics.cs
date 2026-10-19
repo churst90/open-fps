@@ -180,6 +180,7 @@ public static class EntityAcoustics
             Name = def.Identity.Name,
             Prefab = def.Identity.PrefabId,
             Beacon = def.Identity.BeaconCategory,
+            Team = def.Team ?? "",
             Kind = KindOf(def.Type),
             Named = def.Identity.Named,
             Announce = def.Identity.Announce,
