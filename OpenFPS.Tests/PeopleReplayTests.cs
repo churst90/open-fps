@@ -309,12 +309,12 @@ public class PeopleReplayTests
         var view = ServerPeopleView.Of(world, grid);
         var net = Pavements.Build(Pavements.StripsOf(view));
         var solids = Pavements.SolidsOf(view);
-        return HauntFinder.Find(world, grid, data, net, solids);
+        return HauntFinder.Find(view, data, net, solids);
     }
 
     private static void HauntLine(StringBuilder sb, Haunt h)
         => sb.Append(Flat(h.Name)).Append('\t').Append(h.Kind).Append('\t').Append(Pos(h.Stand)).Append('\t')
-             .Append(Degrees(h.Facing)).Append('\t').Append(h.Door == Entity.Null ? "-1" : h.Door.Id.ToString(CultureInfo.InvariantCulture))
+             .Append(Degrees(h.Facing)).Append('\t').Append(h.Door.ToString(CultureInfo.InvariantCulture))
              .Append('\t').Append(Flat(h.Access.X)).Append(',').Append(Flat(h.Access.Y)).Append('\t')
              .Append(h.AccessEdge.ToString(CultureInfo.InvariantCulture)).AppendLine();
 

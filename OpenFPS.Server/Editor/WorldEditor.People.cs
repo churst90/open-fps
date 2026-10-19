@@ -67,7 +67,7 @@ public sealed partial class WorldEditor
         if (_places.TryGetValue(mapId, out var known) && known.Things == things) return known.Names;
         var view = ServerPeopleView.Of(world, grid);
         var paths = Pavements.Build(Pavements.StripsOf(view));
-        var names = HauntFinder.Find(world, grid, data, paths, Pavements.SolidsOf(view)).Select(h => h.Name).Distinct().ToList();
+        var names = HauntFinder.Find(view, data, paths, Pavements.SolidsOf(view)).Select(h => h.Name).Distinct().ToList();
         _places[mapId] = (things, names);
         return names;
     }

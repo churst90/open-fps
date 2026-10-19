@@ -188,7 +188,7 @@ public sealed class CharacterSystem
             if (!c.Ready)
             {
                 if (now < FindAfterSeconds || _maps == null || !_maps.TryGetMapData(mapId, out var data)) continue;
-                Prepare(c, world, grid, view, data);
+                Prepare(c, view, data);
                 if (c.Haunts.Count == 0) continue;
             }
             if (c.Haunts.Count == 0) continue;
@@ -221,12 +221,12 @@ public sealed class CharacterSystem
         _manners.Update(mapId, world, dt);
     }
 
-    private void Prepare(Character c, World world, SpatialGrid<Entity> grid, IPeopleWorld view, MapData data)
+    private void Prepare(Character c, IPeopleWorld view, MapData data)
     {
         c.Ready = true;
         c.Paths = Pavements.Build(Pavements.StripsOf(view));
         c.Solids = Pavements.SolidsOf(view);
-        c.Haunts = KeptTo(c, HauntFinder.Find(world, grid, data, c.Paths, c.Solids));
+        c.Haunts = KeptTo(c, HauntFinder.Find(view, data, c.Paths, c.Solids));
         Log.Information("CHARACTER {Name} on {Map}: {Count} places ({Kinds}) on {Nodes} pavement corners: {Names}",
                         c.Data.Name, c.MapId, c.Haunts.Count,
                         string.Join(", ", c.Haunts.GroupBy(h => h.Kind).Select(g => $"{g.Count()} {g.Key}")),
@@ -289,7 +289,7 @@ public sealed class CharacterSystem
                 {
                     // Out through a lobby's door: opened from inside with the bar, and through once it is open.
                     Stand(c, ref t, ref vel, now);
-                    if (!DoorSystem.OpenEnough(world, c.At?.Door ?? Entity.Null) && now - c.DoorSince < 6) break;
+                    if (!DoorSystem.OpenEnough(world, HauntDoor(c.MapId, c.At?.Door ?? -1)) && now - c.DoorSince < 6) break;
                     c.OpeningDoor = false;
                 }
                 bool arrived = Walk(c, ref t, ref vel, dt);
@@ -303,7 +303,7 @@ public sealed class CharacterSystem
 
             case Doing.AtDoor:
             {
-                var door = c.Target!.Door;
+                var door = HauntDoor(c.MapId, c.Target!.Door);
                 Stand(c, ref t, ref vel, now);
                 if (!world.IsAlive(door) || DoorSystem.OpenEnough(world, door))
                 {
@@ -474,7 +474,7 @@ public sealed class CharacterSystem
         c.EnteringLobby = false;
         c.DoorSince = now;
         // Out through the lobby's door, opened from inside if it is shut; through it at the step outside.
-        c.Passage = leavingLobby ? _manners.Reach(world, c.At!.Door, c.At.Inside, c.At.Outside, c.Entity) : null;
+        c.Passage = leavingLobby ? _manners.Reach(world, HauntDoor(c.MapId, c.At!.Door), c.At.Inside, c.At.Outside, c.Entity) : null;
         c.ThroughAtLeg = 2;
         Log.Information("CHARACTER {Name}: leaving {From} for {To}, {Metres:F0} m on foot.",
                         c.Data.Name, c.At?.Name ?? "where he was", to.Name, PathLength(c.Route));
@@ -487,7 +487,7 @@ public sealed class CharacterSystem
         if (to.Kind == HauntKind.Lobby && !c.EnteringLobby)
         {
             // How he finds it. It is locked from the street, so he waits for it to be opened.
-            c.Passage = _manners.Reach(world, to.Door, to.Outside, to.Inside, c.Entity, open: false);
+            c.Passage = _manners.Reach(world, HauntDoor(c.MapId, to.Door), to.Outside, to.Inside, c.Entity, open: false);
             c.Now = Doing.AtDoor;
             c.DoorSince = now;
             c.FacingYaw = to.Facing + MathF.PI;           // facing the door
@@ -575,6 +575,11 @@ public sealed class CharacterSystem
     }
 
     /// <summary>Where a passenger steps on and off: the front door, on the kerb side (traffic keeps right).</summary>
+    /// <summary>The map's entity for a haunt's door id, or null if the map or the door is gone.</summary>
+    private Entity HauntDoor(string mapId, int id)
+        => id >= 0 && _maps != null && _maps.TryGetMap(mapId, out _, out _, out _, out var lookup)
+           && lookup.TryGetValue(id, out var door) ? door : Entity.Null;
+
     private static Vector3 DoorOf(World world, Entity bus)
     {
         var t = world.Get<Transform>(bus);

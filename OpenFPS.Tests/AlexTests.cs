@@ -186,7 +186,7 @@ public class AlexTests
         var prefabs = new PrefabRepository(Path.Combine(AppContext.BaseDirectory, "prefabs"));
         var maps = new MapManager(new MapRepository(Path.Combine(AppContext.BaseDirectory, "maps")), prefabs);
         maps.Initialize();
-        Assert.True(maps.TryGetMap("city", out World world, out _, out var grid, out _));
+        Assert.True(maps.TryGetMap("city", out World world, out _, out var grid, out var lookup));
         Assert.True(maps.TryGetMapData("city", out var data));
         var alex = Assert.Single(data.Characters!);
         Assert.Equal(("Alex", "alex", "homeless"), (alex.Name, alex.Voice, alex.Kind));
@@ -194,7 +194,7 @@ public class AlexTests
         var view = ServerPeopleView.Of(world, grid);
         var net = Pavements.Build(Pavements.StripsOf(view));
         var solids = Pavements.SolidsOf(view);
-        var haunts = HauntFinder.Find(world, grid, data, net, solids);
+        var haunts = HauntFinder.Find(view, data, net, solids);
         Assert.Equal(2, haunts.Count(h => h.Kind == HauntKind.BusStop));
         foreach (var tower in new[] { "Marlow Tower", "Kestrel House", "Union Building", "Brandt Court", "Selby House" })
         {
@@ -206,8 +206,11 @@ public class AlexTests
             Assert.False(Pavements.Blocked(solids, new Vector2(h.Stand.X, h.Stand.Z), h.Stand.Y), $"{h.Name} stands him in a wall");
         // Waiting in a doorway holds its closer off, so the door stays open all the while he lingers
         // (Cody, 2026-10-08: the apartment's front door stayed open after an NPC).
-        foreach (var h in haunts.Where(h => h.Door != Entity.Null))
-            Assert.False(DoorSystem.InDoorway(world, h.Door, h.Stand), $"{h.Name} stands him in the doorway, holding the door open");
+        foreach (var h in haunts.Where(h => h.Door >= 0))
+        {
+            Assert.True(lookup.TryGetValue(h.Door, out var door), $"{h.Name} names a door the map does not have");
+            Assert.False(DoorSystem.InDoorway(world, door, h.Stand), $"{h.Name} stands him in the doorway, holding the door open");
+        }
 
         // From one shelter to the other is a walk of the pavements, crossing Main Street once.
         var a = haunts.First(h => h.Kind == HauntKind.BusStop);

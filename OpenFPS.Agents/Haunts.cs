@@ -1,10 +1,5 @@
 using System.Numerics;
-using Arch.Core;
-using OpenFPS.Common;
-using OpenFPS.Common.Components;
-using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
-using OpenFPS.Geometry;
 
 namespace OpenFPS.Server.Systems;
 
@@ -38,7 +33,7 @@ public sealed class Haunt
     public float Facing;
     public Vector2 Access;
     public int AccessEdge = -1;
-    public Entity Door = Entity.Null;
+    public int Door = -1;
     public Vector3 Outside, Inside;
     public Vector3 StopAt;
 
@@ -56,26 +51,27 @@ public static class HauntFinder
     /// <summary>A shelter's parts this near a bus stop are that stop's shelter, metres.</summary>
     public const float ShelterMetres = 8f;
 
-    public static List<Haunt> Find(World world, SpatialGrid<Entity> grid, MapData data, Pavements paths,
+    public static List<Haunt> Find(IPeopleWorld world, MapData data, Pavements paths,
                                    IReadOnlyList<Pavements.Solid> solids)
     {
         var found = new List<Haunt>();
         float Ground(Vector3 p)
         {
-            float g = PhysicsUtils.GetGroundHeight(world, grid, new Vector3(p.X, MathF.Max(p.Y, 0.3f), p.Z), out _);
+            float g = world.Ground(new Vector3(p.X, MathF.Max(p.Y, 0.3f), p.Z));
             return g < -900f ? p.Y : g;
         }
 
         // ── Bus stops ───────────────────────────────────────────────────────────────────────────
         var shelterParts = new List<Vector3>();
-        world.Query(new QueryDescription().WithAll<Transform, ColliderComponent>().WithNone<Velocity>(),
-            (Entity e, ref Transform t, ref ColliderComponent c) =>
-            {
-                string name = NameOf(world, e);
-                if (name.Contains("shelter", StringComparison.OrdinalIgnoreCase)
-                    && !name.Contains("roof", StringComparison.OrdinalIgnoreCase) && c.IsSolid)
-                    shelterParts.Add(t.Position);
-            });
+        var boxes = new List<NamedBox>();
+        world.NamedBoxes(boxes);
+        foreach (var box in boxes)
+        {
+            string name = box.Name;
+            if (name.Contains("shelter", StringComparison.OrdinalIgnoreCase)
+                && !name.Contains("roof", StringComparison.OrdinalIgnoreCase) && box.Solid && !box.Moves)
+                shelterParts.Add(box.Centre);
+        }
         foreach (var stop in data.RoadStops ?? new List<RoadStopData>())
         {
             if (!string.Equals(stop.Kind, "bus_stop", StringComparison.OrdinalIgnoreCase)) continue;
@@ -104,18 +100,21 @@ public static class HauntFinder
         }
 
         // ── Front entrances: the pavement outside, and the lobby in ─────────────────────────────
-        world.Query(new QueryDescription().WithAll<Transform, DoorComponent>(), (Entity e, ref Transform t, ref DoorComponent d) =>
+        var doors = new List<DoorBody>();
+        world.Doors(doors);
+        foreach (var door in doors)
         {
-            if (!DoorSystem.OpensByHand(d)) return;
-            string name = NameOf(world, e);
-            if (!name.Contains("entrance", StringComparison.OrdinalIgnoreCase)) return;
-            DoorSystem.Doorway(world, e, out var centre, out var rotation);
-            if (centre.Y > 2.5f) return;                                  // an upstairs door
+            if (!world.OpensByHand(door.Id)) continue;
+            string name = door.Name;
+            if (!name.Contains("entrance", StringComparison.OrdinalIgnoreCase)) continue;
+            var centre = door.Doorway.Centre;
+            var rotation = door.Doorway.Rotation;
+            if (centre.Y > 2.5f) continue;                                // an upstairs door
             var through = Vector3.Transform(Vector3.UnitZ, rotation); through.Y = 0f;
-            if (through.LengthSquared() < 1e-6f) return;
+            if (through.LengthSquared() < 1e-6f) continue;
             through = Vector3.Normalize(through);
             // The street side: the key side of a door that has one, else the side nearer a pavement.
-            float street = d.KeyedSide != 0f ? MathF.Sign(d.KeyedSide) : 0f;
+            float street = door.KeyedSide != 0f ? MathF.Sign(door.KeyedSide) : 0f;
             if (street == 0f && !paths.IsEmpty)
             {
                 var plus = centre + through * 2f; var minus = centre - through * 2f;
@@ -124,10 +123,10 @@ public static class HauntFinder
             }
             if (street == 0f) street = 1f;
             var n = through * street;                                     // out, toward the street
-            float floor = centre.Y - (world.Has<ColliderComponent>(e) ? world.Get<ColliderComponent>(e).Size.Y * 0.5f : 1.05f);
+            float floor = centre.Y - door.LeafSize.Y * 0.5f;
             // Out of the leaf's way: a front door swings out over the pavement, and a door does not
             // open through somebody standing in its sweep (DoorSystem), so he waits a leaf's width off.
-            float leaf = world.Has<ColliderComponent>(e) ? MathF.Max(world.Get<ColliderComponent>(e).Size.X, world.Get<ColliderComponent>(e).Size.Z) : 1f;
+            float leaf = MathF.Max(door.LeafSize.X, door.LeafSize.Z);
             var outside = centre + n * MathF.Max(0.9f, leaf + 0.6f); outside.Y = Ground(outside);
             var inside = centre - n * 1.4f;
             if (Pavements.Blocked(solids, new Vector2(inside.X, inside.Z), floor)) inside = centre - n * 0.9f;
@@ -151,11 +150,11 @@ public static class HauntFinder
                     Kind = HauntKind.Doorway,
                     Stand = b with { Y = Ground(b) },
                     Facing = MathF.Atan2(n.X, n.Z),
-                    Door = e, Outside = outside, Inside = inside,
+                    Door = door.Id, Outside = outside, Inside = inside,
                 });
 
             // Inside, if inside is a hall of some kind and not somebody's flat.
-            string? room = CommandHandler.PlaceAt(world, inside + new Vector3(0f, 1f, 0f));
+            string? room = world.PlaceAt(inside + new Vector3(0f, 1f, 0f));
             if (room == null || !IsLobby(room))
                 Serilog.Log.Debug("Haunts: {Door} opens onto {Room}, not a lobby.", name, room ?? "nowhere named");
             // Where he waits: clear of the doorway, deeper in or to one side, since anybody standing in it
@@ -168,7 +167,7 @@ public static class HauntFinder
                     var p = centre - n * deep + along * side;
                     if (Pavements.Blocked(solids, new Vector2(p.X, p.Z), floor)) continue;
                     p.Y = Ground(p with { Y = floor + 0.3f });
-                    if (!DoorSystem.InDoorway(world, e, p)) return p;
+                    if (!world.InDoorway(door.Id, p)) return p;
                 }
                 return inside;
             }
@@ -180,15 +179,17 @@ public static class HauntFinder
                     Stand = ClearOfTheDoorway(),
                     // Facing the door, as somebody waiting out of the weather does.
                     Facing = MathF.Atan2(n.X, n.Z),
-                    Door = e, Outside = outside, Inside = inside,
+                    Door = door.Id, Outside = outside, Inside = inside,
                 });
-        });
+        }
 
         // ── Squares and parks ───────────────────────────────────────────────────────────────────
-        world.Query(new QueryDescription().WithAll<Transform, RegionComponent>(), (ref Transform t, ref RegionComponent r) =>
+        var regions = new List<RegionBody>();
+        world.Regions(regions);
+        foreach (var r in regions)
         {
-            if (r.IsIndoor || !IsSquare(r.FriendlyName)) return;
-            var c = new Vector2(t.Position.X, t.Position.Z);
+            if (r.Indoor || !IsSquare(r.Name)) continue;
+            var c = new Vector2(r.Centre.X, r.Centre.Z);
             Vector2? clear = null;
             foreach (float radius in new[] { 0f, 4f, 7f, 10f })
                 for (int k = 0; k < (radius == 0f ? 1 : 8) && clear == null; k++)
@@ -197,10 +198,10 @@ public static class HauntFinder
                     var p = c + new Vector2(MathF.Sin(a), MathF.Cos(a)) * radius;
                     if (!Pavements.Blocked(solids, p)) clear = p;
                 }
-            if (clear is not { } spot) return;
+            if (clear is not { } spot) continue;
             var stand = new Vector3(spot.X, 0f, spot.Y);
-            found.Add(new Haunt { Name = r.FriendlyName, Kind = HauntKind.Square, Stand = stand with { Y = Ground(stand) } });
-        });
+            found.Add(new Haunt { Name = r.Name, Kind = HauntKind.Square, Stand = stand with { Y = Ground(stand) } });
+        }
 
         // Where each joins the pavements: the nearest point on them it can walk to in a straight line.
         foreach (var h in found)
@@ -254,9 +255,4 @@ public static class HauntFinder
             }
         return p;
     }
-
-    private static string NameOf(World world, Entity e)
-        => world.Has<IdentityComponent>(e) && !string.IsNullOrWhiteSpace(world.Get<IdentityComponent>(e).Name)
-            ? world.Get<IdentityComponent>(e).Name
-            : world.Has<NameComponent>(e) ? world.Get<NameComponent>(e).Name ?? "" : "";
 }
