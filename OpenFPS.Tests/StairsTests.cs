@@ -711,7 +711,7 @@ public class StairsTests : IClassFixture<StairsTests.City>
         place.Identity.BeaconCategory = "";
         place.Identity.PrefabId = NamedPlaces.PrefabId;
         place.Collider.Size = new Vector3(4f, 2.5f, 2f);
-        Assert.True(NamedPlaces.Is(place));
+        Assert.True(NamedPlaces.Is(place.Identity.PrefabId, place.Moves, place.Collider.IsSolid, place.Collider.Size, place.Identity.Name));
         Assert.True(ClientWorldState.IsMarker(place));
     }
 

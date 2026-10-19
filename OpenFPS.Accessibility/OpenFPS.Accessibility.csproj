@@ -9,7 +9,8 @@
        9, once they read a scene view.
 
        It uses Models (the calibration's reference voice, Speech), Sound (the hearing it sets), World (the
-       roads the driving cues plan on) and Agents (the racing line they plan with, stage 5); its layer may
+       roads the driving cues plan on), Agents (the racing line they plan with, stage 5), Acoustics (the
+       scene view the aids read, stage 9) and Geometry (the boxes and triangles over it); its layer may
        reference the packages below it, never OpenFPS.Common. The client and the server read it; it is not
        in the wire hash (decision 11). Namespaces are those the files had, as for the other moves. -->
 
@@ -24,6 +25,8 @@
     <ProjectReference Include="..\OpenFPS.Models\OpenFPS.Models.csproj" />
     <ProjectReference Include="..\OpenFPS.World\OpenFPS.World.csproj" />
     <ProjectReference Include="..\OpenFPS.Agents\OpenFPS.Agents.csproj" />
+    <ProjectReference Include="..\OpenFPS.Acoustics\OpenFPS.Acoustics.csproj" />
+    <ProjectReference Include="..\OpenFPS.Geometry\OpenFPS.Geometry.csproj" />
   </ItemGroup>
 
   <ItemGroup>

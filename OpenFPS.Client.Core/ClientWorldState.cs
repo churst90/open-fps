@@ -947,7 +947,9 @@ public class ClientWorldState
     /// (<see cref="NamedPlaces"/>).</summary>
     internal static bool IsMarker(EntityDefinition def)
         => def.Type == EntityType.StaticObject && !def.Moves && !def.Collider.IsSolid
-           && (!string.IsNullOrEmpty(def.Identity.BeaconCategory) || NamedPlaces.Is(def));
+           && (!string.IsNullOrEmpty(def.Identity.BeaconCategory)
+               || NamedPlaces.Is(def.Identity.PrefabId, def.Moves, def.Collider.IsSolid,
+                                 def.Collider.Size, def.Identity.Name));
 
     /// <summary>
     /// The static collision grid, made again into a new grid that replaces the old. Never refill it in

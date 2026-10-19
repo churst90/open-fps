@@ -99,10 +99,13 @@ public class CityZoneTests
         var world = City();
         var map = world.AcousticMap!;
         // The stairs' places only: the city has others (Elm Park's fountain, a garden gate).
-        var places = world.MarkerEntityIds.Where(id => OpenFPS.Client.Core.NamedPlaces.Is(world.Entities[id].Definition))
-                                          .Where(id => world.Entities[id].Definition.Identity.Name is var n
-                                                       && (n.Contains(" stairs, ") || n.Contains(" landing, ")))
-                                          .ToList();
+        var places = world.MarkerEntityIds
+                             .Where(id => world.Entities[id].Definition is var d
+                                          && OpenFPS.Client.Core.NamedPlaces.Is(d.Identity.PrefabId, d.Moves,
+                                                                               d.Collider.IsSolid, d.Collider.Size, d.Identity.Name))
+                             .Where(id => world.Entities[id].Definition.Identity.Name is var n
+                                          && (n.Contains(" stairs, ") || n.Contains(" landing, ")))
+                             .ToList();
         Assert.Equal(74, places.Count);                                     // a flight and a landing a storey, 37 storeys
         var acoustics = new SpatialAcoustics();
         Assert.NotNull(acoustics.RoutesFor(world));
