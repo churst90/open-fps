@@ -1189,6 +1189,28 @@ A session is one working session of an agent, as in docs/GEOMETRY.md.
   and the scope's categories come in as options and a registered source.
 - Check: the spoken-lines replay unchanged, line for line; the emitter stream (beacons are voices).
 
+**The plan (2026-10-18).** The view widens in slices, each landing with the first aid that needs it, so every commit
+stays green. `AcousticBody` gains: the kind (`BodyKind`, the entity's type — static object, player, NPC, beacon,
+item, projectile, trigger), the names (`Name`, `Named`, `Announce`), the prefab id (`Prefab`, named places), the
+beacon category (`Beacon`), the team (`Team`), a place's sides and naming (`RegionAId`, `RegionBId`, `RegionName`,
+`RegionIndoor`), the geometry role (what the triangles hold: static, sight-only, mover), a world synth's running bit
+(`SynthRunning`, the level crossing's bell) and a vehicle's wheels as values the body can carry without the physics
+(`WheelSurface`, `WheelWaterMm`, its worst wheel). `IAcousticWorld` gains `Markers` (the fixed named, non-solid
+markers the stairs and the named places read, as `DoorLeaves` has it) and `Regions` (the region entities the
+tracker reads). The sight rays then run over the view as the sound's do (`AcousticRays` is the model: a ray over
+`Geometry`, `Near`, `Unindexed` and the markers, its stops a predicate on `AcousticBody`), so `SpatialService`
+keeps only the game's live queries.
+The order is smallest first: `NamedPlaces` (markers, prefab, name), `StairCues` (markers, beacon category, name),
+`Sightline` (names, kinds, the ray over the view), `WallBumps` (physics' `ContactEvent` and the attempted speed
+instead of `BodyContact`), `UiSounds` (its switches an option; the chat and presence mapping stays the session's),
+then `BeaconAids` (near, category, team), `DrivingAids` (its settings Accessibility's own options), `SightWatch`,
+`SightGrid`, `MapTracker` (`SightKind`/`ScopeView` behind a category source the game registers). One aid per
+commit, by `git mv`, namespaces kept; an aid moves only when it reads nothing of Client.Core.
+Each move is checked by: the build at 0 warnings, the aid's own tests (named in the commit), `SpokenLinesReplayTests`
+unchanged line for line, `EmitterStreamReplayTests` unregenerated, and `tools/engine_packages/run.sh` with the
+ratchet committed lower. The widening fills `WorldSnapshot` and `EntityAcoustics` (Common, hashed), so the wire hash
+changes with it, once; moving an aid does not touch it. The server and the Windows client deploy together then.
+
 ### Stage 10: Agents, the people (2 to 3 sessions)
 
 - After physics stage 3 (`IPhysicsWorld`). Haunts, door manners, the pavement graph, Alex's day and the pedestrians'
