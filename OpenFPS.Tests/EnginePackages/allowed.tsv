@@ -1,6 +1,4 @@
 file	to_package	count
-OpenFPS.Client.Core/BeaconAids.cs	Common	88
-OpenFPS.Client.Core/BeaconAids.cs	game	6
 OpenFPS.Client.Core/DrivingAids.cs	Common	74
 OpenFPS.Client.Core/DrivingAids.cs	game	30
 OpenFPS.Client.Core/MapTracker.cs	Common	103

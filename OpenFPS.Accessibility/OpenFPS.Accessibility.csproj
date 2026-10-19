@@ -36,6 +36,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The tests and the AudioLab's spikes reach the aids' internals, as for the other packages. -->
+    <InternalsVisibleTo Include="OpenFPS.Tests" />
+    <InternalsVisibleTo Include="OpenFPS.AudioLab" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- SpeechDispatcherOutput logs the backend it found or did not. -->
     <PackageReference Include="Serilog" Version="4.2.0" />
   </ItemGroup>

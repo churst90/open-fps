@@ -76,7 +76,7 @@ public class TestConfigIsolationTests
         var known = new SortedSet<string>(StringComparer.Ordinal)
         {
             // Moved by OPENFPS_SETTINGS_DIR.
-            "OpenFPS.Client.Core/SettingsFolder.cs: SpecialFolder.ApplicationData",
+            "OpenFPS.Accessibility/SettingsFolder.cs: SpecialFolder.ApplicationData",
             // Moved by OPENFPS_RENDER_CACHE and OPENFPS_MESH_CACHE.
             "OpenFPS.Client.Core/ClientAudioPaths.cs: SpecialFolder.LocalApplicationData",
             "OpenFPS.Client.Core/MeshAssetFetcher.cs: SpecialFolder.LocalApplicationData",

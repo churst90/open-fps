@@ -5,9 +5,6 @@ using OpenFPS.Acoustics;
 
 namespace OpenFPS.Client.Core;
 
-/// <summary>What comma and period step through: one kind of thing at a time.</summary>
-public enum TrackCategory { Doors, Entrances, Stairs, Items, People, Vehicles, Places }
-
 /// <summary>
 /// The things of one kind on the map, nearest first, stepped through a key at a time (Cody, 2026-10-04:
 /// "just , and . should cycle the selected items", categories on the Shift variants like chat).

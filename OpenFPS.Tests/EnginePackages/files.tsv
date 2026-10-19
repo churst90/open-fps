@@ -1,4 +1,5 @@
 file	package	why
+OpenFPS.Accessibility/BeaconAids.cs	Accessibility	
 OpenFPS.Accessibility/Beacons.cs	Accessibility	
 OpenFPS.Accessibility/DrivingCuePlanner.cs	Accessibility	
 OpenFPS.Accessibility/DrivingCueSounds.cs	Accessibility	
@@ -10,6 +11,7 @@ OpenFPS.Accessibility/ListMenu.cs	Accessibility
 OpenFPS.Accessibility/ListeningCalibration.cs	Accessibility	
 OpenFPS.Accessibility/NamedPlaces.cs	Accessibility	
 OpenFPS.Accessibility/PlayerCoordinates.cs	Accessibility	
+OpenFPS.Accessibility/SettingsFolder.cs	Accessibility	
 OpenFPS.Accessibility/SightKinds.cs	Accessibility	
 OpenFPS.Accessibility/SightRays.cs	Accessibility	
 OpenFPS.Accessibility/Sightline.cs	Accessibility	
@@ -17,6 +19,7 @@ OpenFPS.Accessibility/Speech/ISpeechOutput.cs	Accessibility
 OpenFPS.Accessibility/Speech/SpeechDispatcherOutput.cs	Accessibility	
 OpenFPS.Accessibility/Speech/SpeechLog.cs	Accessibility	
 OpenFPS.Accessibility/StairCues.cs	Accessibility	
+OpenFPS.Accessibility/TrackCategory.cs	Accessibility	
 OpenFPS.Accessibility/TurnNarration.cs	Accessibility	
 OpenFPS.Accessibility/UiCue.cs	Accessibility	
 OpenFPS.Accessibility/UiSounds.cs	Accessibility	
@@ -143,7 +146,6 @@ OpenFPS.Audio/SteamAudio/TracedEchoes.cs	Audio
 OpenFPS.Audio/SteamAudio/TracedReverb.cs	Audio	
 OpenFPS.Audio/SteamAudio/TracedReverbDsp.cs	Audio	
 OpenFPS.Client.Core/AudioDiagnostics.cs	game	
-OpenFPS.Client.Core/BeaconAids.cs	Accessibility	
 OpenFPS.Client.Core/ChatCues.cs	game	
 OpenFPS.Client.Core/ClientAudioPaths.cs	game	
 OpenFPS.Client.Core/ClientAudioSystem.cs	game	the audio world's host: sources from the snapshot, the game's sound features, the place's name
@@ -180,7 +182,6 @@ OpenFPS.Client.Core/Session/ClientGameSession.Scope.cs	game
 OpenFPS.Client.Core/Session/ClientGameSession.Tracker.cs	game	
 OpenFPS.Client.Core/Session/ClientGameSession.cs	game	
 OpenFPS.Client.Core/Session/ConnectRetry.cs	game	
-OpenFPS.Client.Core/SettingsFolder.cs	game	
 OpenFPS.Client.Core/SightGrid.cs	game	
 OpenFPS.Client.Core/SightWatch.cs	Accessibility	
 OpenFPS.Client.Core/SnapshotSources.cs	game	

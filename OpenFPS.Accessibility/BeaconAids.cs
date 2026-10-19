@@ -1,8 +1,10 @@
 using System.Numerics;
 using System.Text.Json;
+using OpenFPS.Acoustics;
 using OpenFPS.Audio.Core;
 using OpenFPS.Audio.Data;
 using OpenFPS.Common;
+using OpenFPS.Models;
 using Serilog;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
@@ -62,7 +64,7 @@ public sealed class BeaconAids
 
     /// <summary>Where every blip is given its id and declared as it starts: ClientAudioSystem's registry, or
     /// one of its own on its own.</summary>
-    internal VoiceRegistry Voices { get; set; }
+    public VoiceRegistry Voices { get; set; }
 
     public BeaconAids(AudioEngineFacade audio, BeaconPreferences? prefs = null,
                       OpenFPS.Audio.Acoustics.SpatialAcoustics? acoustics = null)
@@ -95,7 +97,7 @@ public sealed class BeaconAids
     /// <summary>Blips whatever is due. <paramref name="selfId"/> is the listener's own body: a player on
     /// the wire like any other, which must never blip at its own ears, and whose team decides who is a
     /// teammate.</summary>
-    public void Update(WorldSnapshot world, Vector3 listener, double now, int selfId = -1)
+    public void Update(IAcousticWorld world, Vector3 listener, double now, int selfId = -1)
     {
         EnsureSounds();
         if (!_registered) return;
@@ -107,7 +109,7 @@ public sealed class BeaconAids
             foreach (var (id, feet) in Nearest(world, listener, category, kind.Range, kind.Nearest, skip: selfId))
             {
                 // A body's position is its feet; a person is heard from their head, as their breath is.
-                var at = people ? feet + new Vector3(0f, OtherBodies.HeadHeight, 0f) : feet;
+                var at = people ? feet + new Vector3(0f, Speech.MouthHeight, 0f) : feet;
                 if (!_next.TryGetValue(id, out double due))
                 {
                     // First heard: start on a beat of its own, so two doors side by side do not blip
@@ -131,7 +133,7 @@ public sealed class BeaconAids
     /// False when it was not heard because a wall is in the way, so the tracker can say so: Cody, 2026-10-10, in a
     /// barn, was told of the house's front door "right in front, 18 metres" and heard nothing.
     /// </summary>
-    public bool Ping(WorldSnapshot world, int id, TrackCategory category, Vector3 listener, int selfId = -1)
+    public bool Ping(IAcousticWorld world, int id, TrackCategory category, Vector3 listener, int selfId = -1)
     {
         string? kind = category switch
         {
@@ -143,14 +145,14 @@ public sealed class BeaconAids
             _ => null,
         };
         if (kind == null || PolicyFor(kind) == Beacons.Policy.Forbidden) return true;
-        if (!world.Entities.TryGetValue(id, out var e)) return true;
+        if (!world.TryGetBody(id, out var e)) return true;
         EnsureSounds();
         if (!_registered) return true;
-        var at = e.Transform.Position;
+        var at = e.Position;
         string sound = Kinds[kind].Sound;
         if (kind == Beacons.Player)
         {
-            at += new Vector3(0f, OtherBodies.HeadHeight, 0f);
+            at += new Vector3(0f, Speech.MouthHeight, 0f);
             sound = SoundFor(world, id, TeamOf(world, selfId));
         }
         return Blip(world, id, sound, at, listener);
@@ -162,7 +164,7 @@ public sealed class BeaconAids
     /// a vehicle's on the side of its body toward you (from the middle of its footprint every path out read 0.95
     /// blocked and none was heard, Cody, 2026-10-05); anything else where it is.
     /// </summary>
-    private Vector3 BlipPoint(WorldSnapshot world, int sourceId, Vector3 at, Vector3 listener, out int region)
+    private Vector3 BlipPoint(IAcousticWorld world, int sourceId, Vector3 at, Vector3 listener, out int region)
     {
         region = -1;
         if (TryDoorFace(world, sourceId, listener, out var face, out var inRoom))
@@ -174,7 +176,7 @@ public sealed class BeaconAids
     }
 
     /// <summary>One blip, unless a wall is in the way of it: then false.</summary>
-    private bool Blip(WorldSnapshot world, int sourceId, string sound, Vector3 at, Vector3 listener)
+    private bool Blip(IAcousticWorld world, int sourceId, string sound, Vector3 at, Vector3 listener)
     {
         var (gain, reference) = _audio.Hearing.Place(BlipDb + (float)_prefs.LevelDb);
         at = BlipPoint(world, sourceId, at, listener, out int region);
@@ -219,7 +221,7 @@ public sealed class BeaconAids
     /// half blocked by that path, round a near corner or through a doorway and not through a wall. Whether it
     /// sounds, where from and how loud are the one answer, and so is the tracker's "behind a wall".
     /// </summary>
-    internal bool Reaches(WorldSnapshot world, int sourceId, Vector3 listener, Vector3 at,
+    internal bool Reaches(IAcousticWorld world, int sourceId, Vector3 listener, Vector3 at,
                           out OpenFPS.Audio.Data.AcousticPathData? path)
     {
         path = Answered(world, sourceId, listener, at);
@@ -233,10 +235,10 @@ public sealed class BeaconAids
     /// <summary>The worker's answer for this beacon's blip at <paramref name="at"/> heard at
     /// <paramref name="listener"/>, if it has a fresh one; otherwise the hand-rolled tracer's; null without
     /// acoustics.</summary>
-    internal OpenFPS.Audio.Data.AcousticPathData? Answered(WorldSnapshot world, int sourceId, Vector3 listener, Vector3 at)
+    internal OpenFPS.Audio.Data.AcousticPathData? Answered(IAcousticWorld world, int sourceId, Vector3 listener, Vector3 at)
     {
         if (_acoustics == null) return null;
-        float speed = world.Entities.TryGetValue(sourceId, out var e) ? e.Velocity.Length() : 0f;
+        float speed = world.TryGetBody(sourceId, out var e) ? e.Velocity.Length() : 0f;
         if (Worker != null && Worker.TryGetDirectFor(ProbeOf(sourceId), at, speed, listener, EarSpeed, out var answer))
         {
             AnsweredByWorker++;
@@ -247,19 +249,20 @@ public sealed class BeaconAids
 
     /// <summary>Where a placed beacon blips from for this listener, and asks the worker about it: for the lab's
     /// count of the doors heard (--beacon-count).</summary>
-    internal Vector3 AskFor(WorldSnapshot world, int sourceId, Vector3 listener)
+    internal Vector3 AskFor(IAcousticWorld world, int sourceId, Vector3 listener)
     {
-        var at = BlipPoint(world, sourceId, world.Entities[sourceId].Transform.Position, listener, out _);
+        if (!world.TryGetBody(sourceId, out var body)) return listener;
+        var at = BlipPoint(world, sourceId, body.Position, listener, out _);
         Ask(world, sourceId, at, listener);
         return at;
     }
 
     /// <summary>The acoustic worker blips are heard by (P6); null, the hand-rolled tracer alone.</summary>
-    internal OpenFPS.Audio.Acoustics.AsyncAcousticWorker? Worker { get; set; }
+    public OpenFPS.Audio.Acoustics.AsyncAcousticWorker? Worker { get; set; }
 
     /// <summary>How fast the ear moves, m/s: how far from here an answer traced a moment ago may have been
     /// asked (AcousticPathData.Answers).</summary>
-    internal float EarSpeed { get; set; }
+    public float EarSpeed { get; set; }
 
     /// <summary>Blips decided on the worker's answer rather than the tracer's, for a test.</summary>
     internal int AnsweredByWorker { get; private set; }
@@ -270,7 +273,7 @@ public sealed class BeaconAids
 
     /// <summary>Asks the worker about a beacon's blip from <paramref name="at"/>, its own body left out of the
     /// tracer's rays, so an answer is in by the time it blips.</summary>
-    private void Ask(WorldSnapshot world, int sourceId, Vector3 at, Vector3 listener)
+    private void Ask(IAcousticWorld world, int sourceId, Vector3 at, Vector3 listener)
     {
         if (Worker == null) return;
         Worker.EnqueueRequest(new OpenFPS.Audio.Acoustics.AcousticRequest
@@ -284,9 +287,9 @@ public sealed class BeaconAids
     /// Whether nothing stands between you and the face of the thing on your side of it: one ray from
     /// just off its thinnest face, which clears the jamb and the wall a door is set into.
     /// </summary>
-    internal bool InSight(WorldSnapshot world, int sourceId, Vector3 listener, Vector3 at)
+    internal bool InSight(IAcousticWorld world, int sourceId, Vector3 listener, Vector3 at)
     {
-        if (_acoustics == null || !world.Entities.TryGetValue(sourceId, out var e)) return false;
+        if (_acoustics == null || !world.TryGetBody(sourceId, out var e)) return false;
         // A vehicle's blip is already off its body on your side (TryVehicleSide). Stepped off its
         // narrowest face instead, the ray would cut across its own bonnet.
         if (IsVehicle(e))
@@ -296,11 +299,11 @@ public sealed class BeaconAids
             return len < 0.05f || !_acoustics.RaycastMaterial(world, at, ray / len, len - 0.05f,
                                                                      out _, out _, out _, ignoreEntityId: sourceId);
         }
-        var size = e.Definition.Collider.Size;
+        var size = e.Size;
         Vector3 axis = size.X <= size.Y && size.X <= size.Z ? Vector3.UnitX
                      : size.Z <= size.Y ? Vector3.UnitZ : Vector3.UnitY;
         float half = axis == Vector3.UnitX ? size.X : axis == Vector3.UnitZ ? size.Z : size.Y;
-        var normal = Vector3.Transform(axis, e.Transform.Rotation);
+        var normal = Vector3.Transform(axis, e.Rotation);
         if (Vector3.Dot(listener - at, normal) < 0) normal = -normal;
         var face = at + normal * (0.5f * half + FaceClearance);
         var toEar = listener - face;
@@ -312,20 +315,20 @@ public sealed class BeaconAids
 
     /// <summary>A door's face toward the listener at face height, and a point half a metre into the room
     /// in front of it.</summary>
-    internal static bool TryDoorFace(WorldSnapshot world, int sourceId, Vector3 listener, out Vector3 face, out Vector3 inRoom)
+    internal static bool TryDoorFace(IAcousticWorld world, int sourceId, Vector3 listener, out Vector3 face, out Vector3 inRoom)
     {
         face = inRoom = default;
-        if (!world.Entities.TryGetValue(sourceId, out var e)
-            || !string.Equals(e.Definition.Identity.BeaconCategory, Beacons.Door, StringComparison.OrdinalIgnoreCase)) return false;
-        var size = e.Definition.Collider.Size;
+        if (!world.TryGetBody(sourceId, out var e)
+            || !string.Equals(e.Beacon, Beacons.Door, StringComparison.OrdinalIgnoreCase)) return false;
+        var size = e.Size;
         if (size.X <= 0f || size.Y <= 0f || size.Z <= 0f) return false;
         Vector3 axis = size.X <= size.Z ? Vector3.UnitX : Vector3.UnitZ;
         float thick = axis == Vector3.UnitX ? size.X : size.Z;
-        var normal = Vector3.Transform(axis, e.Transform.Rotation);
+        var normal = Vector3.Transform(axis, e.Rotation);
         normal.Y = 0f;
         if (normal.LengthSquared() < 1e-6f) return false;
         normal = Vector3.Normalize(normal);
-        var centre = e.Transform.Position;
+        var centre = e.Position;
         if (Vector3.Dot(listener - centre, normal) < 0f) normal = -normal;
         float bottom = centre.Y - size.Y * 0.5f, top = centre.Y + size.Y * 0.5f;
         face = new Vector3(centre.X, MathF.Min(bottom + FaceHeightMetres, top - 0.1f), centre.Z) + normal * (thick * 0.5f + 0.05f);
@@ -339,19 +342,19 @@ public sealed class BeaconAids
     /// never passes back through the box, so a vehicle never blocks its own beacon. False for anything
     /// not a vehicle beacon, one with no body, and one you are inside.
     /// </summary>
-    internal static bool TryVehicleSide(WorldSnapshot world, int sourceId, Vector3 listener, out Vector3 side)
+    internal static bool TryVehicleSide(IAcousticWorld world, int sourceId, Vector3 listener, out Vector3 side)
     {
         side = default;
-        if (!world.Entities.TryGetValue(sourceId, out var e) || !IsVehicle(e)) return false;
-        var size = e.Definition.Collider.Size;
+        if (!world.TryGetBody(sourceId, out var e) || !IsVehicle(e)) return false;
+        var size = e.Size;
         if (size.X <= 0f || size.Z <= 0f || Inside(e, listener)) return false;
-        var rotation = e.Transform.Rotation;
-        var local = Vector3.Transform(listener - e.Transform.Position, Quaternion.Inverse(rotation));
+        var rotation = e.Rotation;
+        var local = Vector3.Transform(listener - e.Position, Quaternion.Inverse(rotation));
         float hx = size.X * 0.5f + VehicleClearance, hz = size.Z * 0.5f + VehicleClearance;
         float roof = MathF.Max(size.Y, 0.4f);
         float low = MathF.Min(VehicleSillMetres, roof * 0.5f), high = MathF.Max(low, roof - 0.1f);
         var nearest = new Vector3(Math.Clamp(local.X, -hx, hx), Math.Clamp(local.Y, low, high), Math.Clamp(local.Z, -hz, hz));
-        side = e.Transform.Position + Vector3.Transform(nearest, rotation);
+        side = e.Position + Vector3.Transform(nearest, rotation);
         return true;
     }
 
@@ -361,15 +364,15 @@ public sealed class BeaconAids
     /// <summary>The lowest a vehicle's blip sounds above where it rests: about its sills.</summary>
     private const float VehicleSillMetres = 0.5f;
 
-    private static bool IsVehicle(EntitySnapshot e)
-        => string.Equals(e.Definition.Identity.BeaconCategory, Beacons.Vehicle, StringComparison.OrdinalIgnoreCase);
+    private static bool IsVehicle(AcousticBody e)
+        => string.Equals(e.Beacon, Beacons.Vehicle, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Whether you are inside a vehicle's body, in plan and below its roof: sitting in it.
     /// A car you are in is not one you are looking for, and does not take a nearer one's place.</summary>
-    internal static bool Inside(EntitySnapshot e, Vector3 listener)
+    internal static bool Inside(AcousticBody e, Vector3 listener)
     {
-        var size = e.Definition.Collider.Size;
-        var local = Vector3.Transform(listener - e.Transform.Position, Quaternion.Inverse(e.Transform.Rotation));
+        var size = e.Size;
+        var local = Vector3.Transform(listener - e.Position, Quaternion.Inverse(e.Rotation));
         return MathF.Abs(local.X) < size.X * 0.5f && MathF.Abs(local.Z) < size.Z * 0.5f
             && local.Y > -0.5f && local.Y < MathF.Max(size.Y, 0.4f) + 0.5f;
     }
@@ -379,26 +382,26 @@ public sealed class BeaconAids
     private const float FaceClearance = 0.35f;
 
     /// <summary>The team a body says it is in, or "" for none or no such body.</summary>
-    internal static string TeamOf(WorldSnapshot world, int id)
-        => id >= 0 && world.Entities.TryGetValue(id, out var e) ? e.Definition.Team ?? "" : "";
+    internal static string TeamOf(IAcousticWorld world, int id)
+        => id >= 0 && world.TryGetBody(id, out var e) ? e.Team ?? "" : "";
 
     /// <summary>The teammate's call for a player in your team, the player's otherwise. Two players in no
     /// team are not on the same side.</summary>
-    internal static string SoundFor(WorldSnapshot world, int id, string myTeam)
+    internal static string SoundFor(IAcousticWorld world, int id, string myTeam)
         => myTeam.Length > 0 && string.Equals(TeamOf(world, id), myTeam, StringComparison.OrdinalIgnoreCase)
             ? TeammateSound : Kinds[Beacons.Player].Sound;
 
     /// <summary>The nearest things of a category within reach, and where to blip them from.</summary>
-    private static List<(int Id, Vector3 At)> Nearest(WorldSnapshot world, Vector3 listener, string category, float range, int count,
+    private static List<(int Id, Vector3 At)> Nearest(IAcousticWorld world, Vector3 listener, string category, float range, int count,
                                                       int skip = -1)
     {
         var found = new List<(int Id, Vector3 At, float D)>();
         var floorBeacons = category == Beacons.Stairs ? StairCues.FloorBeacons(world) : null;
-        void Consider(EntitySnapshot e)
+        void Consider(AcousticBody e)
         {
             if (e.Id == skip) return;
-            if (!string.Equals(e.Definition.Identity.BeaconCategory, category, StringComparison.OrdinalIgnoreCase)) return;
-            var at = e.Transform.Position;
+            if (!string.Equals(e.Beacon, category, StringComparison.OrdinalIgnoreCase)) return;
+            var at = e.Position;
             float d = Vector3.Distance(listener, at);
             if (d > range) return;
             // Other floors' stair beacons are in sight up an open stairwell and can be nearer than your
@@ -408,14 +411,15 @@ public sealed class BeaconAids
             if (category == Beacons.Vehicle && Inside(e, listener)) return;
             found.Add((e.Id, at, d));
         }
-        if (world.StaticGrid != null)
-            foreach (int id in world.StaticGrid.GetItemsInRadius(listener, range))
-                if (world.Entities.TryGetValue(id, out var e)) Consider(e);
-        // A door leaf that swings, a car that has been driven: things that move are not in the grid.
-        foreach (var e in world.DynamicEntities) Consider(e);
+        // The static grid round the listener, and everything that moves: a door leaf that swings, a
+        // car that has been driven.
+        var near = new List<AcousticBody>();
+        world.Near(listener, range, staticOnly: false, near);
+        foreach (var e in near) Consider(e);
         // Nor is a marker nothing can bump into, such as the end of a flight of stairs.
-        foreach (int id in world.MarkerEntityIds)
-            if (world.Entities.TryGetValue(id, out var e)) Consider(e);
+        var markers = new List<AcousticBody>();
+        world.Markers(markers);
+        foreach (var e in markers) Consider(e);
         found.Sort(static (a, b) => (a.D, a.Id).CompareTo((b.D, b.Id)));
         var result = new List<(int, Vector3)>();
         var seen = new HashSet<int>();

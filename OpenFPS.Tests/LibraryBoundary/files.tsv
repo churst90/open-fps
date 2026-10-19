@@ -1,4 +1,5 @@
 file	group	projects	library_types
+OpenFPS.Accessibility/BeaconAids.cs	host		
 OpenFPS.Accessibility/Beacons.cs	host		
 OpenFPS.Accessibility/DrivingCuePlanner.cs	host		
 OpenFPS.Accessibility/DrivingCueSounds.cs	host		
@@ -10,6 +11,7 @@ OpenFPS.Accessibility/ListMenu.cs	host
 OpenFPS.Accessibility/ListeningCalibration.cs	host		
 OpenFPS.Accessibility/NamedPlaces.cs	host		
 OpenFPS.Accessibility/PlayerCoordinates.cs	host		
+OpenFPS.Accessibility/SettingsFolder.cs	host		
 OpenFPS.Accessibility/SightKinds.cs	host		
 OpenFPS.Accessibility/SightRays.cs	host		
 OpenFPS.Accessibility/Sightline.cs	host		
@@ -17,6 +19,7 @@ OpenFPS.Accessibility/Speech/ISpeechOutput.cs	host
 OpenFPS.Accessibility/Speech/SpeechDispatcherOutput.cs	host		
 OpenFPS.Accessibility/Speech/SpeechLog.cs	host		
 OpenFPS.Accessibility/StairCues.cs	host		
+OpenFPS.Accessibility/TrackCategory.cs	host		
 OpenFPS.Accessibility/TurnNarration.cs	host		
 OpenFPS.Accessibility/UiCue.cs	host		
 OpenFPS.Accessibility/UiSounds.cs	host		
@@ -137,7 +140,6 @@ OpenFPS.Audio/SteamAudio/TracedEchoes.cs	lib	Audio
 OpenFPS.Audio/SteamAudio/TracedReverb.cs	lib	Audio	
 OpenFPS.Audio/SteamAudio/TracedReverbDsp.cs	lib	Audio	
 OpenFPS.Client.Core/AudioDiagnostics.cs	host		
-OpenFPS.Client.Core/BeaconAids.cs	host		
 OpenFPS.Client.Core/ChatCues.cs	host		
 OpenFPS.Client.Core/ClientAudioPaths.cs	host		
 OpenFPS.Client.Core/ClientAudioSystem.cs	host		
@@ -174,7 +176,6 @@ OpenFPS.Client.Core/Session/ClientGameSession.Scope.cs	host
 OpenFPS.Client.Core/Session/ClientGameSession.Tracker.cs	host		
 OpenFPS.Client.Core/Session/ClientGameSession.cs	host		
 OpenFPS.Client.Core/Session/ConnectRetry.cs	host		
-OpenFPS.Client.Core/SettingsFolder.cs	host		
 OpenFPS.Client.Core/SightGrid.cs	host		
 OpenFPS.Client.Core/SightWatch.cs	host		
 OpenFPS.Client.Core/SnapshotSources.cs	host		
