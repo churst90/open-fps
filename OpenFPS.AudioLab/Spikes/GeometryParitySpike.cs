@@ -598,7 +598,7 @@ public static class GeometryParitySpike
             var oldIndex = new OpenFPS.Client.Core.SightIndex();
             var newIndex = new OpenFPS.Client.Core.SightIndex();
             oldIndex.Refresh(oldSnap, 0); newIndex.Refresh(newSnap, 0);
-            Func<EntitySnapshot, bool> stops = e => OpenFPS.Client.Core.Sightline.Stops(e, -1);
+            Func<OpenFPS.Acoustics.AcousticBody, bool> stops = b => OpenFPS.Client.Core.Sightline.Stops(b, -1);
             for (int i = 0; i < n; i++)
             {
                 var eye = NearSomething(3f);

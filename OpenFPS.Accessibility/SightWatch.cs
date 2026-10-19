@@ -77,7 +77,7 @@ public sealed class SightWatch
     /// "Open, North". <paramref name="ourLineIsLast"/>: nothing has been said since this said
     /// <see cref="LastLine"/>, so cutting it off cuts nothing else.
     /// </summary>
-    public Result Update(WorldSnapshot world, Pose pose, int ownEntityId, double now,
+    public Result Update(IAcousticWorld world, Pose pose, int ownEntityId, double now,
                          bool looking, string cardinal, bool ourLineIsLast)
     {
         if (_lastFeet is { } was && Vector3.DistanceSquared(was, pose.Feet) > JumpMetres * JumpMetres) Reset();
@@ -286,7 +286,7 @@ public sealed class PassingWatch
     public void Forget() => _bearings.Clear();
 
     /// <summary>One look. Returns the line to say, or null.</summary>
-    public string? Update(SightIndex index, WorldSnapshot world, Vector3 eye, float feetY, float yaw, int ownEntityId, double now)
+    public string? Update(SightIndex index, IAcousticWorld world, Vector3 eye, float feetY, float yaw, int ownEntityId, double now)
     {
         _look++;
         var forward = new Vector3(MathF.Sin(yaw), 0f, MathF.Cos(yaw));
@@ -297,12 +297,11 @@ public sealed class PassingWatch
         string bestKey = "", bestKind = "";
         bool prepared = false;
 
-        var movers = world.DynamicEntities;
-        for (int i = 0; i < movers.Count; i++)
+        for (int i = 0; i < world.MovingCount; i++)
         {
-            var e = movers[i];
+            var e = world.MovingAt(i);
             if (e.Id == ownEntityId || !Sightline.IsOnTheMove(e)) continue;
-            var p = e.Transform.Position;
+            var p = e.Position;
             if (p.Y < feetY - 1.5f || p.Y > feetY + 4f) { _bearings.Remove(e.Id); continue; }
             float dx = p.X - eye.X, dz = p.Z - eye.Z;
             float ahead = dx * forward.X + dz * forward.Z;
@@ -314,7 +313,7 @@ public sealed class PassingWatch
             if ((prev.Lateral < 0f) == (lateral < 0f)) continue;
             if (MathF.Abs(prev.Lateral) > SideMetres || MathF.Abs(lateral) > SideMetres) continue;
 
-            string name = e.Definition.Identity.Name ?? "";
+            string name = e.Name ?? "";
             string key = name.Length > 0 ? name : "#" + e.Id;
             if (_saidAt.TryGetValue(key, out double at) && now - at < SameNameSeconds) continue;
             string kind = Sightline.KindOf(e);
@@ -350,9 +349,9 @@ public sealed class PassingWatch
 
     /// <summary>Whether a wall stands between your eyes and the thing: something fixed and solid, not
     /// the ground, met more than a metre short of its middle.</summary>
-    private static bool InView(SightIndex index, WorldSnapshot world, Vector3 eye, float feetY, in EntitySnapshot e, int ownEntityId)
+    private static bool InView(SightIndex index, IAcousticWorld world, Vector3 eye, float feetY, in AcousticBody e, int ownEntityId)
     {
-        var p = e.Transform.Position;
+        var p = e.Position;
         var target = new Vector3(p.X, Math.Clamp(p.Y, feetY + 0.5f, eye.Y), p.Z);
         var dir = target - eye;
         float length = dir.Length();
@@ -396,19 +395,19 @@ public sealed class SightIndex
     public SightGrid Grid { get; } = new();
 
     /// <summary>Gathers what the casts of one look from <paramref name="eye"/> test besides the grid.</summary>
-    public void Prepare(WorldSnapshot world, Vector3 eye) => Grid.Prepare(world, eye, Sightline.NarrationRange + 1f, _marks);
+    public void Prepare(IAcousticWorld world, Vector3 eye) => Grid.Prepare(world, eye, Sightline.NarrationRange + 1f, _marks);
 
-    public void Refresh(WorldSnapshot world, double now)
+    public void Refresh(IAcousticWorld world, double now)
     {
         Grid.Refresh(world, now);
-        if (world.Entities.Count == _builtCount) return;
+        if (world.BodyCount == _builtCount) return;
         if (_builtCount >= 0 && now - _builtAt < RefreshSeconds) return;
-        _builtCount = world.Entities.Count;
+        _builtCount = world.BodyCount;
         _builtAt = now;
         var marks = new List<Mark>();
         // Each door's doorway, as the sound's world input has it (its pose shut, IAcousticWorld.DoorLeaves).
         var leaves = new List<DoorLeaf>();
-        ((IAcousticWorld)world).DoorLeaves(leaves);
+        world.DoorLeaves(leaves);
         foreach (var leaf in leaves)
         {
             var centre = leaf.DoorwayCentre;
@@ -417,16 +416,18 @@ public sealed class SightIndex
             if (across.LengthSquared() < 1e-6f) continue;
             across = Vector3.Normalize(across);
             var size = leaf.Size;
-            marks.Add(new Mark(leaf.Id, Sightline.NameOf(world.Entities[leaf.Id]), centre, across, size.X * 0.5f,
+            if (!world.TryGetBody(leaf.Id, out var leafBody)) continue;
+            marks.Add(new Mark(leaf.Id, Sightline.NameOf(leafBody), centre, across, size.X * 0.5f,
                                centre.Y - size.Y * 0.5f, centre.Y + size.Y * 0.5f, false));
         }
-        foreach (int id in world.MarkerEntityIds)
+        var markerBodies = new List<AcousticBody>();
+        world.Markers(markerBodies);
+        foreach (var body in markerBodies)
         {
-            if (!world.Entities.TryGetValue(id, out var snap)) continue;
-            if (!string.Equals(snap.Definition.Identity.BeaconCategory, Beacons.Stairs, StringComparison.OrdinalIgnoreCase)) continue;
-            var at = snap.Transform.Position;
+            if (!string.Equals(body.Beacon, Beacons.Stairs, StringComparison.OrdinalIgnoreCase)) continue;
+            var at = body.Position;
             float floor = at.Y - StairCues.MarkerHeightMetres;
-            marks.Add(new Mark(id, Sightline.NameOf(snap), at, Vector3.Zero, StairHalfWidth, floor, floor + 2.2f, true));
+            marks.Add(new Mark(body.Id, Sightline.NameOf(body), at, Vector3.Zero, StairHalfWidth, floor, floor + 2.2f, true));
         }
         _marks = marks.ToArray();
     }
@@ -463,7 +464,7 @@ public static class SightCone
     /// <see cref="LandmarkLeadMetres"/>). Tilted up or down: only what the eye line meets — a ceiling,
     /// a wall, never the floor.
     /// </summary>
-    public static Sightline.Sighting? Look(SightIndex index, WorldSnapshot world, Vector3 feet,
+    public static Sightline.Sighting? Look(SightIndex index, IAcousticWorld world, Vector3 feet,
                                            float yaw, float pitch, float eyeHeight, int ownEntityId)
     {
         var eyeAt = feet + new Vector3(0, eyeHeight, 0);
@@ -489,11 +490,11 @@ public static class SightCone
     }
 
     /// <summary><see cref="Sightline.Ahead"/> through the grid, looking through things on the move.</summary>
-    private static Sightline.Sighting? Centre(SightIndex index, WorldSnapshot world, ReadOnlySpan<Vector3> origins, Vector3 dir,
+    private static Sightline.Sighting? Centre(SightIndex index, IAcousticWorld world, ReadOnlySpan<Vector3> origins, Vector3 dir,
                                               float feetY, float eyeY, int ownEntityId)
     {
         dir = Vector3.Normalize(dir);
-        Func<EntitySnapshot, bool> stops = e => Sightline.Stops(e, ownEntityId) && !Sightline.IsOnTheMove(e);
+        Func<AcousticBody, bool> stops = e => Sightline.Stops(e, ownEntityId) && !Sightline.IsOnTheMove(e);
         Sightline.Sighting? best = null;
         foreach (var origin in origins)
         {
@@ -505,7 +506,7 @@ public static class SightCone
     }
 
     /// <summary>The nearest doorway or stair end in the cone, on your floor and in plain view.</summary>
-    public static Sightline.Sighting? Landmark(SightIndex index, WorldSnapshot world, Vector3 feet,
+    public static Sightline.Sighting? Landmark(SightIndex index, IAcousticWorld world, Vector3 feet,
                                                float yaw, float eyeHeight, int ownEntityId)
     {
         var forward = new Vector3(MathF.Sin(yaw), 0f, MathF.Cos(yaw));
@@ -546,8 +547,8 @@ public static class SightCone
 
             float aimY = m.Stairs ? m.Bottom + eyeHeight : Math.Clamp(eye.Y, m.Bottom + 0.3f, m.Top - 0.2f);
             if (!InView(index, world, eye, new Vector3(px, aimY, pz), m, feet.Y, ownEntityId)) continue;
-            if (!world.Entities.TryGetValue(m.Id, out var snap)) continue;
-            best = new Sightline.Sighting(snap, distance);
+            if (!world.TryGetBody(m.Id, out var body)) continue;
+            best = new Sightline.Sighting(body, distance);
         }
         return best;
     }
@@ -562,7 +563,7 @@ public static class SightCone
 
     /// <summary>Whether the eye sees <paramref name="target"/>: nothing fixed and solid in the way
     /// but the door itself (or its other leaf), or the nose of a step.</summary>
-    private static bool InView(SightIndex index, WorldSnapshot world, Vector3 eye, Vector3 target, SightIndex.Mark m,
+    private static bool InView(SightIndex index, IAcousticWorld world, Vector3 eye, Vector3 target, SightIndex.Mark m,
                                float feetY, int ownEntityId)
     {
         var dir = target - eye;
@@ -574,7 +575,7 @@ public static class SightCone
         bool stairs = m.Stairs;
         if (!index.Grid.Cast(world, eye, dir, length,
                 s => s.Id != id && Sightline.Stops(s, ownEntityId) && !Sightline.IsOnTheMove(s)
-                     && (stairs || !EntityAcoustics.IsDoorLeaf(s.Definition) || Sightline.NameOf(s) != name),
+                     && (stairs || !s.DoorLeaf || Sightline.NameOf(s) != name),
                 out var hit, out float d))
             return true;
         if (d >= length - 0.25f) return true;

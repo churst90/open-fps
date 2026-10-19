@@ -175,6 +175,7 @@ public static class EntityAcoustics
             Fixed = def.Type == EntityType.StaticObject,
             Moves = def.Moves,
             DoorLeaf = IsDoorLeaf(def),
+            Geometry = GeometryOf(EntityGeometry.RoleOf(def)),
             Material = def.Material.Material,
             Absorption = def.Acoustics.Absorption,
             Hollow = def.Acoustics.IsHollow,
@@ -220,6 +221,16 @@ public static class EntityAcoustics
         EntityType.Projectile => BodyKind.Projectile,
         EntityType.Trigger => BodyKind.Trigger,
         _ => BodyKind.None,
+    };
+
+    /// <summary>The geometry builder's role as the view's own (<see cref="BodyGeometry"/>).</summary>
+    private static BodyGeometry GeometryOf(GeometryRole role) => role switch
+    {
+        GeometryRole.Static => BodyGeometry.Static,
+        GeometryRole.SightOnly => BodyGeometry.SightOnly,
+        GeometryRole.Mover => BodyGeometry.Mover,
+        GeometryRole.Unindexed => BodyGeometry.Unindexed,
+        _ => BodyGeometry.None,
     };
 
     /// <summary>A door leaf where it stands, with its doorway: the pose the server recorded for it shut; an older

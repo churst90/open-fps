@@ -128,7 +128,6 @@ FILE_RULES = [
     ('OpenFPS.Client.Core/Services/SoundMappingService.cs', 'Audio', 'which bank file a footstep plays'),
     ('OpenFPS.Client.Core/ClientAudioSystem.cs', 'game', 'the audio world\'s host: sources from the snapshot, the game\'s sound features, the place\'s name'),
     ('OpenFPS.Client.Core/WorldAudioPlayer.cs', 'game', 'the wire\'s one-off sounds decoded for the audio world\'s OneOffSounds'),
-    ('OpenFPS.Client.Core/SightWatch.cs', 'Accessibility', ''),
     ('OpenFPS.Client.Core/MapTracker.cs', 'Accessibility', ''),
     ('OpenFPS.Client.Core/ListeningCalibration.cs', 'Accessibility', ''),
     ('OpenFPS.Client.Core/*', 'game', ''),

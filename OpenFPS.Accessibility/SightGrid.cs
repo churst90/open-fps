@@ -1,5 +1,5 @@
 using System.Numerics;
-using OpenFPS.Common;
+using OpenFPS.Acoustics;
 using OpenFPS.Geometry;
 
 namespace OpenFPS.Client.Core;
@@ -13,8 +13,8 @@ namespace OpenFPS.Client.Core;
 /// Floors, roofs and roads are kept apart as slabs and tested whole; door leaves and moving things are
 /// gathered fresh for each look (<see cref="Prepare"/>).</para>
 ///
-/// <para>The answers are <see cref="SpatialService.RaycastSingle(WorldSnapshot, Vector3, Vector3, float, Func{EntitySnapshot, bool}, out EntitySnapshot, out float)"/>'s,
-/// same thing at the same distance; only the cost differs.</para>
+/// <para>The answers are the scene view's (stage 9): the bodies it holds, at the positions and sizes the
+/// host gave them.</para>
 ///
 /// <para>With a triangle world the fixed boxes are its (physical layers for solids, GeometryLayers.Announced
 /// for things named but not solid) and a look asks its tree. The index then keeps only what the
@@ -41,63 +41,63 @@ public sealed class SightGrid
 
     // Per look: the slabs, door leaves and other things within reach.
     private readonly List<int> _nearSlabs = new();
-    private readonly List<EntitySnapshot> _nearLoose = new();
+    private readonly List<AcousticBody> _nearLoose = new();
+    // What the view gave at the last refresh, read twice: for the signature, and to build.
+    private readonly List<AcousticBody> _bodies = new();
 
     /// <summary>How many fixed things the index holds, and how many of them are slabs.</summary>
     public (int Things, int Slabs) Size => (_entries.Length, _slabs.Count);
 
     /// <summary>Whether a thing is one a look can find among the fixed things: fixed, a solid or an
     /// announced thing, and not a door leaf.</summary>
-    private static bool Seen(in EntitySnapshot e)
-    {
-        var def = e.Definition;
-        return def.Type == OpenFPS.Common.Components.EntityType.StaticObject && !def.Moves
-               && (def.Collider.IsSolid || def.Identity.Announce)
-               && def.Collider.Size.X > 0f
-               && !EntityAcoustics.IsDoorLeaf(def);
-    }
+    private static bool Seen(in AcousticBody b)
+        => b.Kind == BodyKind.StaticObject && !b.Moves
+           && (b.Solid || b.Announce)
+           && b.Size.X > 0f
+           && !b.DoorLeaf;
 
     /// <summary>Whether the triangle world holds a thing (EntityGeometry), so a look asks its tree for it.</summary>
-    private static bool InTriangles(in EntitySnapshot e)
-        => EntityGeometry.RoleOf(e.Definition) is GeometryRole.Static or GeometryRole.SightOnly or GeometryRole.Mover;
+    private static bool InTriangles(in AcousticBody b)
+        => b.Geometry is BodyGeometry.Static or BodyGeometry.SightOnly or BodyGeometry.Mover;
 
     /// <summary>Whether this index holds a thing: one a look can find that the triangles do not hold.</summary>
-    private bool Indexed(in EntitySnapshot e) => Seen(e) && !(_triangles && InTriangles(e));
+    private bool Indexed(in AcousticBody b) => Seen(b) && !(_triangles && InTriangles(b));
 
     /// <summary>Whether the index was built for a world with triangles.</summary>
     private bool _triangles;
 
     /// <summary>Rebuilds the index if the world's fixed things have changed: checked when the number of
     /// things in the world changes, at most every <see cref="CheckSeconds"/>.</summary>
-    public void Refresh(WorldSnapshot world, double now)
+    public void Refresh(IAcousticWorld world, double now)
     {
-        bool triangles = SpatialService.UsesTriangles(world);
+        bool triangles = SightRays.UsesTriangles(world);
         if (triangles != _triangles) { _triangles = triangles; _signature = long.MinValue; _checkedCount = -1; }
-        if (world.Entities.Count == _checkedCount && (_entries.Length > 0 || _triangles)) return;
+        if (world.BodyCount == _checkedCount && (_entries.Length > 0 || _triangles)) return;
         if (_checkedCount >= 0 && now - _checkedAt < CheckSeconds) return;
-        _checkedCount = world.Entities.Count;
+        _checkedCount = world.BodyCount;
         _checkedAt = now;
+        world.AllBodies(_bodies);
         long signature = 17;
         int n = 0;
-        foreach (var e in world.Entities.Values)
-            if (Indexed(e)) { signature = signature * 31 + e.Id; n++; }
+        foreach (var b in _bodies)
+            if (Indexed(b)) { signature = signature * 31 + b.Id; n++; }
         signature = signature * 31 + n;
         if (signature == _signature) return;
         _signature = signature;
-        Build(world, n);
+        Build(n);
     }
 
-    private void Build(WorldSnapshot world, int count)
+    private void Build(int count)
     {
         var entries = new Entry[count];
         int i = 0;
         _cells.Clear();
         _slabs.Clear();
-        foreach (var e in world.Entities.Values)
+        foreach (var b in _bodies)
         {
-            if (!Indexed(e) || i >= count) continue;
-            var (min, max) = Sightline.WorldBounds(e);
-            entries[i] = new Entry(e.Id, min, max);
+            if (!Indexed(b) || i >= count) continue;
+            var (min, max) = Sightline.WorldBounds(b);
+            entries[i] = new Entry(b.Id, min, max);
             int x0 = Cell(min.X), x1 = Cell(max.X), z0 = Cell(min.Z), z1 = Cell(max.Z);
             if ((long)(x1 - x0 + 1) * (z1 - z0 + 1) > SlabCells) _slabs.Add(i);
             else
@@ -123,7 +123,7 @@ public sealed class SightGrid
     /// that are not fixed, within <paramref name="reach"/> of <paramref name="at"/>. Casts that leave
     /// that sphere miss whatever is outside it.
     /// </summary>
-    public void Prepare(WorldSnapshot world, Vector3 at, float reach, IReadOnlyList<SightIndex.Mark> doors)
+    public void Prepare(IAcousticWorld world, Vector3 at, float reach, IReadOnlyList<SightIndex.Mark> doors)
     {
         _nearSlabs.Clear();
         foreach (int s in _slabs)
@@ -134,20 +134,23 @@ public sealed class SightGrid
         }
         _nearLoose.Clear();
         float r2 = (reach + 3f) * (reach + 3f);
-        foreach (var e in world.DynamicEntities)
-            if (Vector3.DistanceSquared(e.Transform.Position, at) <= r2 + e.Definition.Collider.Size.LengthSquared())
-                _nearLoose.Add(e);
+        for (int i = 0; i < world.MovingCount; i++)
+        {
+            var b = world.MovingAt(i);
+            if (Vector3.DistanceSquared(b.Position, at) <= r2 + b.Size.LengthSquared())
+                _nearLoose.Add(b);
+        }
         // A fixed thing whose solid changed since the triangles were built is looked at the old way until
         // they catch up.
         if (_triangles && world.GeometryStale is { Count: > 0 } stale)
             foreach (int id in stale)
-                if (world.Entities.TryGetValue(id, out var e) && Seen(e) && Vector3.DistanceSquared(e.Transform.Position, at) <= r2 + e.Definition.Collider.Size.LengthSquared())
-                    _nearLoose.Add(e);
+                if (world.TryGetBody(id, out var b) && Seen(b) && Vector3.DistanceSquared(b.Position, at) <= r2 + b.Size.LengthSquared())
+                    _nearLoose.Add(b);
         for (int i = 0; i < doors.Count; i++)
         {
             var d = doors[i];
             if (d.Stairs || Vector3.DistanceSquared(d.Centre, at) > r2) continue;
-            if (world.Entities.TryGetValue(d.Id, out var leaf)) _nearLoose.Add(leaf);
+            if (world.TryGetBody(d.Id, out var leaf)) _nearLoose.Add(leaf);
         }
     }
 
@@ -155,8 +158,8 @@ public sealed class SightGrid
     /// The nearest thing along the ray that <paramref name="accept"/> admits, within
     /// <paramref name="range"/>, over what <see cref="Prepare"/> gathered and the index.
     /// </summary>
-    public bool Cast(WorldSnapshot world, Vector3 origin, Vector3 dir, float range, Func<EntitySnapshot, bool> accept,
-                     out EntitySnapshot hit, out float distance)
+    public bool Cast(IAcousticWorld world, Vector3 origin, Vector3 dir, float range, Func<AcousticBody, bool> accept,
+                     out AcousticBody hit, out float distance)
     {
         hit = default;
         distance = range;
@@ -170,7 +173,7 @@ public sealed class SightGrid
             var look = new Looks { World = world, Stops = accept, Stale = world.GeometryStale };
             if (geo.Enter(origin, dir, range, OpenFPS.Geometry.GeometryLayers.Sight | OpenFPS.Geometry.GeometryLayers.Announced,
                           ref look, out var h)
-                && h.T < distance && world.Entities.TryGetValue(h.Owner, out var e))
+                && h.T < distance && world.TryGetBody(h.Owner, out var e))
             {
                 distance = h.T; hit = e; found = true;
             }
@@ -214,19 +217,19 @@ public sealed class SightGrid
     /// <summary>What a look stops at, asked of a triangle's owner.</summary>
     private struct Looks : OpenFPS.Geometry.IGeometryFilter
     {
-        public WorldSnapshot World;
-        public Func<EntitySnapshot, bool> Stops;
+        public IAcousticWorld World;
+        public Func<AcousticBody, bool> Stops;
         public IReadOnlySet<int>? Stale;
         public readonly bool Accept(int owner, in OpenFPS.Geometry.Surface surface)
-            => (Stale == null || !Stale.Contains(owner)) && World.Entities.TryGetValue(owner, out var e) && Seen(e) && Stops(e);
+            => (Stale == null || !Stale.Contains(owner)) && World.TryGetBody(owner, out var e) && Seen(e) && Stops(e);
     }
 
-    private void TestEntry(WorldSnapshot world, int idx, Vector3 origin, Vector3 dir, Func<EntitySnapshot, bool> accept,
-                           ref EntitySnapshot hit, ref float distance, ref bool found)
+    private void TestEntry(IAcousticWorld world, int idx, Vector3 origin, Vector3 dir, Func<AcousticBody, bool> accept,
+                           ref AcousticBody hit, ref float distance, ref bool found)
     {
         var en = _entries[idx];
         if (!BoxHit(origin, dir, en.Min, en.Max, distance)) return;
-        if (!world.Entities.TryGetValue(en.Id, out var e) || !accept(e)) return;
+        if (!world.TryGetBody(en.Id, out var e) || !accept(e)) return;
         if (Shape(e, origin, dir, distance, out float d) && d < distance) { distance = d; hit = e; found = true; }
     }
 
@@ -250,26 +253,24 @@ public sealed class SightGrid
         return true;
     }
 
-    /// <summary>The shape test, as SpatialService.RaycastSingle makes it.</summary>
-    private static bool Shape(in EntitySnapshot e, Vector3 origin, Vector3 dir, float range, out float distance)
+    /// <summary>The shape test, as SightRays makes it.</summary>
+    private static bool Shape(in AcousticBody b, Vector3 origin, Vector3 dir, float range, out float distance)
     {
-        var def = e.Definition;
-        var t = e.Transform;
         distance = range;
-        if (def.Collider.Size.X <= 0) return false;
+        if (b.Size.X <= 0) return false;
         bool hit;
-        switch (def.Collider.Shape)
+        switch (b.Shape)
         {
             case OpenFPS.Geometry.ColliderShape.Box:
-                hit = GeometryUtils.RayIntersectsOBB(origin, dir, t.Position, def.Collider.Size, t.Rotation, out distance);
+                hit = GeometryUtils.RayIntersectsOBB(origin, dir, b.Position, b.Size, b.Rotation, out distance);
                 break;
             case OpenFPS.Geometry.ColliderShape.Sphere:
-                hit = GeometryUtils.LineIntersectsSphere(origin, origin + dir * range, t.Position, def.Collider.Size.X / 2f);
-                if (hit) distance = Vector3.Distance(origin, t.Position) - def.Collider.Size.X / 2f;
+                hit = GeometryUtils.LineIntersectsSphere(origin, origin + dir * range, b.Position, b.Size.X / 2f);
+                if (hit) distance = Vector3.Distance(origin, b.Position) - b.Size.X / 2f;
                 break;
             case OpenFPS.Geometry.ColliderShape.Cylinder:
             case OpenFPS.Geometry.ColliderShape.Cone:
-                hit = GeometryUtils.RayIntersectsCylinder(origin, dir, t.Position, def.Collider.Size.X / 2f, def.Collider.Size.Y, out distance);
+                hit = GeometryUtils.RayIntersectsCylinder(origin, dir, b.Position, b.Size.X / 2f, b.Size.Y, out distance);
                 break;
             default:
                 return false;

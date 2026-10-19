@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Numerics;
 using OpenFPS.Client.Core;
+using OpenFPS.Acoustics;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
@@ -407,6 +408,7 @@ public class SightNarrationTests
         var spatial = new SpatialService();
         var rng = new Random(11);
         Func<EntitySnapshot, bool> stops = e => Sightline.Stops(e, -1);
+        Func<AcousticBody, bool> bodyStops = b => Sightline.Stops(b, -1);
         int hits = 0;
         for (int i = 0; i < 1000; i++)
         {
@@ -415,7 +417,7 @@ public class SightNarrationTests
             var dir = Vector3.Transform(Vector3.UnitZ, Quaternion.CreateFromYawPitchRoll(yaw, pitch, 0f));
             index.Prepare(world, origin);
             bool a = spatial.RaycastSingle(world, origin, dir, 20f, stops, out var ha, out float da);
-            bool b = index.Grid.Cast(world, origin, dir, 20f, stops, out var hb, out float db);
+            bool b = index.Grid.Cast(world, origin, dir, 20f, bodyStops, out var hb, out float db);
             Assert.True(a == b, $"ray {i} from {origin} along {dir}: spatial {(a ? $"'{Sightline.NameOf(ha)}' at {da:F2}" : "nothing")}, grid {(b ? $"'{Sightline.NameOf(hb)}' at {db:F2}" : "nothing")}");
             if (!a) continue;
             hits++;

@@ -2,6 +2,4 @@ file	to_package	count
 OpenFPS.Client.Core/MapTracker.cs	Common	103
 OpenFPS.Client.Core/MapTracker.cs	game	15
 OpenFPS.Client.Core/Services/SoundMappingService.cs	game	8
-OpenFPS.Client.Core/SightWatch.cs	Common	48
-OpenFPS.Client.Core/SightWatch.cs	game	7
 OpenFPS.Server/Systems/VehicleSystem.Parking.cs	game	2

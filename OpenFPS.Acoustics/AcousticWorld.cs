@@ -84,6 +84,10 @@ public readonly record struct AirState(float Celsius, float Humidity, float Pres
 /// definition). The aids that name people read it.</summary>
 public enum BodyKind : byte { None = 0, Player, Npc, Beacon, StaticObject, Item, Projectile, Trigger }
 
+/// <summary>Where a body goes in the host's triangle world (open-fps: EntityGeometry's five roles). The
+/// sight's index keeps only what the triangles do not hold.</summary>
+public enum BodyGeometry : byte { None = 0, Static, SightOnly, Mover, Unindexed }
+
 /// <summary>
 /// A thing in the world with a box, as the sound meets it: a wall, a door leaf, a tree's leaves, a car. The
 /// host fills it from what it holds (open-fps: an entity's collider, material, acoustics and emitter).
@@ -111,6 +115,9 @@ public readonly struct AcousticBody
     /// <summary>A door leaf: a fixed solid that is also a doorway between two places. It hangs in its frame and
     /// is never a layer of the wall round it.</summary>
     public bool DoorLeaf { get; init; }
+    /// <summary>Where the host's triangle world holds it (open-fps: <c>EntityGeometry.RoleOf</c>): the sight's
+    /// index keeps only what the triangles do not hold.</summary>
+    public BodyGeometry Geometry { get; init; }
 
     /// <summary>The material's name as the host gave it (empty, or null in a default: the readers say what that is).</summary>
     public string Material { get; init; }
