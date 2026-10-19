@@ -281,6 +281,7 @@ public class AsyncAcousticWorkerTests
         public bool Near(Vector3 centre, float radius, bool staticOnly, List<AcousticBody> into) => No<bool>();
         public void Unindexed(bool staticOnly, List<AcousticBody> into) => No<bool>();
         public void DoorLeaves(List<DoorLeaf> into) => No<bool>();
+        public void Markers(List<AcousticBody> into) => No<bool>();
         public List<OpenFPS.Geometry.SolidSpec> TerrainSolids() => No<List<OpenFPS.Geometry.SolidSpec>>();
     }
 }

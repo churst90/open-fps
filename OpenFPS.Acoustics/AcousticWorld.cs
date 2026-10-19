@@ -64,6 +64,10 @@ public interface IAcousticWorld
     /// it shuts. Cleared first.</summary>
     void DoorLeaves(List<DoorLeaf> into);
 
+    /// <summary>Every marker: a fixed thing nothing meets that a look near the player wants (a stair end, a
+    /// named place), in the host's order. Cleared first.</summary>
+    void Markers(List<AcousticBody> into);
+
     /// <summary>The tiles of ground held, as solids, by owner: what the acoustic scene lays its ground from.</summary>
     List<SolidSpec> TerrainSolids();
 }
@@ -121,6 +125,15 @@ public readonly struct AcousticBody
     public string? SoundId { get; init; }
     /// <summary>A vehicle's side windows as the host last sent them, 0 shut to 1 down.</summary>
     public float WindowsOpen { get; init; }
+
+    /// <summary>What it is called (open-fps: <c>Identity.Name</c>), or null or empty: unnamed.</summary>
+    public string? Name { get; init; }
+    /// <summary>The prefab it was placed from (open-fps: <c>Identity.PrefabId</c>), or null or empty: built by
+    /// hand.</summary>
+    public string? Prefab { get; init; }
+    /// <summary>Its beacon category (open-fps: <c>Identity.BeaconCategory</c>, "door", "item", "stairs"...),
+    /// or null or empty: it is not one.</summary>
+    public string? Beacon { get; init; }
 }
 
 /// <summary>A door leaf where it stands now, and the doorway it shuts: its pose when shut, its size, the two

@@ -159,6 +159,13 @@ public class WorldSnapshot : IAcousticWorld
             if (EntityAcoustics.IsDoorLeaf(snap.Definition)) into.Add(EntityAcoustics.LeafOf(snap));
     }
 
+    void IAcousticWorld.Markers(List<AcousticBody> into)
+    {
+        into.Clear();
+        foreach (int id in MarkerEntityIds)
+            if (Entities.TryGetValue(id, out var snap)) into.Add(EntityAcoustics.BodyOf(snap));
+    }
+
     [ThreadStatic] private static List<int>? _nearIds;
     [ThreadStatic] private static HashSet<int>? _nearSeen;
 

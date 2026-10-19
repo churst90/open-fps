@@ -176,6 +176,9 @@ public static class EntityAcoustics
             RoomSize = def.Region.RoomSize,
             SoundId = def.SoundEmitter.SoundId,
             WindowsOpen = def.SoundEmitter.WindowsOpen,
+            Name = def.Identity.Name,
+            Prefab = def.Identity.PrefabId,
+            Beacon = def.Identity.BeaconCategory,
         };
     }
 

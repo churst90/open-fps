@@ -19,7 +19,7 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class AcousticWorldViewTests
 {
-    private const int WallId = 9001, DoorId = 9002, BusId = 9003, NewWallId = 9004;
+    private const int WallId = 9001, DoorId = 9002, BusId = 9003, NewWallId = 9004, StairId = 9005, PlaceId = 9006;
     private static readonly Vector3 Ear = new(0f, 1.6f, 0f);
     private static readonly Vector3 Source = new(0f, 1f, -30f);
 
@@ -52,6 +52,19 @@ public class AcousticWorldViewTests
             Collider = new ColliderComponent { Shape = ColliderShape.Box, Size = new Vector3(2.5f, 3.2f, 12f), IsSolid = true },
             Material = new MaterialComponent { Material = "Metal" },
         });
+        // A stair end and a named place: fixed, nothing can bump into them, so markers of their own.
+        w.RegisterDefinition(new EntityDefinition
+        {
+            EntityId = StairId, Type = EntityType.StaticObject, Transform = At(new Vector3(2f, 1f, -4f)),
+            Collider = new ColliderComponent { Shape = ColliderShape.Box, Size = new Vector3(0.2f, 0.2f, 0.2f), IsSolid = false },
+            Identity = new IdentityComponent { Name = "Stairs up, 12 steps, to floor 1", BeaconCategory = "stairs" },
+        });
+        w.RegisterDefinition(new EntityDefinition
+        {
+            EntityId = PlaceId, Type = EntityType.StaticObject, Transform = At(new Vector3(-4f, 1f, -4f)),
+            Collider = new ColliderComponent { Shape = ColliderShape.Box, Size = new Vector3(3f, 3f, 3f), IsSolid = false },
+            Identity = new IdentityComponent { Name = "Landing", PrefabId = "named_place" },
+        });
         return w;
     }
 
@@ -65,11 +78,14 @@ public class AcousticWorldViewTests
         sb.Append($"air {view.Air} version {view.GeometryVersion} tiles {view.TileMetres} rooms {view.Rooms?.GetHashCode()} bodies {view.BodyCount}\n");
         var all = new List<AcousticBody>();
         view.AllBodies(all);
-        foreach (var b in all) sb.Append($"body {b.Id} {b.Position} {b.Rotation} {b.Size} {b.Material} {b.Solid} {b.DoorLeaf}\n");
+        foreach (var b in all) sb.Append($"body {b.Id} {b.Name} {b.Prefab} {b.Beacon} {b.Position} {b.Rotation} {b.Size} {b.Material} {b.Solid} {b.DoorLeaf}\n");
         for (int i = 0; i < view.MovingCount; i++) sb.Append($"moving {view.MovingAt(i).Id} {view.MovingAt(i).Position}\n");
         var leaves = new List<DoorLeaf>();
         view.DoorLeaves(leaves);
         foreach (var l in leaves) sb.Append($"leaf {l}\n");
+        var markers = new List<AcousticBody>();
+        view.Markers(markers);
+        foreach (var m in markers) sb.Append($"marker {m.Id} {m.Name} {m.Prefab} {m.Beacon}\n");
         var near = new List<AcousticBody>();
         view.Near(Ear, 60f, staticOnly: false, near);
         foreach (var b in near) sb.Append($"near {b.Id}\n");
@@ -104,6 +120,20 @@ public class AcousticWorldViewTests
         Assert.NotEqual(was, Read(after));
         Assert.NotEqual(before.Air, after.Air);
         Assert.Equal(before.BodyCount + 1, after.BodyCount);
+    }
+
+    /// <summary>The markers are the fixed unsolid named things, answered with the names, prefabs and beacon
+    /// categories the aids read of them; a solid wall and a moving bus are not markers.</summary>
+    [Fact]
+    public void TheMarkersAreNamedWithTheirPrefabsAndCategories()
+    {
+        IAcousticWorld view = World().GetSnapshot();
+        var markers = new List<AcousticBody>();
+        view.Markers(markers);
+        Assert.Equal(new[] { StairId, PlaceId }, markers.Select(m => m.Id).OrderBy(i => i));
+        Assert.Contains(markers, m => m.Id == StairId && m.Name == "Stairs up, 12 steps, to floor 1" && m.Beacon == "stairs");
+        Assert.Contains(markers, m => m.Id == PlaceId && m.Name == "Landing" && m.Prefab == "named_place");
+        Assert.DoesNotContain(markers, m => m.Id == WallId || m.Id == BusId);
     }
 
     /// <summary>
