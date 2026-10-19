@@ -13,6 +13,7 @@ OpenFPS.Accessibility/PlayerCoordinates.cs	Accessibility
 OpenFPS.Accessibility/Speech/ISpeechOutput.cs	Accessibility	
 OpenFPS.Accessibility/Speech/SpeechDispatcherOutput.cs	Accessibility	
 OpenFPS.Accessibility/Speech/SpeechLog.cs	Accessibility	
+OpenFPS.Accessibility/StairCues.cs	Accessibility	
 OpenFPS.Accessibility/TurnNarration.cs	Accessibility	
 OpenFPS.Accessibility/UiCue.cs	Accessibility	
 OpenFPS.Accessibility/ZoneSettle.cs	Accessibility	
@@ -179,7 +180,6 @@ OpenFPS.Client.Core/SightWatch.cs	Accessibility
 OpenFPS.Client.Core/Sightline.cs	Accessibility	
 OpenFPS.Client.Core/SnapshotSources.cs	game	
 OpenFPS.Client.Core/SpatialService.cs	game	
-OpenFPS.Client.Core/StairCues.cs	Accessibility	
 OpenFPS.Client.Core/StrideAccumulator.cs	game	
 OpenFPS.Client.Core/UiSounds.cs	Accessibility	
 OpenFPS.Client.Core/WallBumps.cs	Accessibility	

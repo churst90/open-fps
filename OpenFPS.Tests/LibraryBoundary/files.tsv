@@ -13,6 +13,7 @@ OpenFPS.Accessibility/PlayerCoordinates.cs	host
 OpenFPS.Accessibility/Speech/ISpeechOutput.cs	host		
 OpenFPS.Accessibility/Speech/SpeechDispatcherOutput.cs	host		
 OpenFPS.Accessibility/Speech/SpeechLog.cs	host		
+OpenFPS.Accessibility/StairCues.cs	host		
 OpenFPS.Accessibility/TurnNarration.cs	host		
 OpenFPS.Accessibility/UiCue.cs	host		
 OpenFPS.Accessibility/ZoneSettle.cs	host		
@@ -173,7 +174,6 @@ OpenFPS.Client.Core/SightWatch.cs	host
 OpenFPS.Client.Core/Sightline.cs	host		
 OpenFPS.Client.Core/SnapshotSources.cs	host		
 OpenFPS.Client.Core/SpatialService.cs	host		
-OpenFPS.Client.Core/StairCues.cs	host		
 OpenFPS.Client.Core/StrideAccumulator.cs	host		
 OpenFPS.Client.Core/UiSounds.cs	host		
 OpenFPS.Client.Core/WallBumps.cs	host		

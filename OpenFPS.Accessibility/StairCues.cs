@@ -1,4 +1,5 @@
 using System.Numerics;
+using OpenFPS.Acoustics;
 using OpenFPS.Common;
 
 namespace OpenFPS.Client.Core;
@@ -51,6 +52,7 @@ public sealed class StairCues
     private readonly Dictionary<int, int> _quiet = new();
     private readonly HashSet<int> _flightEnds = new();
     private readonly List<int> _scratch = new();
+    private readonly List<AcousticBody> _markers = new();
 
     /// <summary>True while your feet are on the treads of a flight: between its two ends, and between
     /// the two floors it joins.</summary>
@@ -81,20 +83,21 @@ public sealed class StairCues
     /// One update: the line to say, or null. Only the heading of <paramref name="facing"/> counts;
     /// <paramref name="place"/> is the zone you are in, and leaving it is leaving the landing.
     /// </summary>
-    public string? Update(WorldSnapshot world, Vector3 feet, Quaternion facing, int place = int.MinValue)
+    public string? Update(IAcousticWorld world, Vector3 feet, Quaternion facing, int place = int.MinValue)
     {
         var forward = Flat(Vector3.Transform(Vector3.UnitZ, facing));
+        world.Markers(_markers);
 
         // The flight under your feet, if any: both its ends are quiet while you are on it.
         _flightEnds.Clear();
-        foreach (int id in world.MarkerEntityIds)
+        foreach (var body in _markers)
         {
-            if (!TryMarker(world, id, out var at, out var along, out _)) continue;
+            if (!TryMarker(body, out var at, out var along, out _)) continue;
             float across = Vector2.Distance(new Vector2(feet.X, feet.Z), new Vector2(at.X, at.Z));
             if (across > MaxFlightMetres + LaneHalfWidth) continue;
-            if (OnTreads(world, id, at, along, feet, out int other))
+            if (OnTreads(_markers, body.Id, at, along, feet, out int other))
             {
-                _flightEnds.Add(id);
+                _flightEnds.Add(body.Id);
                 _flightEnds.Add(other);
             }
         }
@@ -107,18 +110,18 @@ public sealed class StairCues
         string? say = null;
         int sayId = -1;
         float sayDistance = float.MaxValue;
-        foreach (int id in world.MarkerEntityIds)
+        foreach (var body in _markers)
         {
-            if (!TryMarker(world, id, out var at, out var along, out string line)) continue;
-            if (_flightEnds.Contains(id)) { _quiet[id] = place; continue; }
+            if (!TryMarker(body, out var at, out var along, out string line)) continue;
+            if (_flightEnds.Contains(body.Id)) { _quiet[body.Id] = place; continue; }
 
             float floor = at.Y - MarkerHeightMetres;
             float across = Vector2.Distance(new Vector2(feet.X, feet.Z), new Vector2(at.X, at.Z));
             float above = MathF.Abs(feet.Y - floor);
-            if (_quiet.TryGetValue(id, out int quietIn))
+            if (_quiet.TryGetValue(body.Id, out int quietIn))
             {
                 // Been somewhere else since: another zone, another floor, or right away across this one.
-                if (quietIn != place || above > LeaveRiseMetres || across > LeaveMetres) _quiet.Remove(id);
+                if (quietIn != place || above > LeaveRiseMetres || across > LeaveMetres) _quiet.Remove(body.Id);
                 else continue;
             }
 
@@ -126,7 +129,7 @@ public sealed class StairCues
                 && Vector3.Dot(forward, along) >= FacingCos)
             {
                 say = line;
-                sayId = id;
+                sayId = body.Id;
                 sayDistance = across;
             }
         }
@@ -134,7 +137,7 @@ public sealed class StairCues
         // A marker that has gone from the world (a map change) is not one you were at.
         _scratch.Clear();
         foreach (int id in _quiet.Keys)
-            if (!world.Entities.ContainsKey(id)) _scratch.Add(id);
+            if (!world.TryGetBody(id, out _)) _scratch.Add(id);
         foreach (int id in _scratch) _quiet.Remove(id);
 
         if (sayId >= 0) { _quiet[sayId] = place; _lastSaid = sayId; }
@@ -152,26 +155,30 @@ public sealed class StairCues
     }
 
     /// <summary>A stair marker: where it stands, the way it faces (level, unit), and what it says.</summary>
-    internal static bool TryMarker(WorldSnapshot world, int id, out Vector3 at, out Vector3 along, out string line)
+    internal static bool TryMarker(in AcousticBody body, out Vector3 at, out Vector3 along, out string line)
     {
         at = default; along = default; line = "";
-        if (!world.Entities.TryGetValue(id, out var e)
-            || !string.Equals(e.Definition.Identity.BeaconCategory, Beacons.Stairs, StringComparison.OrdinalIgnoreCase))
-            return false;
-        at = e.Transform.Position;
-        along = Flat(Vector3.Transform(Vector3.UnitZ, e.Transform.Rotation));
-        line = e.Definition.Identity.Name ?? "";
+        if (!string.Equals(body.Beacon, Beacons.Stairs, StringComparison.OrdinalIgnoreCase)) return false;
+        at = body.Position;
+        along = Flat(Vector3.Transform(Vector3.UnitZ, body.Rotation));
+        line = body.Name ?? "";
         return along != Vector3.Zero && line.Length > 0;
     }
 
     /// <summary>Whether a stair marker is one end of the whole stair: the only marker on its landing.
     /// Every landing in between has the top of one flight and the foot of the next side by side.</summary>
-    public static bool IsStairwellEnd(WorldSnapshot world, int id)
+    public static bool IsStairwellEnd(IAcousticWorld world, int id)
     {
-        if (!TryMarker(world, id, out var at, out _, out _)) return false;
-        foreach (int other in world.MarkerEntityIds)
+        var markers = new List<AcousticBody>();
+        world.Markers(markers);
+        bool found = false;
+        Vector3 at = default;
+        foreach (var body in markers)
+            if (body.Id == id && TryMarker(body, out at, out _, out _)) { found = true; break; }
+        if (!found) return false;
+        foreach (var body in markers)
         {
-            if (other == id || !TryMarker(world, other, out var o, out _, out _)) continue;
+            if (body.Id == id || !TryMarker(body, out var o, out _, out _)) continue;
             if (MathF.Abs(o.Y - at.Y) <= SameFloorMetres
                 && Vector2.Distance(new Vector2(o.X, o.Z), new Vector2(at.X, at.Z)) <= LandingMetres)
                 return false;
@@ -185,11 +192,13 @@ public sealed class StairCues
     /// marker is comes from pairing the markers from the bottom up, since in a dog-leg position and
     /// facing do not say it. See docs/CLIENT_NOTES.md, "Stair cues".
     /// </summary>
-    public static HashSet<int> FloorBeacons(WorldSnapshot world)
+    public static HashSet<int> FloorBeacons(IAcousticWorld world)
     {
+        var markers = new List<AcousticBody>();
+        world.Markers(markers);
         var ms = new List<(int Id, Vector3 At, Vector3 Along)>();
-        foreach (int id in world.MarkerEntityIds)
-            if (TryMarker(world, id, out var at, out var along, out _)) ms.Add((id, at, along));
+        foreach (var body in markers)
+            if (TryMarker(body, out var at, out var along, out _)) ms.Add((body.Id, at, along));
         ms.Sort((a, b) => a.At.Y != b.At.Y ? a.At.Y.CompareTo(b.At.Y) : a.Id.CompareTo(b.Id));
 
         var tops = new HashSet<int>();
@@ -231,7 +240,7 @@ public sealed class StairCues
     /// below): stairwells stack, and straight ahead of a dog-leg's foot are both its own top a storey up
     /// and another flight's top a storey down.
     /// </summary>
-    private static bool OnTreads(WorldSnapshot world, int id, Vector3 at, Vector3 along, Vector3 feet, out int otherEnd)
+    private static bool OnTreads(List<AcousticBody> markers, int id, Vector3 at, Vector3 along, Vector3 feet, out int otherEnd)
     {
         otherEnd = -1;
         var from = new Vector2(at.X, at.Z);
@@ -245,16 +254,16 @@ public sealed class StairCues
         if (MathF.Abs(feet.Y - floor) <= 0.1f) return false;
         bool up = feet.Y > floor;
         float bestRise = float.MaxValue, ahead = float.NaN, otherFloor = float.NaN;
-        foreach (int other in world.MarkerEntityIds)
+        foreach (var body in markers)
         {
-            if (other == id || !TryMarker(world, other, out var o, out var oAlong, out _)) continue;
+            if (body.Id == id || !TryMarker(body, out var o, out var oAlong, out _)) continue;
             if (Vector3.Dot(oAlong, along) > -0.9f) continue;
             float rise = (o.Y - at.Y) * (up ? 1f : -1f);
             if (rise < 0.5f) continue;
             var q = new Vector2(o.X, o.Z) - from;
             float a = Vector2.Dot(q, dir);
             if (a <= 0.5f || a > MaxFlightMetres || MathF.Abs(Vector2.Dot(q, side)) > 0.5f) continue;
-            if (rise < bestRise) { bestRise = rise; ahead = a; otherFloor = o.Y - MarkerHeightMetres; otherEnd = other; }
+            if (rise < bestRise) { bestRise = rise; ahead = a; otherFloor = o.Y - MarkerHeightMetres; otherEnd = body.Id; }
         }
         if (float.IsNaN(otherFloor) || t >= ahead) return false;
         float lo = MathF.Min(floor, otherFloor), hi = MathF.Max(floor, otherFloor);
