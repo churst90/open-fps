@@ -1123,6 +1123,44 @@ A session is one working session of an agent, as in docs/GEOMETRY.md.
     committed with the move; before the report, the guard list of CLAUDE.md, the replays one by one, and the
     replays again with `DOTNET_PROCESSOR_COUNT=4`.
 
+- **Built 2026-10-18** (on Linux, in three commits on `stage6-common` from main `80f738b4`; the plan was the
+  first). The survey found seven files in Common beyond 3.8's list: two were the server's and moved, four stay by
+  the plans, one is a choice written out for Cody.
+  - `GroundProbeMemo` and `MoverPoses` to `OpenFPS.Server/Core/` with `git mv`, namespaces kept. `MoverPoses`
+    moved untouched; `ServerGeometry`, `DoorSystem` and `ParentSystem` are its only readers. The memo's reader and
+    writer was `PhysicsUtils`' memo overload, and its callers were the server's alone (`MovementSystem`,
+    `HotPathTests`, `PhysicsWorldViewTests`, and the AudioLab's `PhysicsReplays` memo-risk check, found when the
+    guard ran): the overload moved onto the type as `GroundProbeMemo.GetGroundHeight`, with a per-thread scratch
+    list of its own, and the callers followed. `PhysicsUtils` keeps the plain World probe, the ignore-list probe
+    and the snapshot probes; its doc names the server's memoized probe in prose now, not a `<see cref>` to a type
+    Common no longer holds.
+  - `PhysicsConstants`, `PhysicsUtils`, `PhysicsViews` and `EntityEmission` stay: physics 4.2 keeps the tick and
+    the input limits with the network and the World and snapshot probes in Common, physics 17.2 put both views in
+    `OpenFPS.Common/PhysicsViews.cs`, and `EntityEmission` is 3.8's `AudioEmission` adapter under the name library
+    stage 6 gave it.
+  - `Scopes` (`ScopeMath`, `ScopeSway`) stays in Common, a choice written out and not picked: the server's
+    `CombatService`, `Program` and `CommandHandler.Doors` and the client's `Scope` and `ClientGameSession.Scope`
+    aim with the same maths, stage 2's built note left them here, and the game has no shared project above
+    Common. Recommendation: leave it. Putting the file in the game needs a shared project (or the words split to
+    Words); that is Cody's decision to make, not a move to guess.
+  - **References.** LiteNetLib left Common's csproj (no file of Common used it) and went explicitly to the server
+    and Client.Core, whose files do use it; the Windows client already referenced it, so it is unchanged. Arch
+    stays: `PhysicsConstants.GravityOf`, `PhysicsUtils` and `PhysicsViews` use it, and it leaves when they do.
+  - **Ratchet.** The packages survey: files 608, crossings 290 to 287 — `PhysicsUtils.cs`' three, Common's last
+    references to a game type, went with the memo; `allowed.tsv` 9 rows to 8. The library survey: 0 crossings,
+    6655 layering, 348 statics, unchanged; its file list follows the two paths. The wire hash changed twice:
+    `96f14841d86e` to `f8fdcb5115e5` (MoverPoses) to `a0961ca3e778` (GroundProbeMemo).
+  - **Checks.** Every commit built Tests, Server, Client.Gtk, AudioLab and the Windows client at 0 warnings; each
+    code commit ran `SpokenLinesReplayTests` (7 passed) and `EmitterStreamReplayTests` (20 passed), unchanged and
+    not regenerated. The guard list ran a few classes per run, all passing: LibraryBoundary, EnginePackages,
+    PhysicsBoundary and RenderFingerprint 59; EmitterStreamReplay, SpokenLinesReplay, VoiceIdBand and
+    VoiceRegistry 60; VoiceStop, BinauralStages, ReverbBusPanning and ModelKindTable 49; MaterialName,
+    OneConstantPerLaw, MapScopedState, WorldWireBytes, EnvironmentWireBytes and RicochetTable 19; DrivingReplay 6,
+    RailReplay 2, MovementReplay 20, PhysicsCrossMachine 8. The four physics replays ran again with
+    `DOTNET_PROCESSOR_COUNT=4`: the same counts, so the streams do not depend on the machine.
+  - **Left.** The Arch reference, which waits for the views and the constants; and the `Scopes` question above.
+    Nothing else of stage 6.
+
 ### Stage 7: Accessibility, the clean half (1 to 1.5 sessions)
 
 - Create `OpenFPS.Accessibility`. Move the twelve clean files, the keys (`GameKey`, `KeyModifiers`) and the speech

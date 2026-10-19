@@ -4,6 +4,15 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-18
 
+- Engine packages stage 6: the server's ground-probe memo (`GroundProbeMemo`, with its probe) and the count of
+  door leaves (`MoverPoses`) moved from Common to `OpenFPS.Server/Core`, and Common's project no longer carries
+  LiteNetLib — the server and Client.Core reference it themselves (docs/ENGINE_PACKAGES.md, stage 6). Nothing
+  spoken, heard or sent changes: the spoken-lines and emitter-stream replays are unchanged and were not
+  regenerated. The packages ratchet fell from 290 crossings to 287 (Common's last game references went with the
+  memo). The wire hash changes (96f14841d86e to a0961ca3e778), so the server and the Windows client deploy
+  together. The door fingerprint is unchanged. The Arch reference stays in Common while the physics views and
+  constants do; `ScopeMath`/`ScopeSway` stay there too for now, a choice left open for Cody (both sides aim with
+  them and the game has no shared project). Built by DeepSeek through OpenCode, reviewed here.
 - Seven of the accessibility aids read the scene view and moved to `OpenFPS.Accessibility` (engine packages stage 9,
   part one; docs/ENGINE_PACKAGES.md): named places, stair cues, sight lines, wall bumps, UI sounds and beacon aids.
   To serve them, the view's bodies now carry their names, prefab, beacon category, team, kind and whether they roll
