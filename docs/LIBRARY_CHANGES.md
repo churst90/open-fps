@@ -11,7 +11,9 @@ tag (docs/SOUND_LIBRARY_BOUNDARY.md, stage 8 and decision 8) and references the 
   `HasWheels`, all `init` properties that default to empty, false or `BodyKind.None`. `IAcousticWorld` gains
   `Markers(List<AcousticBody>)`, the fixed named markers that are not solid. A host that implements `IAcousticWorld`
   must add `Markers` (clearing the list is enough if it has none). The audio reads none of the new fields, so
-  nothing heard changes.
+  nothing heard changes. The body also says `SynthRunning` (a world synth's switch) and, for a vehicle, the
+  surface and water under its worst wheel (`WheelSurface`, `WheelWaterMm`), all `init` properties that default to
+  false or 0; a host need do nothing, and the audio reads none of them.
 - A fire and a wood are cut at the ear like running water (changes.md, 2026-10-18; docs/FIRE.md 12.13): new
   `ExtendedSources` members for it (`CutPoints`, `PlacePoints`, `FireOutline`, `FlamesFor` and their kin),
   `ExtendedSources.CutArea` gains optional `fire`, `flames`, `rise`, `origin` and `turn` parameters (a recompile

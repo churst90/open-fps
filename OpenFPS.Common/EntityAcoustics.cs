@@ -4,6 +4,7 @@ using OpenFPS.Common.Networking;
 using OpenFPS.Acoustics;
 using OpenFPS.Acoustics.Systems;
 using OpenFPS.Geometry;
+using OpenFPS.Physics;
 
 namespace OpenFPS.Common;
 
@@ -153,8 +154,14 @@ public static class EntityAcoustics
     public static AcousticBody BodyOf(in EntitySnapshot snap)
     {
         var def = snap.Definition;
+        var (wheelSurface, wheelWater) = WorstWheel(snap.Wheels);
         if (def == null)
-            return new AcousticBody { Id = snap.Id, Position = snap.Transform.Position, Rotation = snap.Transform.Rotation, Velocity = snap.Velocity, HasWheels = snap.Wheels != null };
+            return new AcousticBody
+            {
+                Id = snap.Id, Position = snap.Transform.Position, Rotation = snap.Transform.Rotation,
+                Velocity = snap.Velocity, HasWheels = snap.Wheels != null, WheelSurface = wheelSurface,
+                WheelWaterMm = wheelWater,
+            };
         return new AcousticBody
         {
             Id = snap.Id,
@@ -177,6 +184,9 @@ public static class EntityAcoustics
             SoundId = def.SoundEmitter.SoundId,
             WindowsOpen = def.SoundEmitter.WindowsOpen,
             HasWheels = snap.Wheels != null,
+            WheelSurface = wheelSurface,
+            WheelWaterMm = wheelWater,
+            SynthRunning = def.SoundEmitter.SynthRunning,
             Name = def.Identity.Name,
             Prefab = def.Identity.PrefabId,
             Beacon = def.Identity.BeaconCategory,
@@ -185,6 +195,18 @@ public static class EntityAcoustics
             Named = def.Identity.Named,
             Announce = def.Identity.Announce,
         };
+    }
+
+    /// <summary>The wheel with the most water under it, and that water, mm: the wet grip the driving cues plan
+    /// the braking on, from what the server sent without the physics that made it. First when tied.</summary>
+    private static (byte Surface, float WaterMm) WorstWheel(WheelState[]? wheels)
+    {
+        byte surface = 0;
+        float water = 0f;
+        if (wheels == null) return (surface, water);
+        foreach (var w in wheels)
+            if (w.WaterMm > water) { water = w.WaterMm; surface = w.Surface; }
+        return (surface, water);
     }
 
     /// <summary>The host's entity type as the view's own (<see cref="BodyKind"/>).</summary>

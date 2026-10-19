@@ -132,6 +132,16 @@ public readonly struct AcousticBody
     /// <summary>It rolls on wheels the host last sent (open-fps: a <c>WheelState</c> array on the snapshot):
     /// a car, for the bump sound model (<c>StruckThings.Describe</c>).</summary>
     public bool HasWheels { get; init; }
+    /// <summary>The surface under its worst wheel, an index into <see cref="OpenFPS.Materials.RoadSurfaces"/>:
+    /// of the wheels the host sent, the one with the most water on it. 0 without wheels.</summary>
+    public byte WheelSurface { get; init; }
+    /// <summary>The water under that wheel, mm (open-fps: <c>WheelState.WaterMm</c>): the driving cues plan
+    /// the braking on the least grip under the car. 0 when dry or without wheels.</summary>
+    public float WheelWaterMm { get; init; }
+
+    /// <summary>A world synth's switch as the host last sent it (open-fps: <c>SoundEmitter.SynthRunning</c>):
+    /// a level crossing's bell rings while it is closed.</summary>
+    public bool SynthRunning { get; init; }
 
     /// <summary>What it is called (open-fps: <c>Identity.Name</c>), or null or empty: unnamed.</summary>
     public string? Name { get; init; }

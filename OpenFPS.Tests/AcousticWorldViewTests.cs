@@ -79,7 +79,7 @@ public class AcousticWorldViewTests
         sb.Append($"air {view.Air} version {view.GeometryVersion} tiles {view.TileMetres} rooms {view.Rooms?.GetHashCode()} bodies {view.BodyCount}\n");
         var all = new List<AcousticBody>();
         view.AllBodies(all);
-        foreach (var b in all) sb.Append($"body {b.Id} {b.Name} {b.Prefab} {b.Beacon} {b.Team} {b.Kind} {b.Named} {b.Announce} {b.HasWheels} {b.Position} {b.Rotation} {b.Size} {b.Material} {b.Solid} {b.DoorLeaf}\n");
+        foreach (var b in all) sb.Append($"body {b.Id} {b.Name} {b.Prefab} {b.Beacon} {b.Team} {b.Kind} {b.Named} {b.Announce} {b.HasWheels} {b.WheelSurface} {b.WheelWaterMm} {b.SynthRunning} {b.Position} {b.Rotation} {b.Size} {b.Material} {b.Solid} {b.DoorLeaf}\n");
         for (int i = 0; i < view.MovingCount; i++) sb.Append($"moving {view.MovingAt(i).Id} {view.MovingAt(i).Position}\n");
         var leaves = new List<DoorLeaf>();
         view.DoorLeaves(leaves);
@@ -139,7 +139,15 @@ public class AcousticWorldViewTests
         Assert.True(view.TryGetBody(BusId, out var bus) && bus.Kind == BodyKind.Npc);
         Assert.False(bus.HasWheels);
         Assert.Equal("north", bus.Team);
-        Assert.True(EntityAcoustics.BodyOf(new EntitySnapshot { Id = 9007, Wheels = new OpenFPS.Physics.WheelState[4] }).HasWheels);
+        var wheels = new OpenFPS.Physics.WheelState[4];
+        wheels[0] = OpenFPS.Physics.WheelState.Encode(4000f, 0f, 0f, 0f, 3, 0.2f, waterMm: 2f);
+        wheels[3] = OpenFPS.Physics.WheelState.Encode(4000f, 0f, 0f, 0f, 7, 0.2f, waterMm: 9f);
+        var wet = EntityAcoustics.BodyOf(new EntitySnapshot { Id = 9007, Wheels = wheels });
+        Assert.True(wet.HasWheels);
+        // The worst wheel is the one with the most water under it, and its surface comes with it.
+        Assert.Equal(7, wet.WheelSurface);
+        Assert.Equal(9f, wet.WheelWaterMm, 2);
+        Assert.False(EntityAcoustics.BodyOf(new EntitySnapshot { Id = 9008 }).HasWheels);
     }
 
     /// <summary>
