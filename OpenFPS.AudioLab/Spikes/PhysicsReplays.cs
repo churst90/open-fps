@@ -388,7 +388,7 @@ public static partial class PhysicsReplays
 
         // Risk 2: what the memo will hand MovementSystem this tick, against a fresh probe.
         var copy = session.GroundProbe;
-        float remembered = PhysicsUtils.GetGroundHeight(ecs, grid, at, body.Id, ref copy, out _);
+        float remembered = GroundProbeMemo.GetGroundHeight(ecs, grid, at, body.Id, ref copy, out _);
         float stale = MathF.Abs(remembered - serverGround);
         if (stale > 0.001f) run.MemoStale++;
         run.WorstMemoError = MathF.Max(run.WorstMemoError, stale);

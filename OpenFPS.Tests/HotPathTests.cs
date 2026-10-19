@@ -218,8 +218,8 @@ public class HotPathTests
             float direct = PhysicsUtils.GetGroundHeight(world, grid, standing, out string directMaterial);
 
             var memo = new GroundProbeMemo();
-            float first = PhysicsUtils.GetGroundHeight(world, grid, standing, -1, ref memo, out string firstMaterial);
-            float second = PhysicsUtils.GetGroundHeight(world, grid, standing, -1, ref memo, out string secondMaterial);
+            float first = GroundProbeMemo.GetGroundHeight(world, grid, standing, -1, ref memo, out string firstMaterial);
+            float second = GroundProbeMemo.GetGroundHeight(world, grid, standing, -1, ref memo, out string secondMaterial);
 
             Assert.Equal(direct, first);
             Assert.Equal(direct, second);

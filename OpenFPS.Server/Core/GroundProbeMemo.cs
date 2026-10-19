@@ -1,5 +1,8 @@
+using System.Collections.Generic;
 using System.Numerics;
+using Arch.Core;
 using OpenFPS.Geometry;
+using OpenFPS.Physics;
 
 namespace OpenFPS.Common;
 
@@ -16,6 +19,12 @@ namespace OpenFPS.Common;
 /// </summary>
 public struct GroundProbeMemo
 {
+    // The probe runs on the server tick thread (and the tests' threads); per-thread scratch keeps it
+    // allocation-free without anyone waiting on anyone.
+    [ThreadStatic] private static List<PhysicsBody>? _bodies;
+
+    private static List<PhysicsBody> Bodies => _bodies ??= new List<PhysicsBody>(64);
+
     private bool _valid;
     private Vector3 _position;
     private int _staticVersion;
@@ -52,4 +61,25 @@ public struct GroundProbeMemo
 
     /// <summary>Forgets the remembered floor — after a respawn or a teleport, where it describes nowhere.</summary>
     public void Invalidate() => _valid = false;
+
+    /// <summary>
+    /// A body's floor on the server, the triangle world's part remembered (a session's memo): asked
+    /// again only when the point or the static geometry changed. What moves and the statics the triangles do
+    /// not hold are asked every time, so the answer is the one a fresh probe and a client's give.
+    /// </summary>
+    public static float GetGroundHeight(World world, SpatialGrid<Entity> grid, Vector3 pos, int own,
+        ref GroundProbeMemo memo, out string material)
+    {
+        // The view first: handing out the triangle world places its movers, which may move the version.
+        var view = ServerPhysicsView.Of(world, grid);
+        if (memo.TryGet(pos, grid.StaticVersion, out float floor, out string under))
+            PerfProbe.Count("server.groundprobe.hit");
+        else
+            using (PerfProbe.Measure("server.groundprobe"))
+            {
+                floor = Footing.TriangleGround(view, pos, own, null, out under);
+                memo.Store(pos, grid.StaticVersion, floor, under);
+            }
+        return Footing.GroundOn(view, pos, own, null, floor, under, Bodies, out material);
+    }
 }

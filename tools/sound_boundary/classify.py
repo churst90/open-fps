@@ -105,7 +105,6 @@ FILE_RULES = [
     (CO + 'PhysicsUtils.cs', 'b', '', 'player movement'),
     (CO + 'PhysicsViews.cs', 'b', '', "player movement: open-fps's world and a client's snapshot as the physics sees them"),
     (CO + 'PhysicsConstants.cs', 'b', '', 'player movement'),
-    (CO + 'GroundProbeMemo.cs', 'b', '', 'server movement'),
     (CO + 'EntityGeometry.cs', 'b', '', "open-fps's entities to solids: the adapter the geometry library is fed through"),
     (CO + 'EntityAcoustics.cs', 'b', '', "open-fps's entities to rooms, openings and solids: the adapter the acoustics are fed through"),
     (CO + 'UpdateThrottle.cs', 'b', '', 'client loop'),

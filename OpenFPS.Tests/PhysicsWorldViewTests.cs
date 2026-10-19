@@ -143,9 +143,9 @@ public class PhysicsWorldViewTests
         var trailer = w.Car(new Vector3(10f, 0.25f, 0f), new Vector3(2f, 0.5f, 4f));   // a low trailer, off to one side
         var feet = new Vector3(0.1f, 0.3f, 0.2f);
         var memo = new GroundProbeMemo();
-        Assert.Equal(0f, PhysicsUtils.GetGroundHeight(w.World, w.Grid, feet, Own, ref memo, out _), 4);
+        Assert.Equal(0f, GroundProbeMemo.GetGroundHeight(w.World, w.Grid, feet, Own, ref memo, out _), 4);
         w.Move(trailer, new Vector3(0f, 0.25f, 0f));                                       // pushed under the body
-        float remembered = PhysicsUtils.GetGroundHeight(w.World, w.Grid, feet, Own, ref memo, out string material);
+        float remembered = GroundProbeMemo.GetGroundHeight(w.World, w.Grid, feet, Own, ref memo, out string material);
         Assert.Equal(1, memo.Hits);
         Assert.Equal(0.5f, remembered, 4);
         Assert.Equal("Metal", material);

@@ -158,7 +158,7 @@ public static class MovementSystem
 
                 // Never write the floor's material into the player's: a person on a concrete roof was
                 // concrete to anything that met them. Footsteps probe the ground themselves.
-                float groundY = PhysicsUtils.GetGroundHeight(world, grid, transform.Position, e.Id, ref session.GroundProbe, out _);
+                float groundY = GroundProbeMemo.GetGroundHeight(world, grid, transform.Position, e.Id, ref session.GroundProbe, out _);
 
                 Vector3 inputDir = Vector3.Zero;
                 if (input.MoveDirection != Vector3.Zero)

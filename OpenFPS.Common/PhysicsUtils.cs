@@ -22,8 +22,8 @@ public static class PhysicsUtils
     private static List<PhysicsBody> Bodies => _bodies ??= new List<PhysicsBody>(64);
 
     /// <summary>The floor height under a point, on the server (<see cref="Footing"/>'s ground probe over
-    /// <see cref="ServerPhysicsView"/>). A player's step goes through
-    /// <see cref="GetGroundHeight(World, SpatialGrid{Entity}, Vector3, int, ref GroundProbeMemo, out string)"/>.</summary>
+    /// <see cref="ServerPhysicsView"/>). A player's step goes through the server's memoized probe instead
+    /// (<c>GroundProbeMemo.GetGroundHeight</c>, which remembers the triangle world's floor).</summary>
     public static float GetGroundHeight(World world, SpatialGrid<Entity> grid, Vector3 pos, out string material)
         => GetGroundHeight(world, grid, pos, null, out material);
 
@@ -42,27 +42,6 @@ public static class PhysicsUtils
             foreach (var e in ignore) skip.Add(e.Id);
         }
         return Footing.GroundOn(ServerPhysicsView.Of(world, grid), pos, int.MinValue, skip, Bodies, out material);
-    }
-
-    /// <summary>
-    /// A body's floor on the server, the triangle world's part remembered (the session's memo): asked
-    /// again only when the point or the static geometry changed. What moves and the statics the triangles do
-    /// not hold are asked every time, so the answer is the one a fresh probe and a client's give.
-    /// </summary>
-    public static float GetGroundHeight(World world, SpatialGrid<Entity> grid, Vector3 pos, int own,
-        ref GroundProbeMemo memo, out string material)
-    {
-        // The view first: handing out the triangle world places its movers, which may move the version.
-        var view = ServerPhysicsView.Of(world, grid);
-        if (memo.TryGet(pos, grid.StaticVersion, out float floor, out string under))
-            PerfProbe.Count("server.groundprobe.hit");
-        else
-            using (PerfProbe.Measure("server.groundprobe"))
-            {
-                floor = Footing.TriangleGround(view, pos, own, null, out under);
-                memo.Store(pos, grid.StaticVersion, floor, under);
-            }
-        return Footing.GroundOn(view, pos, own, null, floor, under, Bodies, out material);
     }
 
     /// <summary>The floor height under a point, on the client: the same question as the server's, of the
