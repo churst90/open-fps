@@ -62,6 +62,7 @@ OpenFPS.Agents/JunctionRules.cs	Agents
 OpenFPS.Agents/LaneRoutes.cs	Agents	
 OpenFPS.Agents/LineFollower.cs	Agents	
 OpenFPS.Agents/MachinePower.cs	Agents	
+OpenFPS.Agents/Pavements.cs	Agents	
 OpenFPS.Agents/PeopleWorld.cs	Agents	
 OpenFPS.Agents/RaceLine.cs	Agents	
 OpenFPS.Agents/RouteRules.cs	Agents	
@@ -414,7 +415,6 @@ OpenFPS.Server/Systems/LightningSystem.cs	game	host: steps Environment
 OpenFPS.Server/Systems/MovementSystem.cs	game	
 OpenFPS.Server/Systems/OccupancySystem.cs	game	
 OpenFPS.Server/Systems/ParentSystem.cs	game	
-OpenFPS.Server/Systems/Pavements.cs	game	host: Agents once it reads a view
 OpenFPS.Server/Systems/PedestrianSpeech.Homeless.cs	game	host: steps Agents (the lines are Speech)
 OpenFPS.Server/Systems/PedestrianSpeech.cs	game	host: steps Agents (the lines are Speech)
 OpenFPS.Server/Systems/RailSystem.cs	game	host: steps Agents (physics survey: trains kinematic)

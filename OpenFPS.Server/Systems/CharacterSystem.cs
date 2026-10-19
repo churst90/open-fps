@@ -180,6 +180,7 @@ public sealed class CharacterSystem
     {
         double now = _clocks[mapId] = _clocks.GetValueOrDefault(mapId) + dt;
         var cond = PedestrianSpeech.Conditions(env, weather);
+        var view = ServerPeopleView.Of(world, grid);
         foreach (var c in _all)
         {
             if (c.MapId != mapId) continue;
@@ -187,7 +188,7 @@ public sealed class CharacterSystem
             if (!c.Ready)
             {
                 if (now < FindAfterSeconds || _maps == null || !_maps.TryGetMapData(mapId, out var data)) continue;
-                Prepare(c, world, grid, data);
+                Prepare(c, world, grid, view, data);
                 if (c.Haunts.Count == 0) continue;
             }
             if (c.Haunts.Count == 0) continue;
@@ -220,11 +221,11 @@ public sealed class CharacterSystem
         _manners.Update(mapId, world, dt);
     }
 
-    private void Prepare(Character c, World world, SpatialGrid<Entity> grid, MapData data)
+    private void Prepare(Character c, World world, SpatialGrid<Entity> grid, IPeopleWorld view, MapData data)
     {
         c.Ready = true;
-        c.Paths = Pavements.Build(Pavements.StripsOf(world));
-        c.Solids = Pavements.SolidsOf(world);
+        c.Paths = Pavements.Build(Pavements.StripsOf(view));
+        c.Solids = Pavements.SolidsOf(view);
         c.Haunts = KeptTo(c, HauntFinder.Find(world, grid, data, c.Paths, c.Solids));
         Log.Information("CHARACTER {Name} on {Map}: {Count} places ({Kinds}) on {Nodes} pavement corners: {Names}",
                         c.Data.Name, c.MapId, c.Haunts.Count,

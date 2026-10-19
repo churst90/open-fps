@@ -191,8 +191,9 @@ public class AlexTests
         var alex = Assert.Single(data.Characters!);
         Assert.Equal(("Alex", "alex", "homeless"), (alex.Name, alex.Voice, alex.Kind));
 
-        var net = Pavements.Build(Pavements.StripsOf(world));
-        var solids = Pavements.SolidsOf(world);
+        var view = ServerPeopleView.Of(world, grid);
+        var net = Pavements.Build(Pavements.StripsOf(view));
+        var solids = Pavements.SolidsOf(view);
         var haunts = HauntFinder.Find(world, grid, data, net, solids);
         Assert.Equal(2, haunts.Count(h => h.Kind == HauntKind.BusStop));
         foreach (var tower in new[] { "Marlow Tower", "Kestrel House", "Union Building", "Brandt Court", "Selby House" })

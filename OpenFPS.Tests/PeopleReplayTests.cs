@@ -306,8 +306,9 @@ public class PeopleReplayTests
 
     private static List<Haunt> FindHaunts(World world, SpatialGrid<Entity> grid, MapData data)
     {
-        var net = Pavements.Build(Pavements.StripsOf(world));
-        var solids = Pavements.SolidsOf(world);
+        var view = ServerPeopleView.Of(world, grid);
+        var net = Pavements.Build(Pavements.StripsOf(view));
+        var solids = Pavements.SolidsOf(view);
         return HauntFinder.Find(world, grid, data, net, solids);
     }
 

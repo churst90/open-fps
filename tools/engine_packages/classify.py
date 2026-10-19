@@ -141,7 +141,6 @@ FILE_RULES = [
     ('OpenFPS.Server/Systems/Haunts.cs', 'game', 'host: Agents once it reads a view'),
     ('OpenFPS.Server/Systems/DoorManners.cs', 'game', 'host: Agents once it reads a view'),
     ('OpenFPS.Server/Systems/CharacterSystem.cs', 'game', 'host: steps Agents'),
-    ('OpenFPS.Server/Systems/Pavements.cs', 'game', 'host: Agents once it reads a view'),
     ('OpenFPS.Server/Systems/CrossingSystem.cs', 'game', 'host: steps Agents'),
     ('OpenFPS.Server/Systems/RailSystem.cs', 'game', 'host: steps Agents (physics survey: trains kinematic)'),
     ('OpenFPS.Server/Systems/WorldEnvironmentSystem.cs', 'game', 'host: steps Environment'),

@@ -65,8 +65,9 @@ public sealed partial class WorldEditor
         if (!_maps.TryGetMap(mapId, out var world, out _, out var grid, out _) || !_maps.TryGetMapData(mapId, out var data)) return new List<string>();
         int things = _maps.AuthoredEntities(mapId).Count;
         if (_places.TryGetValue(mapId, out var known) && known.Things == things) return known.Names;
-        var paths = Pavements.Build(Pavements.StripsOf(world));
-        var names = HauntFinder.Find(world, grid, data, paths, Pavements.SolidsOf(world)).Select(h => h.Name).Distinct().ToList();
+        var view = ServerPeopleView.Of(world, grid);
+        var paths = Pavements.Build(Pavements.StripsOf(view));
+        var names = HauntFinder.Find(world, grid, data, paths, Pavements.SolidsOf(view)).Select(h => h.Name).Distinct().ToList();
         _places[mapId] = (things, names);
         return names;
     }

@@ -1,6 +1,4 @@
 using System.Numerics;
-using Arch.Core;
-using OpenFPS.Common.Components;
 using OpenFPS.Geometry;
 
 namespace OpenFPS.Server.Systems;
@@ -285,29 +283,31 @@ public sealed class Pavements
     /// Every pavement on a map: a slab whose name has "sidewalk" or "pavement" in it, lying flat (under
     /// half a metre thick) and longer than it is wide.
     /// </summary>
-    public static List<Strip> StripsOf(World world)
+    public static List<Strip> StripsOf(IPeopleWorld world)
     {
+        var boxes = new List<NamedBox>();
+        world.NamedBoxes(boxes);
         var strips = new List<Strip>();
-        world.Query(new QueryDescription().WithAll<Transform, ColliderComponent>().WithNone<Velocity>(),
-            (Entity e, ref Transform t, ref ColliderComponent c) =>
-            {
-                string name = world.Has<IdentityComponent>(e) && !string.IsNullOrWhiteSpace(world.Get<IdentityComponent>(e).Name)
-                    ? world.Get<IdentityComponent>(e).Name
-                    : world.Has<NameComponent>(e) ? world.Get<NameComponent>(e).Name ?? "" : "";
-                if (!IsPavement(name) || c.Shape != ColliderShape.Box || c.Size.Y > 0.5f) return;
-                var x = Vector3.Transform(Vector3.UnitX, t.Rotation); x.Y = 0f;
-                var z = Vector3.Transform(Vector3.UnitZ, t.Rotation); z.Y = 0f;
-                if (x.LengthSquared() < 1e-6f || z.LengthSquared() < 1e-6f) return;
-                x = Vector3.Normalize(x); z = Vector3.Normalize(z);
-                bool alongX = c.Size.X >= c.Size.Z;
-                var axis = alongX ? x : z;
-                float half = (alongX ? c.Size.X : c.Size.Z) * 0.5f;
-                float width = alongX ? c.Size.Z : c.Size.X;
-                if (half * 2f < width * 1.5f) return;
-                var centre = new Vector2(t.Position.X, t.Position.Z);
-                var d = new Vector2(axis.X, axis.Z) * half;
-                strips.Add(new Strip(centre - d, centre + d, width * 0.5f, name));
-            });
+        // The store's query order, newest entity first: the network's edge numbers and so a route's
+        // tie-breaks stay what they were before the law read a view.
+        for (int i = boxes.Count - 1; i >= 0; i--)
+        {
+            var box = boxes[i];
+            string name = box.Name;
+            if (box.Moves || !IsPavement(name) || box.Shape != ColliderShape.Box || box.Size.Y > 0.5f) continue;
+            var x = Vector3.Transform(Vector3.UnitX, box.Rotation); x.Y = 0f;
+            var z = Vector3.Transform(Vector3.UnitZ, box.Rotation); z.Y = 0f;
+            if (x.LengthSquared() < 1e-6f || z.LengthSquared() < 1e-6f) continue;
+            x = Vector3.Normalize(x); z = Vector3.Normalize(z);
+            bool alongX = box.Size.X >= box.Size.Z;
+            var axis = alongX ? x : z;
+            float half = (alongX ? box.Size.X : box.Size.Z) * 0.5f;
+            float width = alongX ? box.Size.Z : box.Size.X;
+            if (half * 2f < width * 1.5f) continue;
+            var centre = new Vector2(box.Centre.X, box.Centre.Z);
+            var d = new Vector2(axis.X, axis.Z) * half;
+            strips.Add(new Strip(centre - d, centre + d, width * 0.5f, name));
+        }
         // In entity order, so the network, and every route on it, is the same every time.
         return strips;
     }
@@ -319,17 +319,21 @@ public sealed class Pavements
     /// The solid boxes a person walking could meet: standing between knee and head height, not
     /// moving, not a door (a door is walked through, open). Floors, kerbs and roofs are not in the way.
     /// </summary>
-    public static List<Solid> SolidsOf(World world)
+    public static List<Solid> SolidsOf(IPeopleWorld world)
     {
+        var boxes = new List<NamedBox>();
+        world.NamedBoxes(boxes);
         var solids = new List<Solid>();
-        world.Query(new QueryDescription().WithAll<Transform, ColliderComponent>().WithNone<Velocity, DoorComponent>(),
-            (Entity e, ref Transform t, ref ColliderComponent c) =>
-            {
-                if (!c.IsSolid || c.Shape != ColliderShape.Box || c.Size.X <= 0 || c.Size.Y <= 0 || c.Size.Z <= 0) return;
-                float bottom = t.Position.Y - c.Size.Y * 0.5f, top = t.Position.Y + c.Size.Y * 0.5f;
-                if (top < 0.45f || bottom > 1.85f) return;
-                solids.Add(new Solid(t.Position, t.Rotation, c.Size * 0.5f));
-            });
+        // The same store order, as the host walked it.
+        for (int i = boxes.Count - 1; i >= 0; i--)
+        {
+            var box = boxes[i];
+            if (box.Moves || box.IsDoor || !box.Solid || box.Shape != ColliderShape.Box
+                || box.Size.X <= 0 || box.Size.Y <= 0 || box.Size.Z <= 0) continue;
+            float bottom = box.Centre.Y - box.Size.Y * 0.5f, top = box.Centre.Y + box.Size.Y * 0.5f;
+            if (top < 0.45f || bottom > 1.85f) continue;
+            solids.Add(new Solid(box.Centre, box.Rotation, box.Size * 0.5f));
+        }
         return solids;
     }
 }
