@@ -9,7 +9,5 @@ OpenFPS.Client.Core/Services/SoundMappingService.cs	game	8
 OpenFPS.Client.Core/SightWatch.cs	Common	48
 OpenFPS.Client.Core/SightWatch.cs	game	7
 OpenFPS.Client.Core/UiSounds.cs	Common	30
-OpenFPS.Client.Core/WallBumps.cs	Common	37
-OpenFPS.Client.Core/WallBumps.cs	game	30
 OpenFPS.Common/PhysicsUtils.cs	game	3
 OpenFPS.Server/Systems/VehicleSystem.Parking.cs	game	2

@@ -1251,11 +1251,11 @@ public sealed partial class ClientGameSession : IDisposable
         var struck = first is { } f && f.EntityId == hit.EntityId ? firstStruck : secondStruck;
         if (!NavigationAids.WallBumps) return;
 
-        string name = Sightline.NameOf(EntityAcoustics.BodyOf(struck));
+        string name = Sightline.NameOf(struck);
         Vector3 where = WallBumps.TouchPoint(struck, hit);
         var sounds = WallBumps.Sound(struck, hit, where, input.Sprint, unchecked(_bumpSeed + 1));
         Serilog.Log.Information("[BUMP] '{Name}' e{Id} {Material} at {Pos}, intent {Intent:F2}, {Count} sounds {Db:F0} dB",
-            name, hit.EntityId, struck.Definition.Material.Material, where, hit.Intent, sounds.Count,
+            name, hit.EntityId, struck.Material, where, hit.Intent, sounds.Count,
             sounds.Count > 0 ? sounds[0].LevelDb : 0f);
         if (sounds.Count > 0)
             _audioSystem.WorldAudio.Receive(new WorldAudioEvent

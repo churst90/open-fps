@@ -123,33 +123,3 @@ public class ClientPhysicsSystem
     public BodyContact? SecondContact { get; private set; }
 }
 
-/// <summary>
-/// The body pressed into something and was held off it: the entity, the surface's outward normal, the
-/// attempted speed into it, the speed attempted at all, and where the feet ended up.
-/// <see cref="Intent"/> is the share aimed at the surface: one walking straight at a wall, near zero
-/// brushing along it.
-/// </summary>
-public readonly record struct BodyContact(int EntityId, Vector3 Normal, float IntoSpeed, float Speed, Vector3 Feet)
-{
-    public float Intent => Speed > 1e-4f ? Math.Clamp(IntoSpeed / Speed, 0f, 1f) : 0f;
-}
-
-/// <summary>What a fresh step's contacts are to the wall bumps.</summary>
-public static class BodyContacts
-{
-    /// <summary>
-    /// One fresh movement step's two contacts put to <paramref name="bumps"/>: what the body pressed hardest
-    /// into, and the other thing it pressed into (in a corner, the other wall), each already resolved
-    /// (<see cref="WallBumps.Resolve"/>). Of two walls pressed equally, which the step names first depends on the
-    /// order it met them; asked of both, a corner is two walls whatever that order. True when either is a new
-    /// bump, which <paramref name="bumped"/> says.
-    /// </summary>
-    public static bool Bump(this WallBumps bumps, BodyContact? first, BodyContact? second, Vector3 feet, out BodyContact? bumped)
-    {
-        bumped = null;
-        if (first == null) (first, second) = (second, null);
-        if (bumps.Update(first, feet)) { bumped = first; return true; }
-        if (second != null && bumps.Update(second, feet)) { bumped = second; return true; }
-        return false;
-    }
-}

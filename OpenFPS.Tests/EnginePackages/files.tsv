@@ -19,6 +19,7 @@ OpenFPS.Accessibility/Speech/SpeechLog.cs	Accessibility
 OpenFPS.Accessibility/StairCues.cs	Accessibility	
 OpenFPS.Accessibility/TurnNarration.cs	Accessibility	
 OpenFPS.Accessibility/UiCue.cs	Accessibility	
+OpenFPS.Accessibility/WallBumps.cs	Accessibility	
 OpenFPS.Accessibility/ZoneSettle.cs	Accessibility	
 OpenFPS.Acoustics/AcousticConstants.cs	Acoustics	
 OpenFPS.Acoustics/AcousticMap.cs	Acoustics	
@@ -184,7 +185,6 @@ OpenFPS.Client.Core/SnapshotSources.cs	game
 OpenFPS.Client.Core/SpatialService.cs	game	
 OpenFPS.Client.Core/StrideAccumulator.cs	game	
 OpenFPS.Client.Core/UiSounds.cs	Accessibility	
-OpenFPS.Client.Core/WallBumps.cs	Accessibility	
 OpenFPS.Client.Core/WorldAudioPlayer.cs	game	the wire's one-off sounds decoded for the audio world's OneOffSounds
 OpenFPS.Common/AudioEvents.cs	Common	wire
 OpenFPS.Common/Components.cs	Common	wire and entity model

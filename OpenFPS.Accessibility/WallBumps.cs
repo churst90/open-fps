@@ -1,10 +1,41 @@
 using System.Numerics;
-using OpenFPS.Common;
-using OpenFPS.Sound;
+using OpenFPS.Acoustics;
 using OpenFPS.Materials;
 using OpenFPS.Physics;
+using OpenFPS.Sound;
 
 namespace OpenFPS.Client.Core;
+
+/// <summary>
+/// The body pressed into something and was held off it: the entity, the surface's outward normal, the
+/// attempted speed into it, the speed attempted at all, and where the feet ended up.
+/// <see cref="Intent"/> is the share aimed at the surface: one walking straight at a wall, near zero
+/// brushing along it.
+/// </summary>
+public readonly record struct BodyContact(int EntityId, Vector3 Normal, float IntoSpeed, float Speed, Vector3 Feet)
+{
+    public float Intent => Speed > 1e-4f ? Math.Clamp(IntoSpeed / Speed, 0f, 1f) : 0f;
+}
+
+/// <summary>What a fresh step's contacts are to the wall bumps.</summary>
+public static class BodyContacts
+{
+    /// <summary>
+    /// One fresh movement step's two contacts put to <paramref name="bumps"/>: what the body pressed hardest
+    /// into, and the other thing it pressed into (in a corner, the other wall), each already resolved
+    /// (<see cref="WallBumps.Resolve"/>). Of two walls pressed equally, which the step names first depends on the
+    /// order it met them; asked of both, a corner is two walls whatever that order. True when either is a new
+    /// bump, which <paramref name="bumped"/> says.
+    /// </summary>
+    public static bool Bump(this WallBumps bumps, BodyContact? first, BodyContact? second, Vector3 feet, out BodyContact? bumped)
+    {
+        bumped = null;
+        if (first == null) (first, second) = (second, null);
+        if (bumps.Update(first, feet)) { bumped = first; return true; }
+        if (second != null && bumps.Update(second, feet)) { bumped = second; return true; }
+        return false;
+    }
+}
 
 /// <summary>
 /// Walking into something: once per contact, a knock from where you touched it, and its name (Cody,
@@ -16,6 +47,8 @@ namespace OpenFPS.Client.Core;
 ///   * within it, only a different entity whose face turns more than <see cref="NewFaceDegrees"/> from
 ///     every face touched bumps again: a corner is two walls, a wall of panels one.
 /// Only faces that stand up: never the ground (<see cref="Sightline.IsGround"/>), a ceiling or a step.
+/// It reads the scene view (<see cref="IAcousticWorld"/>): the bump the physics reports, the things it
+/// names from the bodies (stage 9, docs/ENGINE_PACKAGES.md).
 /// </summary>
 public sealed class WallBumps
 {
@@ -72,19 +105,16 @@ public sealed class WallBumps
     }
 
     /// <summary>
-    /// The contact as a bump sees it: the entity it was, or null when it was nothing that counts —
+    /// The contact as a bump sees it: the thing it was, or null when it was nothing that counts —
     /// an entity this client no longer holds, a face that does not stand up (a ceiling met on a jump,
     /// the top of something), or the ground (a floor's edge, a kerb, a step you could take).
     /// </summary>
-    public static BodyContact? Resolve(BodyContact? contact, WorldSnapshot world, float eyeHeight, out EntitySnapshot struck)
+    public static BodyContact? Resolve(BodyContact? contact, IAcousticWorld world, float eyeHeight, out AcousticBody struck)
     {
         struck = default;
         if (contact is not { } c) return null;
-        bool known = world.Entities.TryGetValue(c.EntityId, out struck);
-        if (!known)
-            foreach (var d in world.DynamicEntities)
-                if (d.Id == c.EntityId) { struck = d; known = true; break; }
-        if (!known || MathF.Abs(c.Normal.Y) > 0.5f || Sightline.IsGround(struck, c.Feet.Y, c.Feet.Y + eyeHeight))
+        if (!world.TryGetBody(c.EntityId, out struck)) return null;
+        if (MathF.Abs(c.Normal.Y) > 0.5f || Sightline.IsGround(struck, c.Feet.Y, c.Feet.Y + eyeHeight))
             return null;
         // Anything whose top is within a step of the feet is a step, whatever its shape: a stair
         // tread built as a column, a low kerb block. You step up it, you do not walk into it.
@@ -123,7 +153,7 @@ public sealed class WallBumps
     /// Where the body touched it: on the surface, at shoulder height unless the thing is lower than
     /// that, a couple of centimetres proud so the knock is not heard through the very thing it hit.
     /// </summary>
-    public static Vector3 TouchPoint(in EntitySnapshot struck, BodyContact c)
+    public static Vector3 TouchPoint(in AcousticBody struck, BodyContact c)
     {
         var (min, max) = Sightline.WorldBounds(struck);
         Vector3 n = new(c.Normal.X, 0f, c.Normal.Z);
@@ -141,7 +171,7 @@ public sealed class WallBumps
     /// its studs, a glass door loose in its latch, a fence's pale on its bolt, a car's panels). A person met is
     /// still the plain impact of two bodies (<see cref="PersonSound"/>).
     /// </summary>
-    public static List<TransientSound> Sound(in EntitySnapshot struck, BodyContact c, Vector3 where, bool running, int seed = 0)
+    public static List<TransientSound> Sound(in AcousticBody struck, BodyContact c, Vector3 where, bool running, int seed = 0)
     {
         if (Sightline.IsPerson(struck)) return PersonSound(struck, c, where, running);
         var strike = StrikeOf(struck, c, where, running, seed, out _);
@@ -169,13 +199,12 @@ public sealed class WallBumps
     /// touched (the hand at shoulder height), at the closing speed. Quantised so a wall of one kind is a few
     /// renders, not one per bump: speed to 0.2 m/s, places to tenths of the face.
     /// </summary>
-    public static Strike StrikeOf(in EntitySnapshot struck, BodyContact c, Vector3 where, bool running, int seed, out StruckThing thing)
+    public static Strike StrikeOf(in AcousticBody struck, BodyContact c, Vector3 where, bool running, int seed, out StruckThing thing)
     {
-        var def = struck.Definition;
-        var local = Vector3.Transform(c.Normal, Quaternion.Inverse(struck.Transform.Rotation));
-        thing = StruckThings.Describe(def.Material.Material, def.Collider.Size, local, def.Acoustics.LeafMetres,
-                                      def.Acoustics.StudSpacingMetres, def.Moves, isVehicle: struck.Wheels != null, out bool lengthIsUp,
-                                      form: def.Collider.Form);
+        var local = Vector3.Transform(c.Normal, Quaternion.Inverse(struck.Rotation));
+        thing = StruckThings.Describe(struck.Material, struck.Size, local, struck.Build.LeafMetres,
+                                      struck.Build.StudSpacingMetres, struck.Moves, isVehicle: struck.HasWheels, out bool lengthIsUp,
+                                      form: struck.Form);
         // Where on the face: across from the box's own centre along the face, up from its bottom.
         var (min, max) = Sightline.WorldBounds(struck);
         float upFrac = max.Y - min.Y > 0.05f ? Math.Clamp((c.Feet.Y + 1.4f - min.Y) / (max.Y - min.Y), 0.05f, 0.95f) : 0.5f;
@@ -194,17 +223,16 @@ public sealed class WallBumps
     /// Walking into a person: the impact model every collision used before the struck things (ImpactAcoustics), a
     /// body (Skin) against them, weighing what a person weighs.
     /// </summary>
-    public static List<TransientSound> PersonSound(in EntitySnapshot struck, BodyContact c, Vector3 where, bool running)
+    public static List<TransientSound> PersonSound(in AcousticBody struck, BodyContact c, Vector3 where, bool running)
     {
-        var def = struck.Definition;
         var body = AcousticRegistry.GetProperties("Skin");
-        string mat = string.IsNullOrEmpty(def.Material.Material) ? "Generic" : def.Material.Material;
+        string mat = string.IsNullOrEmpty(struck.Material) ? "Generic" : struck.Material;
         var props = AcousticRegistry.GetProperties(mat);
 
         // The face that was met: the collider's own axis nearest the contact normal is its thickness,
         // the other two are the panel.
-        var size = def.Collider.Size;
-        var local = Vector3.Transform(c.Normal, Quaternion.Inverse(struck.Transform.Rotation));
+        var size = struck.Size;
+        var local = Vector3.Transform(c.Normal, Quaternion.Inverse(struck.Rotation));
         float ax = MathF.Abs(local.X), ay = MathF.Abs(local.Y), az = MathF.Abs(local.Z);
         float width, height, thickness;
         if (ax >= ay && ax >= az) { width = size.Z; height = size.Y; thickness = size.X; }
@@ -220,6 +248,6 @@ public sealed class WallBumps
         closing = MathF.Max(closing, ImpactAcoustics.MinimumSpeed + 0.05f);
 
         return ImpactAcoustics.Between(body, props, where, closing, LeadingMassKg, massKg,
-                                       width, height, thickness, struckIsFixed: !def.Moves);
+                                       width, height, thickness, struckIsFixed: !struck.Moves);
     }
 }
