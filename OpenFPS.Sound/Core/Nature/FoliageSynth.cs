@@ -99,6 +99,13 @@ public sealed class FoliageSynth
     /// air moving through a tree.</summary>
     public void ReadWind(WindWeather wind, float x, float z, double seconds)
     {
+        // A wood cut at the ear: where each bough's pieces are.
+        if (_windWorld != null)
+        {
+            for (int b = 0; b < Boughs; b++)
+                _boughWindIn[b] = WindField.SpeedAt(wind, _windWorld[b].X, Spec.CrownHeightMetres, _windWorld[b].Y, seconds);
+            return;
+        }
         for (int b = 0; b < Boughs; b++)
         {
             var at = BoughOffset(Spec, b);
@@ -184,7 +191,7 @@ public sealed class FoliageSynth
         Spec = spec;
         _rate = sampleRate;
         _sum = new EventSum(sampleRate, seed);
-        places = Math.Clamp(places, 1, 1 + Boughs);
+        places = Math.Clamp(places, 1, ExtendedSources.MaxPlaces);
         _sums = new EventSum[places];
         _sums[0] = _sum;
         for (int k = 1; k < places; k++) _sums[k] = new EventSum(sampleRate, seed * 7919 + k * 104729 + 1);
@@ -340,7 +347,8 @@ public sealed class FoliageSynth
         _shedLevel = SheddingPascals * _shedScale * MathF.Pow(u, 2.5f + Vogel) * MathF.Sqrt(_density);
 
         // The places' shares: events by probability, the shedding's power by gain.
-        if (_sums.Length > 1)
+        // A wood cut at the ear: each piece its crowns' share (FollowCut).
+        if (!FollowCut(dt) && _sums.Length > 1)
         {
             Span<float> shares = stackalloc float[_sums.Length];
             ExtendedSources.Shares(Spread, shares);
@@ -397,11 +405,99 @@ public sealed class FoliageSynth
         }
     }
 
+    // ── A wood's crowns cut at the ear (2026-10-17, docs/FIRE.md 12.13) ─────────────────────────
+
+    /// <summary>
+    /// A wood heard as one (WoodChorus) cut at the listener by the bearings its crowns lie on (ExtendedSources.CutPoints), from
+    /// the client: each piece plays its crowns' share of the wood, its strikes and its shedding. The six boughs stand across
+    /// the wood, each over a run of the pieces (or a share of one), reading the wind where its pieces are, so a gust crosses the
+    /// wood piece by piece. Null: the places shared out by <see cref="Spread"/>, as a tree's.
+    /// </summary>
+    public ExtendedSources.LineCut? Cut;
+    private ExtendedSources.LineCut? _cutBy;
+    private float[]? _share, _shareTarget;
+    /// <summary>Each bough's share of the strikes: a sixth for a tree; under a cut its pieces' share of the wood.</summary>
+    private readonly float[] _boughShare = { 1f / Boughs, 1f / Boughs, 1f / Boughs, 1f / Boughs, 1f / Boughs, 1f / Boughs };
+    /// <summary>Under a cut: the run of pieces [first, first + count) each bough stands over, and how many boughs share each piece.</summary>
+    private readonly int[] _boughFirst = new int[Boughs], _boughCount = new int[Boughs];
+    private readonly int[] _boughsOnPiece = new int[ExtendedSources.MaxPlaces];
+    private Vector2[]? _windWorld;
+
+    /// <summary>How long a piece's share takes to move from one cut to the next, s: the ear moved, not the wood.</summary>
+    public const float RecutGlideSeconds = 0.5f;
+
+    /// <summary>Takes a new cut and moves each place's share toward it; false when there is none (a tree, or a wood not cut).</summary>
+    private bool FollowCut(float dt)
+    {
+        if (!ReferenceEquals(Cut, _cutBy) && Cut?.Area is { Discrete: true }) Recut(Cut);
+        if (_cutBy == null || _share == null || _shareTarget == null) return false;
+        float a = MathF.Min(1f, dt / RecutGlideSeconds);
+        for (int k = 0; k < _share.Length; k++)
+        {
+            _share[k] += (_shareTarget[k] - _share[k]) * a;
+            _placeGainTarget[k] = MathF.Sqrt(MathF.Max(0f, _share[k]));
+        }
+        int n = _cutBy.Count;
+        for (int b = 0; b < Boughs; b++)
+        {
+            float s = 0f;
+            for (int i = _boughFirst[b]; i < _boughFirst[b] + _boughCount[b]; i++)
+                s += _share[Math.Min(_share.Length - 1, _cutBy.PlaceOfPiece(i))];
+            // A piece fewer than the boughs is shared by the boughs over it.
+            _boughShare[b] = n >= Boughs ? s : s / Math.Max(1, _boughsOnPiece[_boughFirst[b]]);
+        }
+        _middleShare = 0f;
+        return true;
+    }
+
+    /// <summary>The boughs over a new cut's pieces, the wind read where they are, and each place's share of the wood to glide to.
+    /// The first cut starts from the wood heard from its middle, as its voice began.</summary>
+    private void Recut(ExtendedSources.LineCut cut)
+    {
+        int places = _sums.Length;
+        if (_share == null)
+        {
+            _share = new float[places];
+            _share[0] = 1f;
+        }
+        _shareTarget ??= new float[places];
+        for (int k = 0; k < places; k++) _shareTarget[k] = cut.ShareOfPlace(k);
+        _cutBy = cut;
+        var area = cut.Area!;
+        int n = Math.Max(1, cut.Count);
+        Array.Clear(_boughsOnPiece);
+        _windWorld ??= new Vector2[Boughs];
+        for (int b = 0; b < Boughs; b++)
+        {
+            if (n >= Boughs) { _boughFirst[b] = b * n / Boughs; _boughCount[b] = (b + 1) * n / Boughs - _boughFirst[b]; }
+            else { _boughFirst[b] = b * n / Boughs; _boughCount[b] = 1; }
+            _boughsOnPiece[Math.Min(_boughsOnPiece.Length - 1, _boughFirst[b])]++;
+            var sum = Vector2.Zero;
+            for (int i = _boughFirst[b]; i < _boughFirst[b] + _boughCount[b]; i++) sum += new Vector2(area.Places[i].At.X, area.Places[i].At.Z);
+            _windWorld[b] = sum / Math.Max(1, _boughCount[b]);
+        }
+    }
+
     /// <summary>The place a strike of bough <paramref name="bough"/> is heard from: the middle by its
-    /// share, otherwise the bough's own side of the crown.</summary>
+    /// share, otherwise the bough's own side of the crown; under a cut, one of the pieces it stands over, by their shares.</summary>
     private EventSum PlaceFor(int bough)
     {
         if (_sums.Length == 1) return _sum;
+        if (_cutBy != null && _share != null)
+        {
+            int first = _boughFirst[bough], count = _boughCount[bough];
+            if (count == 1) return _sums[Math.Min(_sums.Length - 1, _cutBy.PlaceOfPiece(first))];
+            float total = 0f;
+            for (int i = first; i < first + count; i++) total += _share[Math.Min(_share.Length - 1, _cutBy.PlaceOfPiece(i))];
+            float u = _sum.Uniform() * total;
+            for (int i = first; i < first + count; i++)
+            {
+                int p = Math.Min(_sums.Length - 1, _cutBy.PlaceOfPiece(i));
+                u -= _share[p];
+                if (u <= 0f) return _sums[p];
+            }
+            return _sums[Math.Min(_sums.Length - 1, _cutBy.PlaceOfPiece(first + count - 1))];
+        }
         if (_sum.Uniform() < _middleShare) return _sum;
         return _sums[1 + PlaceOfBough(bough, _sums.Length - 1)];
     }
@@ -412,7 +508,7 @@ public sealed class FoliageSynth
         for (int b = 0; b < Boughs; b++)
         {
             float speed = _agitation[b];
-            float strikes = StrikesPerSecond(speed) / Boughs * _density;
+            float strikes = StrikesPerSecond(speed) * _boughShare[b] * _density;
             // The closing speed of two fluttering leaves is a fraction of the wind through them.
             float closing = MathF.Pow(MathF.Max(0f, speed) / 5f, StrikeSpeedPower);
 

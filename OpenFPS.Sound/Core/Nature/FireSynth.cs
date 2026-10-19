@@ -145,6 +145,146 @@ public sealed class FireSynth
     /// from the middle, 1 each part from its own place.</summary>
     public float Spread;
 
+    /// <summary>
+    /// Its burning area cut at the listener (ExtendedSources.CutArea, docs/FIRE.md 12.13), from the client: each body of fire
+    /// is heard from the pieces its own ground lies in, its crackle, its fizz and every event in the bed's voices and its
+    /// roar in the flames' over them. Null: its own places (<see cref="Layout"/>), shared out by <see cref="Spread"/>.
+    /// </summary>
+    public ExtendedSources.LineCut? Cut;
+    private ExtendedSources.LineCut? _cutBy;
+    private float[]? _weightTarget, _roarTarget;
+    /// <summary>Where the wind is read under a cut: each place's piece, east and north.</summary>
+    private Vector2[]? _windWorld;
+    /// <summary>Points spread over each body of fire's own ground (cell-major, cell c's from _subStart[c]), x across and z
+    /// along: the share of it each piece holds is the share of these whose bearing from the ear falls in it.</summary>
+    private float[]? _subX, _subZ;
+    private int[]? _subStart;
+
+    /// <summary>How long a body of fire's share takes to move from the pieces of one cut to the next's, s: the pieces' voices
+    /// move with the ear, and what they play follows over a quarter second rather than at once (a cut is the ear moving, not
+    /// the fire changing).</summary>
+    public const float RecutGlideSeconds = 0.25f;
+
+    /// <summary>The spread the parts are shared out by: all of it under a cut, whose pieces are what merges a far fire.</summary>
+    private float SpreadNow => _cutBy != null ? 1f : Math.Clamp(Spread, 0f, 1f);
+
+    /// <summary>Each body of fire's ground as points: a few by a few over its square of the grid, those inside the shape (a
+    /// single body, a hearth, its whole bed); about four hundred in all.</summary>
+    private void Subsample()
+    {
+        var (nx, nz, _) = CellGrid(Spec);
+        float sx = Spec.AreaWidth / nx, sz = Spec.AreaDepth / nz;
+        // About four hundred points over the whole fire, a grid one a cell. A fire that is one body is a single cell, and
+        // its pieces are thin: a regular grid's rows fall to one side of a piece's bearing and bias its share, so a lone
+        // body is sampled four times as finely with the points placed at random within their cells (no bias).
+        bool lone = _cells.Length == 1;
+        int k = lone ? 32 : Math.Clamp((int)MathF.Ceiling(MathF.Sqrt(400f / _cells.Length)), 3, 20);
+        var outline = Spec.Outline;
+        var xs = new List<float>();
+        var zs = new List<float>();
+        _subStart = new int[_cells.Length + 1];
+        for (int c = 0; c < _cells.Length; c++)
+        {
+            _subStart[c] = xs.Count;
+            for (int i = 0; i < k; i++)
+                for (int j = 0; j < k; j++)
+                {
+                    float ux = lone ? SubJitter(c, i, j, 1) : 0.5f, uz = lone ? SubJitter(c, i, j, 2) : 0.5f;
+                    float x = _cells[c].X + sx * ((i + ux) / k - 0.5f), z = _cells[c].Z + sz * ((j + uz) / k - 0.5f);
+                    if (!outline.Contains(x, z)) continue;
+                    xs.Add(x);
+                    zs.Add(z);
+                }
+            if (xs.Count == _subStart[c]) { xs.Add(_cells[c].X); zs.Add(_cells[c].Z); }
+        }
+        _subStart[^1] = xs.Count;
+        _subX = xs.ToArray();
+        _subZ = zs.ToArray();
+    }
+
+    /// <summary>A sample's phase within its cell, [0, 1), fixed by where it is (a hash, not the synth's own draw, so
+    /// neither the shapes' nor the events' randomness is moved).</summary>
+    private static float SubJitter(int c, int i, int j, int salt)
+    {
+        uint h = (uint)(c * 73856093 ^ i * 19349663 ^ j * 83492791 ^ salt * 2654435761);
+        h ^= h >> 16; h *= 0x7feb352du; h ^= h >> 15; h *= 0x846ca68bu; h ^= h >> 16;
+        return (h & 0xffffffu) * (1f / 0x1000000u);
+    }
+
+    /// <summary>
+    /// Each body of fire's share of each place under a new cut: of its ground, the share whose bearing from the ear falls in
+    /// each piece (its bed's), and in each flame over a run of them (its roar's). The first cut starts from the fire heard
+    /// from its middle, as its voice began; each later from the last, and the shares glide there.
+    /// </summary>
+    private void Recut(ExtendedSources.LineCut cut)
+    {
+        var area = cut.Area!;
+        int places = _sums.Length;
+        if (_cutBy == null)
+        {
+            Array.Clear(_weights);
+            Array.Clear(_roarWeights);
+            for (int c = 0; c < _cells.Length; c++) _weights[c * places] = _roarWeights[c * places] = 1f;
+        }
+        _cutBy = cut;
+        _weightTarget ??= new float[_weights.Length];
+        _roarTarget ??= new float[_roarWeights.Length];
+        Array.Clear(_weightTarget);
+        Array.Clear(_roarTarget);
+        if (_subX == null) Subsample();
+        int n = cut.Count, flames = area.Flames;
+        for (int c = 0; c < _cells.Length; c++)
+        {
+            int from = _subStart![c], to = _subStart[c + 1];
+            float each = 1f / (to - from);
+            for (int s = from; s < to; s++)
+            {
+                var at = area.Origin + Vector3.Transform(new Vector3(_subX![s], 0f, _subZ![s]), area.Turn);
+                int piece = area.PieceOf(new Vector2(at.X, at.Z), cut.Edges);
+                int p = Math.Min(places - 1, cut.PlaceOfPiece(piece));
+                _weightTarget[c * places + p] += each;
+                int rp = flames > 0 ? n + ExtendedSources.FlameOfPiece(n, flames, piece) : p;
+                _roarTarget[c * places + (rp < places ? rp : p)] += each;
+            }
+            float best = -1f;
+            for (int p = 0; p < places; p++)
+                if (_weightTarget[c * places + p] > best) { best = _weightTarget[c * places + p]; _cells[c].NearestPlace = p; }
+        }
+        // The wind at each place: its piece's middle, and a flame's over its run.
+        _windWorld ??= new Vector2[places];
+        for (int p = 0; p < places && p < cut.Places; p++)
+        {
+            if (p < n)
+            {
+                var at = area.Places[cut.PieceOfPlace(p)].At;
+                _windWorld[p] = new Vector2(at.X, at.Z);
+                continue;
+            }
+            var (f, t) = ExtendedSources.FlameRun(n, flames, p - n);
+            var sum = Vector2.Zero;
+            for (int i = f; i < t; i++) sum += new Vector2(area.Places[i].At.X, area.Places[i].At.Z);
+            _windWorld[p] = sum / Math.Max(1, t - f);
+        }
+        for (int p = cut.Places; p < places; p++) _windWorld[p] = _windWorld[0];
+    }
+
+    /// <summary>Body <paramref name="cell"/>'s share of place <paramref name="place"/> now: of its crackle, fizz and events
+    /// (its bed's), or of its roar.</summary>
+    internal float ShareOf(int cell, int place, bool roar = false) => (roar ? _roarWeights : _weights)[cell * _sums.Length + place];
+
+    /// <summary>A new cut taken, and each body of fire's shares moved toward it.</summary>
+    private void FollowCut(float dt)
+    {
+        if (!ReferenceEquals(Cut, _cutBy) && Cut?.Area is { Discrete: false }) Recut(Cut);
+        if (_weightTarget == null || _roarTarget == null) return;
+        float a = MathF.Min(1f, dt / RecutGlideSeconds);
+        for (int i = 0; i < _weights.Length; i++)
+        {
+            _weights[i] += (_weightTarget[i] - _weights[i]) * a;
+            _roarWeights[i] += (_roarTarget[i] - _roarWeights[i]) * a;
+        }
+    }
+
     public bool Lit = true;
 
     /// <summary>Seconds since it was lit, or NaN for a fire that has always been burning.</summary>
@@ -164,6 +304,13 @@ public sealed class FireSynth
     /// <summary>Reads the wind field at each place, the fire's middle at (x, z).</summary>
     public void ReadWind(WindWeather wind, float x, float z, double seconds)
     {
+        // Cut: where each place's piece is.
+        if (_windWorld != null)
+        {
+            for (int p = 0; p < _windAt.Length; p++)
+                _windAt[p] = WindField.SpeedAt(wind, _windWorld[p].X, Spec.FlameHeightMetres, _windWorld[p].Y, seconds);
+            return;
+        }
         for (int p = 0; p < _windAt.Length; p++)
             _windAt[p] = WindField.SpeedAt(wind, x + _layout[p].X, Spec.FlameHeightMetres, z + _layout[p].Z, seconds);
     }
@@ -650,6 +797,7 @@ public sealed class FireSynth
 
     public void Control(float dt)
     {
+        FollowCut(dt);
         _clock += dt;
         _burn += Math.Clamp((Lit ? 1f : 0f) - _burn, -dt / 20f, dt / 5f);
         // Water takes the flames' heat over the fuel surface's own time, seconds, not at once.
@@ -672,7 +820,7 @@ public sealed class FireSynth
         }
 
         // The places' share of what is not theirs: merged, everything is heard from the middle.
-        float s = Math.Clamp(Spread, 0f, 1f);
+        float s = SpreadNow;
         for (int p = 0; p < places; p++) _crackleRateAt[p] = 0f;
 
         float total = 0f;
@@ -907,7 +1055,7 @@ public sealed class FireSynth
     {
         int places = _sums.Length;
         if (places == 1) return 0;
-        float s = Math.Clamp(Spread, 0f, 1f);
+        float s = SpreadNow;
         if (_sum.Uniform() >= s) return 0;
         float u = _sum.Uniform(), acc = 0f;
         for (int p = 0; p < places; p++)
@@ -972,7 +1120,7 @@ public sealed class FireSynth
     private void Puff()
     {
         int places = _sums.Length;
-        float s = Math.Clamp(Spread, 0f, 1f);
+        float s = SpreadNow;
         Span<float> power = stackalloc float[places];
         Span<float> fizzPower = stackalloc float[places];
         for (int c = 0; c < _cells.Length; c++)

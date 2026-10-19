@@ -76,7 +76,7 @@ public class WideSourcesTests
     }
 
     [Fact]
-    public void TreesFiresAndFountainTapsHavePlacesAndNothingElseDoes()
+    public void TreesAndFountainTapsHavePlacesFiresAndWoodsAreCutAndNothingElseDoes()
     {
         var tree = Wide.Layout("foliage:park_tree", ModelLibrary.Presets)!;
         Assert.Equal(1 + ExtendedSources.TreePlaces, tree.Length);
@@ -84,8 +84,15 @@ public class WideSourcesTests
         float reach = ExtendedSources.Reach(tree);
         _o.WriteLine($"tree: {tree.Length} places, reach {reach:F2} m");
         Assert.InRange(reach, 2f, FoliageSpec.ParkTree.CrownRadiusMetres);
-        // The bed's places and the flames' above them (docs/FIRE.md 12.2).
-        Assert.Equal(1 + ExtendedSources.FirePlaces + FireSynth.FlamePlaces, Wide.Layout("fire:fire_pit", ModelLibrary.Presets)!.Length);
+        // A fire's burning area and a wood's crowns are cut at the ear (docs/FIRE.md 12.13); laid out, as the old rule lays
+        // them, the bed's places and the flames' above them (12.2).
+        Assert.Null(Wide.Layout("fire:fire_pit", ModelLibrary.Presets));
+        Assert.True(Wide.IsFire("fire:fire_pit") && Wide.IsArea("fire:fire_pit") && Wide.IsCut("fire:fire_pit", ModelLibrary.Presets));
+        Assert.Null(Wide.Layout("wood:park_tree@60x40", ModelLibrary.Presets));
+        Assert.True(Wide.IsWood("wood:park_tree@60x40"));
+        var old = new OpenFPS.Sound.Core.Nature.WideSources { Rule = ExtendedSources.PlaceRule.Middle };
+        Assert.False(old.IsFire("fire:fire_pit"));
+        Assert.Equal(1 + ExtendedSources.FirePlaces + FireSynth.FlamePlaces, old.Layout("fire:fire_pit", ModelLibrary.Presets)!.Length);
         Assert.Equal(1 + ExtendedSources.WaterTapPlaces, Wide.Layout("water:park_fountain/elm_park/3", ModelLibrary.Presets)!.Length);
         Assert.Null(Wide.Layout("water:park_fountain", ModelLibrary.Presets));
         Assert.Null(Wide.Layout("machine:ac_window", ModelLibrary.Presets));
@@ -96,16 +103,16 @@ public class WideSourcesTests
     /// Each place is as loud as what it carries, by the mixer's own law (Loudness.RenderedGain) from where it is,
     /// at its share of the source (2026-10-16: no gain any more holds them to the source heard from its middle,
     /// which beside a line of creek made the level rise and fall 10 dB a stretch). A tree, the fire pit and a
-    /// fountain's tap are smaller than their extent, so this moves them under half a decibel at 1, 5 and 20 m.
+    /// fountain's tap are smaller than their extent, so this moves them under half a decibel at 1, 5 and 20 m. (A fire is cut
+    /// at the ear now, its pieces the law over its bed: FireAndWoodCutTests.)
     /// </summary>
     [Fact]
-    public void EachPlaceIsAsLoudAsItsShareAndATreeAFireAndATapMoveUnderHalfADecibel()
+    public void EachPlaceIsAsLoudAsItsShareAndATreeAndATapMoveUnderHalfADecibel()
     {
         var tap = ModelLibrary.Presets.Water("park_fountain");
         foreach (var (key, middle, levelDb, extent) in new[]
         {
             ("foliage:park_tree", new Vector3(0f, 7f, 0f), FoliageSpec.ParkTree.SourceLevelDb, FoliageSpec.ParkTree.ExtentMetres),
-            ("fire:fire_pit", new Vector3(0f, 0.6f, 0f), FireSpec.GardenFirePit.SourceLevelDb, FireSpec.GardenFirePit.ExtentMetres),
             ("water:park_fountain/elm_park/1", new Vector3(0f, 0.8f, 0f), tap.SourceLevelDb, tap.Taps[1].ExtentMetres),
         })
         {

@@ -341,6 +341,7 @@ OpenFPS.Sound/Core/MixSettings.cs	lib	Sound
 OpenFPS.Sound/Core/Nature/EarWindSynth.cs	lib	Sound	
 OpenFPS.Sound/Core/Nature/EventSum.cs	lib	Sound	
 OpenFPS.Sound/Core/Nature/ExtendedSources.Area.cs	lib	Sound	
+OpenFPS.Sound/Core/Nature/ExtendedSources.Parts.cs	lib	Sound	
 OpenFPS.Sound/Core/Nature/ExtendedSources.cs	lib	Sound	
 OpenFPS.Sound/Core/Nature/FallingWaterSynth.cs	lib	Sound	
 OpenFPS.Sound/Core/Nature/FireReferences.cs	lib	Sound	

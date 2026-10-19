@@ -290,6 +290,10 @@ public static partial class ExtendedSources
         public int Count => Edges.Length - 1;
         public float Length => Edges[^1] - Edges[0];
 
+        /// <summary>How many voices it is heard from: a voice a piece, and a fire's flames over them (AreaPieces.Flames), the
+        /// places after the pieces'.</summary>
+        public int Places => Count + (Area?.Flames ?? 0);
+
         /// <summary>The path it was cut along, when it was cut along one (<see cref="Cut(LinePath, Vector3, int, float)"/>,
         /// <see cref="Whole(LinePath)"/>): what a shore's synth reads where its water lies from, piece by piece.</summary>
         public LinePath? Path { get; init; }
@@ -337,10 +341,23 @@ public static partial class ExtendedSources
         /// all along, its share of the power.</summary>
         public float ShareOfPlace(int place)
         {
-            if (place < 0 || place >= Count || Length <= 0f) return 0f;
+            if (place < 0 || place >= Places) return 0f;
+            // An area's piece: its share of the surface (of a wood, of its crowns); a fire's bed and its flames each half.
+            if (Area is { } area)
+            {
+                float total = area.TotalArea;
+                if (!(total > 0f)) return 0f;
+                if (place >= Count)
+                {
+                    var (from, to) = FlameRun(Count, area.Flames, place - Count);
+                    float run = 0f;
+                    for (int k = from; k < to; k++) run += area.PieceArea[k];
+                    return HeardFlameShare * run / total;
+                }
+                return (area.Flames > 0 ? 1f - HeardFlameShare : 1f) * area.PieceArea[PieceOfPlace(place)] / total;
+            }
+            if (Length <= 0f) return 0f;
             int i = PieceOfPlace(place);
-            // An area's piece: its share of the surface.
-            if (Area is { } area) return area.TotalArea > 0f ? area.PieceArea[i] / area.TotalArea : 0f;
             return (Edges[i + 1] - Edges[i]) / Length;
         }
 

@@ -2666,13 +2666,16 @@ public partial class FmodAudioProvider : IAudioProvider
             if (shared == null || emitter.Place <= 0 || emitter.Place >= shared.Places) return null;
             return new NaturePlaceState(shared, emitter.Place, rate, emitter.Position);
         }
-        int places = Options.WideSources.Layout(emitter.PhysicalKey, ModelLibrary.Presets)?.Length ?? 1;
+        // A fire's burning area and a wood's crowns cut at the ear: a stream for every piece they can be cut into, each made
+        // when it first sounds; the cut, when the client has made one, from the start.
+        bool cut = Options.WideSources.IsFire(emitter.PhysicalKey) || Options.WideSources.IsWood(emitter.PhysicalKey);
+        int places = cut ? ExtendedSources.MaxPlaces : Options.WideSources.Layout(emitter.PhysicalKey, ModelLibrary.Presets)?.Length ?? 1;
         PlacedNatureVoice voice = kind == OpenFPS.Models.ModelSynth.Shore
             ? ShoreVoice(emitter, rate)
             : kind == OpenFPS.Models.ModelSynth.Wood && OpenFPS.Sound.WoodChorus.ParseKey(emitter.PhysicalKey, out string woodPreset, out _, out _)
             ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Models.ModelLibrary.Presets.Foliage(woodPreset), places, rate,
                                     emitter.Seed * 43 + 17, emitter.Position, Weather)
-              { WindPlaces = Options.WideSources.Layout(emitter.PhysicalKey, ModelLibrary.Presets)?[1..], TargetTrees = emitter.Trees }
+              { WindPlaces = Options.WideSources.Layout(emitter.PhysicalKey, ModelLibrary.Presets)?[1..], TargetTrees = emitter.Trees, Wood = true }
             : kind == OpenFPS.Models.ModelSynth.Flow
             ? new PlacedNatureVoice(emitter.PhysicalKey, OpenFPS.Models.ModelLibrary.Presets.Flow(preset), rate,
                                     emitter.Seed * 47 + 19, emitter.Position, Weather, Options.WideSources) { TargetCut = PiecesOf(emitter.EntityId) }
@@ -2683,6 +2686,7 @@ public partial class FmodAudioProvider : IAudioProvider
                                     emitter.Seed * 43 + 17, emitter.Position, Weather);
         voice.TargetSpread = emitter.Spread;
         voice.TargetQuench = emitter.Quench;
+        if (cut) voice.TargetCut = PiecesOf(emitter.EntityId);
         if (voice.Fire != null) voice.Fire.Hearing = Hearing;
         if (voice.Flow != null) voice.Flow.Lab = Lab;
         return new NaturePlaceState(voice, 0, rate, emitter.Position);
@@ -3771,7 +3775,7 @@ public partial class FmodAudioProvider : IAudioProvider
                         // trees it stands for now (WoodChorus).
                         middle.Shared.TargetSpread = emitter.Spread;
                         middle.Shared.TargetQuench = emitter.Quench;
-                        if (middle.Shared.WindPlaces != null) middle.Shared.TargetTrees = emitter.Trees;
+                        if (middle.Shared.Wood) middle.Shared.TargetTrees = emitter.Trees;
                     }
                     else if (active.MachineState is WaterTapState { Place: 0 } tapMiddle)
                     {

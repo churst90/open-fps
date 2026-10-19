@@ -1893,10 +1893,26 @@ public partial class AudioWorld
             {
                 // A line: as many pieces as the angle it covers here asks for, the rest of it merged.
                 if (!_cutting.TryGetValue(id, out var c)) _cutting[id] = c = new Cutting();
-                // An open water's surface: by the angle it covers, all round from over it.
-                c.Wanted = _audio.Options.WideSources.IsOpenWater(key)
+                // An open water's surface and a fire's burning area: by the angle it covers, all round from over it.
+                c.Wanted = _audio.Options.WideSources.IsArea(key)
                     ? OpenFPS.Sound.Core.Nature.ExtendedSources.WantedAreaPieces(path, eyePos, c.Wanted)
                     : OpenFPS.Sound.Core.Nature.ExtendedSources.WantedPieces(path, eyePos, c.Wanted);
+                c.Count = 1;
+                // A fire's flames over its pieces are voices too, all together within one source's voices.
+                int voices = _audio.Options.WideSources.IsFire(key)
+                    ? Math.Min(c.Wanted + OpenFPS.Sound.Core.Nature.ExtendedSources.FlamesFor(c.Wanted), OpenFPS.Sound.Core.Nature.ExtendedSources.MaxPlaces)
+                    : c.Wanted;
+                if (voices > 1) _placeCandidates.Add((-_heardInRanking.GetValueOrDefault(id), id, voices - 1));
+                continue;
+            }
+            if (_audio.Options.WideSources.IsWood(key))
+            {
+                // A wood: as many pieces as the angle its crowns cover here asks for.
+                if (!_cutting.TryGetValue(id, out var c)) _cutting[id] = c = new Cutting();
+                CrownsOf(id, _crownPoints, _crownWeights);
+                c.Wanted = OpenFPS.Sound.Core.Nature.ExtendedSources.WantedPointPieces(
+                    System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_crownPoints),
+                    System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_crownWeights), eyePos, c.Wanted);
                 c.Count = 1;
                 if (c.Wanted > 1) _placeCandidates.Add((-_heardInRanking.GetValueOrDefault(id), id, c.Wanted - 1));
                 continue;
@@ -1929,7 +1945,7 @@ public partial class AudioWorld
         if (LinePathOf(src, key) is not { } path || distance > 2f * path.Length) return 1f;
         float point = MathF.Min(1f, MathF.Max(0.1f, reference) / MathF.Max(1e-3f, distance));
         // An open water's surface by the law over its area.
-        if (_audio.Options.WideSources.IsOpenWater(key))
+        if (_audio.Options.WideSources.IsArea(key))
             return MathF.Sqrt(OpenFPS.Sound.Core.Nature.ExtendedSources.AreaMeanLawPower(path, eyePos, reference)) / point;
         return MathF.Sqrt(OpenFPS.Sound.Core.Nature.ExtendedSources.MeanLawPower(path, eyePos, reference)) / point;
     }
@@ -1937,13 +1953,19 @@ public partial class AudioWorld
     // ── A line's own path (SoundEmitterComponent.Line, 2026-10-17) ───────────────────────────────
 
     private sealed record LinePathEntry(Vector3 Position, Quaternion Rotation, Vector3[]? Line, float Length,
-                                        OpenFPS.Sound.Core.Nature.LinePath Path);
+                                        OpenFPS.Sound.Core.Nature.LinePath Path)
+    {
+        /// <summary>A fire's key, which carries its shape.</summary>
+        public string? Key { get; init; }
+    }
     private readonly Dictionary<int, LinePathEntry> _linePaths = new();
 
     /// <summary>The path a line source is heard along (its spec's own line, or straight along its x), kept while it
     /// stands where it stood; null for anything that is not a line this world cuts.</summary>
     private OpenFPS.Sound.Core.Nature.LinePath? LinePathOf(AudioSource src, string key)
     {
+        // A fire's burning area: its shape's outline round its bed.
+        if (_audio.Options.WideSources.IsFire(key)) return FireOutlineOf(src, key);
         float length = _audio.Options.WideSources.LineLength(key, ModelLibrary.Presets);
         var line = src.Spec.Line;
         // Running water along a line (its own, or straight along its x), or a shore's whole outline.
@@ -1960,15 +1982,35 @@ public partial class AudioWorld
         return path;
     }
 
+    /// <summary>
+    /// The outline of the ground a fire burns over (ExtendedSources.FireOutline), at its bed, turned and moved by its emitter:
+    /// what its burning area is cut over at the ear. Kept while it stands where it stood and burns the same shape.
+    /// </summary>
+    private OpenFPS.Sound.Core.Nature.LinePath? FireOutlineOf(AudioSource src, string key)
+    {
+        var at = src.Emission;
+        var turn = src.State.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : src.State.Rotation;
+        if (_linePaths.TryGetValue(src.Id, out var known) && known.Position == at && known.Rotation == turn && known.Key == key)
+            return known.Path;
+        OpenFPS.Environment.FireSpec spec;
+        try { spec = ModelLibrary.Presets.Fire(key[5..]); }
+        catch (Exception) { return null; }
+        var path = OpenFPS.Sound.Core.Nature.ExtendedSources.FireOutline(spec.Outline, at, turn);
+        _linePaths[src.Id] = new LinePathEntry(at, turn, null, -1f, path) { Key = key };
+        return path;
+    }
+
     /// <summary>Where a source is heard from first, for its path and its distance: a line's point nearest the ear (stood
     /// beside its near part, whatever its middle is behind), anything else its emission point.</summary>
     private Vector3 HeardPoint(AudioSource src, Vector3 ear, out bool alongLine)
     {
         string? key = src.Spec.IsSynth ? VoiceKey(src.Spec) : null;
-        var path = key != null ? LinePathOf(src, key) : null;
+        // A fire is asked about from the middle of its bed, as before it was cut: its own collider is its bed, and a probe on
+        // its edge would be asked through it. Its pieces share that path until each has its own (todo.md, a path per piece).
+        var path = key != null && !_audio.Options.WideSources.IsFire(key) ? LinePathOf(src, key) : null;
         alongLine = path != null;
         // Over an open water, the water is under you.
-        if (path != null && _audio.Options.WideSources.IsOpenWater(key)
+        if (path != null && _audio.Options.WideSources.IsArea(key)
             && OpenFPS.Sound.Core.Nature.ExtendedSources.Inside(path, new Vector2(ear.X, ear.Z)))
             return ear with { Y = path.Points[0].Y };
         return path != null ? path.Nearest(ear, out _) : src.Emission;
@@ -2089,6 +2131,11 @@ public partial class AudioWorld
         public int Voiced = 1;
         public double FewerSince = double.NaN;
         public long Frame;
+        /// <summary>A wood's: the woods its crowns were taken from, and each crown's share of the wood when it was cut.</summary>
+        public OpenFPS.Sound.WoodChorus? Woods;
+        public float[] CutWeights = Array.Empty<float>();
+        /// <summary>How many pieces a wood was cut into, asked: a run of bearings with no crown in it is given to its neighbour.</summary>
+        public int Asked;
     }
     private readonly Dictionary<int, Cutting> _cutting = new();
 
@@ -2102,14 +2149,18 @@ public partial class AudioWorld
         if (!_cutting.TryGetValue(src.Id, out var c)) _cutting[src.Id] = c = new Cutting();
         c.Frame = _spreadFrame;
         c.Base = e;
-        int n = Math.Max(1, c.Count);
+        // A fire's voices are its bed's pieces and its flames over them.
+        bool fire = _audio.Options.WideSources.IsFire(e.PhysicalKey);
+        int n = fire ? OpenFPS.Sound.Core.Nature.ExtendedSources.BedPiecesFor(Math.Max(1, c.Count)) : Math.Max(1, c.Count);
         // A banked bed's whole line is cut again as the ear moves too: its lanes are heard from where it was cut. An open
-        // water's surface is cut by the bearings it covers, its places worked out with the cut (ExtendedSources.CutArea).
-        bool area = _audio.Options.WideSources.IsOpenWater(e.PhysicalKey);
+        // water's surface and a fire's burning area are cut by the bearings they cover, their places worked out with the cut
+        // (ExtendedSources.CutArea).
+        bool area = _audio.Options.WideSources.IsArea(e.PhysicalKey);
         if (c.Cut == null || c.Cut.Count != n || !ReferenceEquals(c.Path, path)
             || (n > 1 || path.Banked || area) && Vector3.Distance(eyePos, c.CutAt) > c.Cut.RecutMetres)
         {
-            c.Cut = area ? OpenFPS.Sound.Core.Nature.ExtendedSources.CutArea(path, eyePos, n, e.MinDistance)
+            c.Cut = fire ? FireCut(src, path, eyePos, n, e)
+                  : area ? OpenFPS.Sound.Core.Nature.ExtendedSources.CutArea(path, eyePos, n, e.MinDistance)
                   : n == 1 && !path.Banked ? OpenFPS.Sound.Core.Nature.ExtendedSources.Whole(path)
                   : OpenFPS.Sound.Core.Nature.ExtendedSources.Cut(path, eyePos, n, e.MinDistance);
             c.CutAt = eyePos;
@@ -2121,14 +2172,90 @@ public partial class AudioWorld
         return c;
     }
 
+    /// <summary>A fire's burning area cut at the ear into <paramref name="pieces"/> of its bed and the flames over them, in its
+    /// own frame, so its synth finds where each of its bodies of fire is (docs/FIRE.md 12.13).</summary>
+    private static OpenFPS.Sound.Core.Nature.ExtendedSources.LineCut FireCut(AudioSource src, OpenFPS.Sound.Core.Nature.LinePath outline,
+                                                                            Vector3 eyePos, int pieces, in SpatialEmitter e)
+    {
+        float rise = 0f;
+        try { rise = ModelLibrary.Presets.Fire(e.PhysicalKey[5..]).RoarRiseMetres; }
+        catch (Exception) { }
+        var turn = src.State.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : src.State.Rotation;
+        return OpenFPS.Sound.Core.Nature.ExtendedSources.CutArea(outline, eyePos, pieces, e.MinDistance, true,
+                                                                 OpenFPS.Sound.Core.Nature.ExtendedSources.FlamesFor(pieces), rise, src.Emission, turn);
+    }
+
+    // What a wood's crowns are, gathered again each frame for the wood being cut or chosen.
+    private readonly List<Vector3> _crownPoints = new();
+    private readonly List<float> _crownWeights = new();
+
+    /// <summary>The crowns of wood <paramref name="woodId"/> (WoodChorus) and each one's share of itself heard in the wood now
+    /// (WoodChorus.Weigh, this frame's).</summary>
+    private void CrownsOf(int woodId, List<Vector3> points, List<float> weights)
+    {
+        points.Clear();
+        weights.Clear();
+        if (_sources.Woods is not { } woods) return;
+        var inWood = _woodWeights.InWood;
+        foreach (var w in woods.Woods)
+        {
+            if (w.Id != woodId) continue;
+            foreach (int i in w.Crowns)
+            {
+                points.Add(woods.Crowns[i].At);
+                weights.Add(i < inWood.Length ? inWood[i] : 0f);
+            }
+            return;
+        }
+    }
+
+    /// <summary>
+    /// A wood cut at the ear by the bearings its crowns lie on (ExtendedSources.CutPoints): as many pieces as the place
+    /// budget gave it, each as loud as its crowns each at its own distance, handed to its synth when they change. Cut again
+    /// when the ear has moved a tenth of the way to its nearest crown, or when the crowns' shares of it have moved a tenth
+    /// (a tree near you taking a voice of its own leaves the wood). A few hundred distances, on this thread.
+    /// </summary>
+    private Cutting CutWood(AudioSource src, ref SpatialEmitter e, Vector3 eyePos)
+    {
+        if (!_cutting.TryGetValue(src.Id, out var c)) _cutting[src.Id] = c = new Cutting();
+        c.Frame = _spreadFrame;
+        c.Base = e;
+        int n = Math.Max(1, c.Count);
+        CrownsOf(src.Id, _crownPoints, _crownWeights);
+        var points = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_crownPoints);
+        var weights = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_crownWeights);
+        bool moved = c.CutWeights.Length != weights.Length;
+        if (!moved)
+        {
+            double change = 0, total = 0;
+            for (int k = 0; k < weights.Length; k++) { change += MathF.Abs(weights[k] - c.CutWeights[k]); total += c.CutWeights[k]; }
+            moved = change > 0.1 * Math.Max(total, 1e-3);
+        }
+        if (c.Cut == null || c.Asked != n || moved || !ReferenceEquals(c.Woods, _sources.Woods)
+            || Vector3.Distance(eyePos, c.CutAt) > c.Cut.RecutMetres)
+        {
+            c.Cut = OpenFPS.Sound.Core.Nature.ExtendedSources.CutPoints(points, weights, eyePos, n, e.MinDistance);
+            c.Asked = n;
+            c.CutAt = eyePos;
+            c.CutWeights = weights.ToArray();
+            c.Woods = _sources.Woods;
+            _audio.PlanPieces(e.EntityId, c.Cut);
+        }
+        c.Path = null;
+        PlacePiece(ref e, c, eyePos, 0);
+        e.Spread = 0f;
+        return c;
+    }
+
     /// <summary>One place of a cut line: at its piece's centroid, at the gain that makes it as loud as its piece.
     /// Returns where along the line it is, m from the middle.</summary>
     private static float PlacePiece(ref SpatialEmitter e, Cutting c, Vector3 eyePos, int place)
     {
         var cut = c.Cut!;
-        int i = cut.PieceOfPlace(place);
-        // An open water's piece: its bearings from the cut, integrated from where the ear is now, so it glides between cuts.
-        var p = cut.Area != null ? OpenFPS.Sound.Core.Nature.ExtendedSources.PlaceArea(cut, eyePos, i, c.Base.MinDistance)
+        int i = Math.Min(cut.PieceOfPlace(Math.Min(place, cut.Count - 1)), cut.Count - 1);
+        // An area's piece (an open water's, a fire's bed's, a fire's flames over a run of them, a wood's crowns): its bearings
+        // from the cut, the law over it from where the ear is now, so it glides between cuts.
+        var p = cut.Area != null ? OpenFPS.Sound.Core.Nature.ExtendedSources.PlaceOfArea(cut, eyePos, place, c.Base.MinDistance)
               : OpenFPS.Sound.Core.Nature.ExtendedSources.Place(c.Path!, eyePos, cut.Edges[i], cut.Edges[i + 1], c.Base.MinDistance);
         var offset = p.At - c.Base.Position;
         e.Position = p.At;
@@ -2140,12 +2267,19 @@ public partial class AudioWorld
     /// <summary>
     /// The other pieces of a cut line, each a voice at its own point reading its own stream of the one synth: every
     /// event in the piece it happens in, never a copy. Places the cut no longer has keep their last placing for
-    /// <see cref="MergeHoldSeconds"/>, so what was rendered into them rings out, and are then let go.
+    /// <see cref="MergeHoldSeconds"/>, so what was rendered into them rings out, and are then let go. A wood's
+    /// pieces name its middle voice (<see cref="SpatialEmitter.PlaceOfEntity"/>); while the budget holds that voice
+    /// back (<paramref name="wood"/>), its pieces are held back with it, so no piece names a voice that is not playing.
     /// </summary>
-    private void PlacePieces(int sourceId, Cutting c, in SpatialEmitter middle, IAcousticWorld world, Vector3 eyePos, double now)
+    private void PlacePieces(int sourceId, Cutting c, in SpatialEmitter middle, IAcousticWorld world, Vector3 eyePos, double now, bool wood)
     {
         var cut = c.Cut!;
-        for (int k = 1; k < cut.Count; k++)
+        if (wood && !_audio.IsPlaying(middle.EntityId))
+        {
+            if (c.Voiced > 1) StopPieces(sourceId, c, 1);
+            return;
+        }
+        for (int k = 1; k < cut.Places; k++)
         {
             var e = middle;
             float along = PlacePiece(ref e, c, eyePos, k);
@@ -2161,9 +2295,9 @@ public partial class AudioWorld
             _voices.Declare(e.EntityId, sourceId, VoiceKind.Place, new Vector3(along, 0f, 0f), e.EarLevelDb);
             _voices.Sound(e);
         }
-        if (cut.Count >= c.Voiced) { c.Voiced = cut.Count; c.FewerSince = double.NaN; return; }
+        if (cut.Places >= c.Voiced) { c.Voiced = cut.Places; c.FewerSince = double.NaN; return; }
         if (double.IsNaN(c.FewerSince)) c.FewerSince = now;
-        else if (now - c.FewerSince >= MergeHoldSeconds) StopPieces(sourceId, c, cut.Count);
+        else if (now - c.FewerSince >= MergeHoldSeconds) StopPieces(sourceId, c, cut.Places);
     }
 
     /// <summary>What a walk hears of some sources at one point (the tests and AudioLab --extent-walk).</summary>
@@ -2210,7 +2344,7 @@ public partial class AudioWorld
         var middle = e;
         if (e.PlaceOfEntity != 0 && !latest.TryGetValue(e.PlaceOfEntity, out middle)) return 0f;
         if (pieces.TryGetValue(middle.EntityId, out var cut)) return cut.ShareOfPlace(e.Place);
-        if (wide.LineLength(middle.PhysicalKey, ModelLibrary.Presets) > 0f || wide.IsOutline(middle.PhysicalKey) || wide.IsOpenWater(middle.PhysicalKey))
+        if (wide.IsCut(middle.PhysicalKey, ModelLibrary.Presets))
             return e.Place == 0 ? 1f : 0f;
         var layout = wide.Layout(middle.PhysicalKey, ModelLibrary.Presets);
         if (layout == null) return 1f;
@@ -2866,6 +3000,8 @@ public partial class AudioWorld
         Vector3[]? extentLayout = null;
         // Running water along a line: cut into pieces at the ear (ExtendedSources.Cut); the path it runs along, or none.
         OpenFPS.Sound.Core.Nature.LinePath? linePath = null;
+        // A wood heard as one, cut at the ear by its crowns (CutWood).
+        bool woodCut = false;
         float chorusTrees = 1f;
         // The declared level, for the ear model; 0 for an authored source with only a volume.
         float earLevel = 0f;
@@ -2898,6 +3034,11 @@ public partial class AudioWorld
                 if (!PhysicalLevel(resolvedSoundId, out float levelDb, out float extent)) return;
                 physicalKey = PhysicalKeyOf(src, resolvedSoundId);
                 var physicalSynth = OpenFPS.Models.ModelKindTable.KindOf(resolvedSoundId)!.Synth;
+                // A wood cut at the ear by its crowns: each piece is its crowns heard by one crown's own law (its size, not
+                // the wood's), as each tree would be (CutWood).
+                woodCut = _audio.Options.WideSources.IsWood(physicalKey);
+                if (woodCut && OpenFPS.Sound.WoodChorus.ParseKey(physicalKey, out string woodPreset, out _, out _))
+                    extent = ModelLibrary.Presets.Foliage(woodPreset).ExtentMetres;
                 // Placed by its declared level and size: inside its extent the level is flat, and the
                 // gain is paid down so the far field is unchanged (Loudness.Widen; widening without
                 // paying once handed every quiet vehicle eight decibels).
@@ -2906,8 +3047,10 @@ public partial class AudioWorld
                 // difference back, so it is placed by its level and not its peaks.
                 headroomGain = OpenFPS.Audio.Fmod.PhysicalVoiceState.HeadroomGain(PhysicalHeadroom(resolvedSoundId));
                 engineVolume = gain * spec.Volume * headroomGain;
-                // A tree's share of itself, or a wood's gain (its synth renders its trees: WoodChorus).
-                engineVolume *= ChorusShare(src.Id, out chorusTrees);
+                // A tree's share of itself, or a wood's gain (its synth renders its trees: WoodChorus). A wood cut at the ear
+                // by its crowns has its pieces' gains instead, each its crowns' law (CutWood).
+                float chorusGain = ChorusShare(src.Id, out chorusTrees);
+                if (!woodCut) engineVolume *= chorusGain;
                 engineMinDistance = reference;
                 engineExtent = extent;
                 engineRange = MathF.Max(engineRange, _audio.Hearing.AudibleRange(levelDb));
@@ -3171,16 +3314,18 @@ public partial class AudioWorld
         // The road under a machine hands its sound back a moment later; see GroundReflection. Engines and
         // physical models only: a sustained recording (a PA's speech) gets none, as speech flanged with
         // one (docs/CLIENT_NOTES.md, "Speech has no ground reflection").
-        Cutting? cutting = linePath != null ? CutOf(src, linePath, ref emitter, eyePos) : null;
+        Cutting? cutting = linePath != null ? CutOf(src, linePath, ref emitter, eyePos) : woodCut ? CutWood(src, ref emitter, eyePos) : null;
         long groundAt = System.Diagnostics.Stopwatch.GetTimestamp();
         if (engineKey.Length > 0 || physicalKey.Length > 0) ApplyGround(ref emitter, world);
         _partMs[1] += Ms(groundAt);
         Spreading? spreading = extentLayout != null ? SpreadOf(src, extentLayout, ref emitter, eyePos, engineDt, now) : null;
         _placed[src.Id] = (emitter.Volume, emitter.MinDistance, emitter.Range);
+        // Every middle goes to the budget; a wood's pieces follow it (PlacePieces), so a wood the budget holds while
+        // its pieces still sound cannot leave its pieces naming a voice that is not playing.
         _voices.Submit(emitter);
         // ...and its other places, after its middle, so the synth they read already exists.
         if (spreading != null) PlaceOuter(src.Id, spreading, emitter, world, now);
-        if (cutting != null) PlacePieces(src.Id, cutting, emitter, world, eyePos, now);
+        if (cutting != null) PlacePieces(src.Id, cutting, emitter, world, eyePos, now, woodCut);
 
         // The front outlet, after the machine's own voice so a just-built engine exists for the tap.
         if (engineKey.Length > 0 && _frontVoiced.Contains(src.Id))

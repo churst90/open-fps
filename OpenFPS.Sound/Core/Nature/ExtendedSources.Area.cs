@@ -33,8 +33,45 @@ public sealed class AreaPieces
     public float Facing { get; init; }
     public float Surface { get; init; }
 
+    /// <summary>Where the ear was when it was cut: what a synth reads which piece a part of it is in from (the bearing of
+    /// the part from here, <see cref="PieceOf"/>).</summary>
+    public Vector3 Ear { get; init; }
+
+    /// <summary>A fire's flames over its bed (docs/FIRE.md 12.2): how many voices above the pieces carry the roar, each over
+    /// a run of neighbouring pieces (<see cref="ExtendedSources.FlameRun"/>), and how far above the bed they are, m. None for
+    /// anything else.</summary>
+    public int Flames { get; init; }
+    public float Rise { get; init; }
+
+    /// <summary>Where the thing cut stands and how it is turned: a fire's own frame (x across, z along), so its synth finds
+    /// where each of its bodies of fire is in the world.</summary>
+    public Vector3 Origin { get; init; }
+    public Quaternion Turn { get; init; } = Quaternion.Identity;
+
+    /// <summary>A wood's crowns cut at the ear (<see cref="ExtendedSources.CutPoints"/>): the samples are the crowns themselves
+    /// (each its share of the wood in <see cref="SampleArea"/>, its height in <see cref="SampleHeight"/>), not strips of a
+    /// surface.</summary>
+    public bool Discrete { get; init; }
+    public float[]? SampleHeight { get; init; }
+
     /// <summary>The whole surface's area, m².</summary>
     public float TotalArea => PieceArea.Sum();
+
+    /// <summary>The piece a point (east, north) is in, by its bearing from where the ear was when it was cut; a point
+    /// beyond either end of the bearings cut goes to the nearer end.</summary>
+    public int PieceOf(Vector2 at, float[] edges)
+    {
+        double a = Math.IEEERemainder(Math.Atan2(at.Y - Ear.Z, at.X - Ear.X) - Facing, 2 * Math.PI);
+        int lo = 0, hi = edges.Length - 2;
+        if (a <= edges[0]) return 0;
+        if (a >= edges[^1]) return hi;
+        while (lo < hi)
+        {
+            int mid = (lo + hi) >> 1;
+            if (a < edges[mid + 1]) hi = mid; else lo = mid + 1;
+        }
+        return lo;
+    }
 }
 
 public static partial class ExtendedSources
@@ -107,8 +144,11 @@ public static partial class ExtendedSources
     /// the piece, the ear the surface's height above it. The law along each bearing is in closed form; the bearings of a
     /// piece are summed, a few to a piece. Each piece's points, where its synth reads the water, a few along each bearing
     /// with the area each stands for. The cut's edges are the bearings, radians from the middle of those it covers.
+    /// A fire's bed (<paramref name="fire"/>, <paramref name="flames"/> over 0) has its flames <paramref name="rise"/> m above
+    /// it, each over a run of its pieces (FlameRun); <paramref name="origin"/> and <paramref name="turn"/> are its own frame.
     /// </summary>
-    public static LineCut CutArea(LinePath outline, Vector3 ear, int pieces, float reference)
+    public static LineCut CutArea(LinePath outline, Vector3 ear, int pieces, float reference, bool fire = false, int flames = 0, float rise = 0f,
+                                  Vector3 origin = default, Quaternion? turn = null)
     {
         int n = Math.Clamp(pieces, 1, MaxPlaces);
         var (from, to, facing, inside) = AreaSpan(outline, ear);
@@ -128,13 +168,25 @@ public static partial class ExtendedSources
         starts[n] = samples.Count;
         var e = new Vector2(ear.X, ear.Z);
         float edgeDistance = Vector2.Distance(e, Flat(outline.Nearest(ear with { Y = surface }, out _)));
+        // A fire (its own frame, <paramref name="origin"/>) is cut again when the ear has moved an eighth of its shortest
+        // piece, the one beside it: a piece is dTheta of the bearings, edgeDistance * dTheta m of its edge, and beside a
+        // small fire a bearing swings fastest, where the pieces are thin and the ear is close (a line's own rule is a
+        // quarter of its shortest piece along it). An open water's pieces are wide, and it keeps its quarter of the way to
+        // its shore. Both bounded below, so a walked-around fire recuts a few cm, a few cheap rays an outline.
+        // Measured 2026-10-18 in a Debug build: one cut of a 0.9 m pit or a burning car takes 21 us, and the fire synth's
+        // redistribution after it 80 us. Walked round at 1.5 m the pit recuts every 2 cm, up to 70 times a second, so about
+        // 7 ms of the placement thread's second, 0.1 ms a frame: small enough to stay on that thread.
+        float recut = fire
+            ? MathF.Max(0.02f, 0.125f * edgeDistance * (float)((to - from) / n))
+            : MathF.Max(0.25f, 0.25f * edgeDistance);
         return new LineCut(edges)
         {
             Path = outline,
             Area = new AreaPieces
             {
                 Places = places, PieceArea = areas, SampleStart = starts, Samples = samples.ToArray(), SampleArea = sampleArea.ToArray(),
-                RecutMetres = MathF.Max(0.25f, 0.25f * edgeDistance), Inside = inside, Facing = (float)facing, Surface = surface,
+                RecutMetres = recut, Inside = inside, Facing = (float)facing, Surface = surface,
+                Ear = ear, Flames = n > 1 ? Math.Clamp(flames, 0, n) : 0, Rise = rise, Origin = origin, Turn = turn ?? Quaternion.Identity,
             },
         };
 
@@ -170,7 +222,7 @@ public static partial class ExtendedSources
     private static (PathPlace Place, float Area) AreaPiece(LinePath outline, Vector3 ear, double thetaFrom, double thetaTo, float reference,
                                                           float surface, bool inside, List<Vector2>? samples, List<float>? sampleArea)
     {
-        double r = MathF.Max(0.1f, reference), h = Math.Max(0.05, ear.Y - surface);
+        double r = MathF.Max(0.1f, reference), h = Math.Max(0.05, Math.Abs(ear.Y - surface));
         double span = thetaTo - thetaFrom;
         int rays = Math.Clamp((int)Math.Ceiling(Math.Abs(span) * 180.0 / Math.PI / 2.0), 4, MostRaysAPiece);
         double dTheta = span / rays;
@@ -220,7 +272,7 @@ public static partial class ExtendedSources
         var (from, to, facing, inside) = AreaSpan(outline, ear);
         double r = MathF.Max(0.1f, reference);
         float surface = SurfaceOf(outline);
-        double h = Math.Max(0.05, ear.Y - surface);
+        double h = Math.Max(0.05, Math.Abs(ear.Y - surface));
         const int Rays = 72;
         double dTheta = (to - from) / Rays, law = 0, area = 0;
         Span<double> hits = stackalloc double[64];

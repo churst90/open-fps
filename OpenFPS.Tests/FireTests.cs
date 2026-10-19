@@ -22,8 +22,9 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class FireTests : IDisposable
 {
-    /// <summary>A world's wide sources as shipped (AudioWorldOptions.WideSources).</summary>
-    private static readonly OpenFPS.Sound.Core.Nature.WideSources Wide = new();
+    /// <summary>A world that lays its fires out at their own places (the rule before 2026-10-16, which still has them): the
+    /// shipped world cuts a fire's burning area at the ear instead (FireAndWoodCutTests).</summary>
+    private static readonly OpenFPS.Sound.Core.Nature.WideSources Wide = new() { Rule = ExtendedSources.PlaceRule.Middle };
 
     private const int Rate = 48000;
     private readonly ITestOutputHelper _o;

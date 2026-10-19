@@ -303,8 +303,9 @@ public sealed class PlacedNatureVoice
     private const int ControlBlock = 256;
 
     public volatile float TargetSpread;
-    /// <summary>For running water along a line: the pieces it is cut into at the listener, each place one of
-    /// them (ExtendedSources.Cut), from the client (IAudioProvider.PlanPieces). Null until the first.</summary>
+    /// <summary>For running water along a line, a shore, an open water, a fire's burning area and a wood's crowns: the pieces it
+    /// is cut into at the listener, each place one of them (ExtendedSources.Cut, CutArea, CutPoints), from the client
+    /// (IAudioProvider.PlanPieces). Null until the first.</summary>
     public volatile ExtendedSources.LineCut? TargetCut;
     public volatile bool Running = true;
     /// <summary>A fire's share of its heat taken by water now (the server's, SoundEmitterComponent.Quench).</summary>
@@ -312,6 +313,8 @@ public sealed class PlacedNatureVoice
     /// <summary>For a wood heard as one (WoodChorus): the places its wind is read at, one a bough, and how
     /// many trees it stands for now (the client's, eased here so it never steps). Null for a tree.</summary>
     public Vector3[]? WindPlaces;
+    /// <summary>A wood heard as one (WoodChorus), whose trees it stands for come from the client (TargetTrees).</summary>
+    public bool Wood;
     public volatile float TargetTrees = 1f;
     private float _trees = -1f;
     /// <summary>Place voices reading this synth, for the log.</summary>
@@ -412,20 +415,25 @@ public sealed class PlacedNatureVoice
         if (Foliage != null)
         {
             Foliage.Spread = spread;
-            if (WindPlaces != null)
+            // A wood cut at the ear (its crowns' pieces), from the client.
+            Foliage.Cut = TargetCut;
+            if (Wood)
             {
                 // Eased over about a second: the share moves with the listener, a few metres a second.
                 float target = MathF.Max(0f, TargetTrees);
                 _trees = _trees < 0f ? target : _trees + (target - _trees) * MathF.Min(1f, dt / 0.5f);
                 Foliage.Trees = _trees;
-                Foliage.ReadWindAt(Weather.Wind, Position.X, Position.Z, now, WindPlaces);
             }
+            // A wood laid out reads its wind at its places; cut, where its pieces are (FoliageSynth.ReadWind).
+            if (WindPlaces != null) Foliage.ReadWindAt(Weather.Wind, Position.X, Position.Z, now, WindPlaces);
             else Foliage.ReadWind(Weather.Wind, Position.X, Position.Z, now);
             Foliage.Control(dt);
         }
         else if (Fire != null)
         {
             Fire.Spread = spread;
+            // Its burning area cut at the ear, from the client.
+            Fire.Cut = TargetCut;
             Fire.Lit = Running;
             Fire.Quench = TargetQuench;
             // The wind at each of its places: a gust crosses a big fire as it crosses a wood.

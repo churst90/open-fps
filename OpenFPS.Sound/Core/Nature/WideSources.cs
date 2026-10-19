@@ -79,7 +79,8 @@ public sealed class WideSources
         var layout = _layouts.GetOrAdd(physicalKey, static (key, args) =>
         {
             var (self, presets) = args;
-            if (self.LineLength(key, presets) > 0f) return null;
+            // A line, a fire's burning area and a wood's crowns are cut at the ear instead.
+            if (self.LineLength(key, presets) > 0f || self.IsFire(key) || self.IsWood(key)) return null;
             var places = presets.Places(key);
             if (places != null && self._scale != 1f)
                 for (int i = 0; i < places.Length; i++) places[i] *= self._scale;
@@ -151,6 +152,25 @@ public sealed class WideSources
     /// world does not spread its sources.</summary>
     public bool IsOpenWater(string? physicalKey)
         => _enabled && _rule == ExtendedSources.PlaceRule.Pieces && ShoreSpec.TryOpen(physicalKey, out _, out _);
+
+    /// <summary>A fire heard from its whole burning area (docs/FIRE.md 12.13): its shape cut at the ear as an open water's
+    /// surface is (ExtendedSources.CutArea), its flames over runs of the pieces, under <see cref="ExtendedSources.PlaceRule.Pieces"/>.
+    /// False for everything when this world does not spread its sources.</summary>
+    public bool IsFire(string? physicalKey)
+        => _enabled && _rule == ExtendedSources.PlaceRule.Pieces && physicalKey != null && physicalKey.StartsWith("fire:", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>A wood heard as one (WoodChorus) heard from its crowns: cut at the ear by the bearings they lie on
+    /// (ExtendedSources.CutPoints), under <see cref="ExtendedSources.PlaceRule.Pieces"/>. False for everything when this world
+    /// does not spread its sources.</summary>
+    public bool IsWood(string? physicalKey)
+        => _enabled && _rule == ExtendedSources.PlaceRule.Pieces && physicalKey != null && physicalKey.StartsWith(WoodChorus.Prefix, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>A surface cut at the ear by the bearings it covers: an open water's or a fire's.</summary>
+    public bool IsArea(string? physicalKey) => IsOpenWater(physicalKey) || IsFire(physicalKey);
+
+    /// <summary>Anything this world cuts at the ear rather than lays out: a line, a shore's outline, a surface, a wood.</summary>
+    public bool IsCut(string? physicalKey, IPresets presets)
+        => LineLength(physicalKey, presets) > 0f || IsOutline(physicalKey) || IsArea(physicalKey) || IsWood(physicalKey);
 
     /// <summary>How many streams a running-water synth renders: one for each piece a line can be cut into, or
     /// its own places.</summary>

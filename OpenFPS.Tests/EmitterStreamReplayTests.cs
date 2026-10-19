@@ -794,12 +794,14 @@ internal sealed class Replay
     /// <summary>
     /// Two seconds walking out of a small roofed room through its doorway: outside, a tree near the door
     /// (spread over its places), a fountain's tap, an air conditioner on the wall, and nine pines 170 to
-    /// 200 m off, heard as woods (WoodChorus: four of them, the pines falling in four 200 m squares).
+    /// 250 m off, heard as woods (WoodChorus: four of them, one per 200 m square, each spread across its
+    /// square so it covers over ten degrees of the ear's view and is heard from several places, not one voice).
     ///
-    /// S1: the woods (-20000000 down) and their places (-245000001 down) have Play and Place lines and no
-    /// Path line: the path pass skips every id under -5000, so their band gains are what they started with
-    /// indoors, unchanged as you step outside. The tree's and the tap's places (-5008413 down, -5008425
-    /// down) get Path lines from the path pass's branch for spread sources.
+    /// S1: the woods (-1015, the tree by the door as a wood of one, and -1030, -1031, -1040, -1041) and their
+    /// places (-1042, -1046, -1047, -1048, -1049) have Play and Place lines, and their lines carry their path
+    /// (CarriesPath), as the tree's own voice (701) and its places (-1016 up), and the tap (702) and its
+    /// places (-1004 up), have theirs. No Path line is written for any voice: the path pass folds a spread
+    /// source's path into its Play and Place lines, so their band gains follow the path as you step outside.
     /// </summary>
     private static void PlacesAndWoods(Replay r)
     {
@@ -814,8 +816,17 @@ internal sealed class Replay
         r.Fixture(701, "foliage:park_tree", true, new Vector3(3f, 0f, 7f), 90f, 1f);
         r.Fixture(702, "water:park_fountain/elm_park/0", true, new Vector3(-3f, 0.4f, 6.5f), 120f, 1f);
         r.Fixture(703, "machine:ac_condenser", true, new Vector3(4.5f, 0.5f, 4f), 120f, 1f);
-        for (int i = 0; i < 9; i++)
-            r.Fixture(710 + i, "foliage:pine", true, new Vector3(-15f + 15f * (i % 3), 0f, 170f + 15f * (i / 3)), 90f, 1f);
+        // Nine pines 170 to 250 m off in four woods (a 200 m square each: x below and above 0, z short of and at
+        // 200). Each wood is spread across its square: packed into 30 m, as they were before the cut at the ear
+        // (2026-10-18), a wood covers so little of the ear's view that it is one voice and has no places to check.
+        var pines = new[]
+        {
+            new Vector3(-150f, 0f, 170f), new Vector3(-90f, 0f, 185f), new Vector3(-40f, 0f, 170f),
+            new Vector3(40f, 0f, 170f), new Vector3(90f, 0f, 185f),
+            new Vector3(-150f, 0f, 200f), new Vector3(-40f, 0f, 200f),
+            new Vector3(40f, 0f, 200f), new Vector3(120f, 0f, 200f),
+        };
+        for (int i = 0; i < pines.Length; i++) r.Fixture(710 + i, "foliage:pine", true, pines[i], 90f, 1f);
         r.World.RefreshWoods();
         var feet = new Vector3(0f, 0f, 1.5f);
         var walking = new Vector3(0f, 0f, 1.4f);

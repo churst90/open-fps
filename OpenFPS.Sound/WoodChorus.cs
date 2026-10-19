@@ -140,6 +140,9 @@ public sealed class WoodChorus
         /// <summary>A wood's trees now (its synth's FoliageSynth.Trees) and the amplitude gain that sets
         /// its rendered power to its trees' at their own distances.</summary>
         public readonly Dictionary<int, (float Trees, float Gain)> Woods = new();
+        /// <summary>Each crown's share of itself heard in its wood, by its index in <see cref="WoodChorus.Crowns"/>: what a wood cut at
+        /// the ear by its crowns (ExtendedSources.CutPoints) weighs each by.</summary>
+        public float[] InWood = Array.Empty<float>();
     }
 
     /// <summary>
@@ -151,6 +154,7 @@ public sealed class WoodChorus
     {
         into.Individual.Clear();
         into.Woods.Clear();
+        if (into.InWood.Length != _crowns.Length) into.InWood = new float[_crowns.Length];
         foreach (var w in _woods)
         {
             double trees = 0, power = 0;
@@ -162,6 +166,7 @@ public sealed class WoodChorus
                 float own = IndividualShare(d);
                 into.Individual[c.Id] = MathF.Sqrt(own);
                 float rest = voiced == null || voiced(c.Id) ? 1f - own : 1f;
+                into.InWood[i] = MathF.Max(0f, rest);
                 if (rest <= 0f) continue;
                 trees += rest;
                 float dd = MathF.Max(d, refT);

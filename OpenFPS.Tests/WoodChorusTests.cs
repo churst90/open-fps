@@ -45,8 +45,11 @@ public class WoodChorusTests
         Assert.True(WoodChorus.ParseKey(key, out var preset, out float rx, out float rz));
         Assert.Equal(("park_tree", 60f, 40f), (preset, rx, rz));
         Assert.False(WoodChorus.ParseKey("foliage:park_tree", out _, out _, out _));
-        // A wood's places are spread over the wood, not a crown.
-        var layout = Wide.Layout(key, ModelLibrary.Presets)!;
+        // Shipped, a wood is cut at the ear by its crowns (FireAndWoodCutTests); laid out, as the old rule lays it, its
+        // places are spread over the wood, not a crown.
+        Assert.True(Wide.IsWood(key));
+        Assert.Null(Wide.Layout(key, ModelLibrary.Presets));
+        var layout = new WideSources { Rule = ExtendedSources.PlaceRule.Middle }.Layout(key, ModelLibrary.Presets)!;
         Assert.Equal(1 + FoliageSynth.Boughs, layout.Length);
         Assert.InRange(ExtendedSources.Reach(layout), 25f, 41f);
     }
