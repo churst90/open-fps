@@ -1418,6 +1418,18 @@ each with its own artifacts. **Decided by Cody, 2026-10-19:** the extension inte
 stage; `Parking`, `CrowdSystem` and `CrossingSystem` stay where they are; and the two city runs as the guard, with
 Alex's day at `Pace = 6` and positions stored to the centimetre.
 
+**Built so far (2026-10-19).** The guard and the view are in, and no law has moved. `PeopleReplayTests` stores an
+hour of the city and ten minutes on Market Square: `HauntFinder`'s places, every door's manner and `GoingIn`,
+Alex's `ViewOf` and body every 0.1 s, every door state change, and every line said, with seeds 20261006 and
+20261019. It passes three times without regenerating, once with `DOTNET_PROCESSOR_COUNT=4`, and a deliberate
+`LingerSeconds` 60.0 to 61.0 change altered Alex's hour as it should. `OpenFPS.Agents/PeopleWorld.cs` carries
+`IPeopleWorld` and the plan's records; `ServerPeopleView` fills them from the map and delegates the physics
+questions to `ServerPhysicsView`. Nothing reads it yet, so the wire hash stays `a3d6f3a6ec76` and the door
+fingerprint stays. Judgment calls: all the plan's records are kept though the first five moves read only the
+doors, regions, portals and named boxes; door closing animations carry no tick because `DoorManners.Through`
+derives its pause from `HashCode.Combine`, whose seed .NET picks per process (the states and animation lengths
+are stored); and `VehicleBody` is named `VehicleView` because `OpenFPS.Sound` already has a `VehicleBody`.
+
 ### What can run beside what
 
 | Can run together | Why |

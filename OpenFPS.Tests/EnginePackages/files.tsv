@@ -62,6 +62,7 @@ OpenFPS.Agents/JunctionRules.cs	Agents
 OpenFPS.Agents/LaneRoutes.cs	Agents	
 OpenFPS.Agents/LineFollower.cs	Agents	
 OpenFPS.Agents/MachinePower.cs	Agents	
+OpenFPS.Agents/PeopleWorld.cs	Agents	
 OpenFPS.Agents/RaceLine.cs	Agents	
 OpenFPS.Agents/RouteRules.cs	Agents	
 OpenFPS.Agents/StreetEvents.cs	Agents	
@@ -361,6 +362,7 @@ OpenFPS.Server/Core/PlayerStore.cs	game
 OpenFPS.Server/Core/RateLimiter.cs	game	
 OpenFPS.Server/Core/RestingStates.cs	game	
 OpenFPS.Server/Core/ServerGeometry.cs	game	
+OpenFPS.Server/Core/ServerPeopleView.cs	game	
 OpenFPS.Server/Core/SessionManager.cs	game	
 OpenFPS.Server/Core/StandingSpots.cs	game	
 OpenFPS.Server/Core/Teleporter.cs	game	

@@ -4,6 +4,21 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-19
 
+- Engine packages stage 10, the guard and the view: `PeopleReplayTests` now stores an hour of the city
+  (3,600 s, pace 6, parking every 20 s, 23:00) and ten minutes with a player on Market Square, covering
+  `HauntFinder`'s places, every door's manner and `GoingIn`, Alex's `ViewOf` and body every 0.1 s, every door
+  state change and every line said. It passed three times unchanged, once with `DOTNET_PROCESSOR_COUNT=4`, and a
+  local `LingerSeconds` change broke it as intended. `OpenFPS.Agents/PeopleWorld.cs` adds `IPeopleWorld` with
+  the plan's person, player, vehicle, door, region, portal and named-box records, and `ServerPeopleView` fills
+  them from a map, delegating the physics to `ServerPhysicsView`; `PeopleWorldViewTests` fills it from a small
+  world and checks every list's order and the store facts. No law moved and no line of spoken or heard output
+  changed. The wire hash is unchanged (`a3d6f3a6ec76`), so the server and the Windows client do not need to
+  deploy together, and the door fingerprint is unchanged. The packages ratchet stays at 10 crossings; its files
+  list and the sound boundary's gained the two new files. Judgment calls: door closing animations are stored
+  without a tick because `DoorManners` pauses on `HashCode.Combine`, which .NET seeds per process; the vehicle
+  record is called `VehicleView` because `OpenFPS.Sound` already has `VehicleBody`; and the plan's full record
+  set stayed although the first five moves do not read the people or vehicles yet. Built by DeepSeek through
+  OpenCode.
 - Engine packages stage 9 finished: the last four aids now read the scene view and live in
   `OpenFPS.Accessibility` (docs/ENGINE_PACKAGES.md, stage 9). `DrivingAids` moved first, with `DrivingCues` becoming
   Accessibility's own options; `SightWatch` and `SightGrid` moved together because they are one index (the grid

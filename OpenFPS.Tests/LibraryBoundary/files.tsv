@@ -62,6 +62,7 @@ OpenFPS.Agents/JunctionRules.cs	host
 OpenFPS.Agents/LaneRoutes.cs	host		
 OpenFPS.Agents/LineFollower.cs	host		
 OpenFPS.Agents/MachinePower.cs	host		
+OpenFPS.Agents/PeopleWorld.cs	host		
 OpenFPS.Agents/RaceLine.cs	host		
 OpenFPS.Agents/RouteRules.cs	host		
 OpenFPS.Agents/StreetEvents.cs	host		
