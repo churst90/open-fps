@@ -1322,12 +1322,13 @@ top reads from the survey's `edges.tsv`, with line examples, are: `CharacterSyst
 (`:58`, `:135`, `:192`, `:228`, `:318`). The full per-type tables are in the survey.
 
 **First, the guard, on `main` before any move.** A new `PeopleReplayTests` (its own non-parallel collection, like
-`PhysicsReplayTests`) runs a fixed city day: city map, `CharacterSystem { Pace = 1 }`,
+`PhysicsReplayTests`) runs a fixed city day: city map, `CharacterSystem { Pace = 6 }` (as `NpcDoorTests`' city hour, so the hour holds several of Alex's choices),
 `StreetLife.ParkEverySeconds = 20`, 23:00, 3 °C, day 40, `Clear`, 3,600 s at 1/30 s, stepped as `NpcDoorTests`'
 city hour steps — vehicles, characters, doors, parents — with occupancy after parents so riding is exercised, and
 `Clock.Now` replaced by the tick. It stores: the list `HauntFinder.Find` gives
 (every name, kind, stand, facing, door, access); every door's `Kind` and the `GoingIn` examples; every tick of
-Alex's `ViewOf` (doing, place, target, where, until) and body position/facing on a 0.1 s cadence; every door
+Alex's `ViewOf` (doing, place, target, where, until) and body position/facing on a 0.1 s cadence, positions
+rounded to the centimetre and angles to the degree so the stored lines hold on other machines; every door
 whose target, openness or hand changed, with the tick; and every `say` with speaker, label, synth key, position,
 level and delay. A second, 600 s run puts a player on a named square and keeps Alex's `Places` to that square, so
 his asking and idle lines are heard and stored; without a hearer `PedestrianSpeech` says nothing. `OPENFPS_PEOPLE_WRITE=1`
@@ -1413,10 +1414,9 @@ this stage that edits `CharacterSystem`, `DoorManners`, `Pavements`, `Haunts`, `
 `MapManager`, `DoorSystem`, the `EnginePackages` lists or the new `PeopleBoundary` folder; the law moves all
 share those files and run one after another, later ones on the earlier. The guard test's folder is new and can
 run beside an unrelated stage only until the first move edits the hosts. At most two filtered test runs at once,
-each with its own artifacts. **Decisions for Cody:** the extension interface (recommended) or the widened
-`IPhysicsWorld`; keep the three state machines in the host for this stage (recommended) or move them too; leave
-`Parking`, `CrowdSystem` and `CrossingSystem` where they are (recommended); and accept the two city runs and the
-one-hour `Pace = 1` day as the guard.
+each with its own artifacts. **Decided by Cody, 2026-10-19:** the extension interface; the three state machines stay in the host for this
+stage; `Parking`, `CrowdSystem` and `CrossingSystem` stay where they are; and the two city runs as the guard, with
+Alex's day at `Pace = 6` and positions stored to the centimetre.
 
 ### What can run beside what
 
