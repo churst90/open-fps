@@ -20,7 +20,7 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class AcousticWorldViewTests
 {
-    private const int WallId = 9001, DoorId = 9002, BusId = 9003, NewWallId = 9004, StairId = 9005, PlaceId = 9006;
+    private const int WallId = 9001, DoorId = 9002, BusId = 9003, NewWallId = 9004, StairId = 9005, PlaceId = 9006, RegionId = 9007;
     private static readonly Vector3 Ear = new(0f, 1.6f, 0f);
     private static readonly Vector3 Source = new(0f, 1f, -30f);
 
@@ -44,7 +44,14 @@ public class AcousticWorldViewTests
             EntityId = DoorId, Type = EntityType.StaticObject, Transform = At(new Vector3(-20f, 1f, -10f)),
             Collider = new ColliderComponent { Shape = ColliderShape.Box, Size = new Vector3(0.9f, 2f, 0.05f), IsSolid = true },
             Material = new MaterialComponent { Material = "Wood" },
-            Portal = new PortalComponent { RegionAId = -1, RegionBId = -1, ApertureSize = 1f },
+            Portal = new PortalComponent { RegionAId = RegionId, RegionBId = -1, ApertureSize = 1f },
+        });
+        // The room on one side of the door.
+        w.RegisterDefinition(new EntityDefinition
+        {
+            EntityId = RegionId, Type = EntityType.StaticObject, Transform = At(new Vector3(-20f, 1f, -6f)),
+            Collider = new ColliderComponent { Shape = ColliderShape.Box, Size = new Vector3(8f, 3f, 8f) },
+            Region = new RegionComponent { FriendlyName = "Hall", IsIndoor = true, RoomSize = new Vector3(8f, 3f, 8f) },
         });
         // A bus off to the west.
         w.RegisterDefinition(new EntityDefinition
@@ -79,7 +86,7 @@ public class AcousticWorldViewTests
         sb.Append($"air {view.Air} version {view.GeometryVersion} tiles {view.TileMetres} rooms {view.Rooms?.GetHashCode()} bodies {view.BodyCount}\n");
         var all = new List<AcousticBody>();
         view.AllBodies(all);
-        foreach (var b in all) sb.Append($"body {b.Id} {b.Name} {b.Prefab} {b.Beacon} {b.Team} {b.Kind} {b.Named} {b.Announce} {b.HasWheels} {b.WheelSurface} {b.WheelWaterMm} {b.SynthRunning} {b.Geometry} {b.Position} {b.Rotation} {b.Size} {b.Material} {b.Solid} {b.DoorLeaf}\n");
+        foreach (var b in all) sb.Append($"body {b.Id} {b.Name} {b.Prefab} {b.Beacon} {b.Team} {b.Kind} {b.Named} {b.Announce} {b.HasWheels} {b.WheelSurface} {b.WheelWaterMm} {b.SynthRunning} {b.Geometry} {b.RegionName} {b.RegionIndoor} {b.RegionAId} {b.RegionBId} {b.Position} {b.Rotation} {b.Size} {b.Material} {b.Solid} {b.DoorLeaf}\n");
         for (int i = 0; i < view.MovingCount; i++) sb.Append($"moving {view.MovingAt(i).Id} {view.MovingAt(i).Position}\n");
         var leaves = new List<DoorLeaf>();
         view.DoorLeaves(leaves);
@@ -140,7 +147,9 @@ public class AcousticWorldViewTests
         Assert.False(bus.HasWheels);
         Assert.Equal("north", bus.Team);
         Assert.True(view.TryGetBody(WallId, out var wall) && wall.Geometry == BodyGeometry.Static);
-        Assert.True(view.TryGetBody(DoorId, out var door) && door.Geometry == BodyGeometry.Mover);
+        Assert.True(view.TryGetBody(DoorId, out var door) && door.Geometry == BodyGeometry.Mover
+                    && door.RegionAId == RegionId && door.RegionBId == -1);
+        Assert.True(view.TryGetBody(RegionId, out var region) && region.RegionName == "Hall" && region.RegionIndoor);
         var wheels = new OpenFPS.Physics.WheelState[4];
         wheels[0] = OpenFPS.Physics.WheelState.Encode(4000f, 0f, 0f, 0f, 3, 0.2f, waterMm: 2f);
         wheels[3] = OpenFPS.Physics.WheelState.Encode(4000f, 0f, 0f, 0f, 7, 0.2f, waterMm: 9f);

@@ -1,7 +1,6 @@
 using System.Numerics;
-using OpenFPS.Common;
-using OpenFPS.Common.Components;
 using OpenFPS.Acoustics;
+using OpenFPS.Common;
 
 namespace OpenFPS.Client.Core;
 
@@ -12,7 +11,7 @@ namespace OpenFPS.Client.Core;
 /// under your fingers. Each thing is said with its direction (<see cref="DirectionWords"/>), distance
 /// across the ground and floors up or down. The order is worked out again only on a category change or
 /// after moving <see cref="ResortMetres"/>, so stepping does not jump about as you turn. Everything
-/// comes from the world the client already holds, within <see cref="RangeMetres"/>.
+/// comes from the scene view (stage 9) within <see cref="RangeMetres"/>.
 /// </summary>
 public sealed class MapTracker
 {
@@ -98,7 +97,7 @@ public sealed class MapTracker
     /// Shift+comma (-1) and Shift+period (+1): the next category round the ring, and how many of it
     /// there are near you. The next comma or period then says the nearest.
     /// </summary>
-    public string CycleCategory(int direction, WorldSnapshot world, Vector3 feet, int selfId)
+    public string CycleCategory(int direction, IAcousticWorld world, Vector3 feet, int selfId)
     {
         int n = Ring.Length;
         _category = Ring[(((int)_category + Math.Sign(direction)) % n + n) % n];
@@ -115,11 +114,11 @@ public sealed class MapTracker
     /// first key after the order is worked out says the nearest, whichever key it is. At either end
     /// it stays on the last one and says so, as the chat ring says "Top." and "Bottom.".
     /// </summary>
-    public string Step(int direction, WorldSnapshot world, Vector3 feet, float yaw, int selfId)
+    public string Step(int direction, IAcousticWorld world, Vector3 feet, float yaw, int selfId)
     {
         bool stale = !_sorted || Vector2.Distance(new Vector2(feet.X, feet.Z), new Vector2(_sortedAt.X, _sortedAt.Z)) > ResortMetres
                      || MathF.Abs(feet.Y - _sortedAt.Y) > StoreyMetres * 0.5f
-                     || (Selected is { } was && !world.Entities.ContainsKey(was.Id));
+                     || (Selected is { } was && !world.TryGetBody(was.Id, out _));
         if (stale) Rebuild(world, feet, selfId);
         if (_list.Count == 0) return $"No {NameOf(_category).ToLowerInvariant()} within {RangeMetres:0} metres.";
 
@@ -137,10 +136,10 @@ public sealed class MapTracker
     }
 
     /// <summary>The thing where it is NOW: a person or a car may have moved since the order was made.</summary>
-    private Tracked Live(WorldSnapshot world, Tracked t)
+    private Tracked Live(IAcousticWorld world, Tracked t)
     {
-        if (_category is TrackCategory.People or TrackCategory.Vehicles && world.Entities.TryGetValue(t.Id, out var e))
-            return t with { At = e.Transform.Position, FloorY = e.Transform.Position.Y };
+        if (_category is TrackCategory.People or TrackCategory.Vehicles && world.TryGetBody(t.Id, out var b))
+            return t with { At = b.Position, FloorY = b.Position.Y };
         return t;
     }
 
@@ -164,7 +163,7 @@ public sealed class MapTracker
         return rise > 0 ? $"{count} up" : $"{count} down";
     }
 
-    private void Rebuild(WorldSnapshot world, Vector3 feet, int selfId)
+    private void Rebuild(IAcousticWorld world, Vector3 feet, int selfId)
     {
         _list.Clear();
         _list.AddRange(Gather(world, feet, _category, selfId));
@@ -175,23 +174,17 @@ public sealed class MapTracker
 
     /// <summary>Everything of a category within <see cref="RangeMetres"/> in a straight line, nearest to
     /// get to first (<see cref="Reach"/>), each once.</summary>
-    public static List<Tracked> Gather(WorldSnapshot world, Vector3 feet, TrackCategory category, int selfId)
+    public static List<Tracked> Gather(IAcousticWorld world, Vector3 feet, TrackCategory category, int selfId)
     {
         var found = new List<Tracked>();
-        void Consider(in EntitySnapshot e)
+        var bodies = new List<AcousticBody>();
+        world.AllBodies(bodies);
+        foreach (var e in bodies)
         {
-            if (e.Id == selfId) return;
+            if (e.Id == selfId) continue;
             if (Match(world, e, category, feet) is { } t && Vector3.Distance(feet, t.At) <= RangeMetres)
                 found.Add(t with { Distance = Reach(feet, t.At, t.FloorY) });
         }
-        // A place is a region, and the world keeps a list of those; everything else is looked at once.
-        if (category == TrackCategory.Places)
-        {
-            foreach (int id in world.RegionEntityIds)
-                if (world.Entities.TryGetValue(id, out var r)) Consider(r);
-        }
-        else
-            foreach (var e in world.Entities.Values) Consider(e);
         found.Sort((a, b) => a.Distance != b.Distance ? a.Distance.CompareTo(b.Distance) : a.Id.CompareTo(b.Id));
 
         // The two leaves of a bi-parting door, the same place named twice: the nearer stands for both.
@@ -207,11 +200,10 @@ public sealed class MapTracker
     }
 
     /// <summary>Whether a thing belongs to a category, and if so how it is named and placed.</summary>
-    internal static Tracked? Match(WorldSnapshot world, in EntitySnapshot e, TrackCategory category, Vector3 feet)
+    internal static Tracked? Match(IAcousticWorld world, in AcousticBody e, TrackCategory category, Vector3 feet)
     {
-        var def = e.Definition;
-        string beacon = def.Identity.BeaconCategory ?? "";
-        Vector3 at = e.Transform.Position;
+        string beacon = e.Beacon ?? "";
+        Vector3 at = e.Position;
         switch (category)
         {
             case TrackCategory.Doors:
@@ -230,29 +222,29 @@ public sealed class MapTracker
                 if (!Is(beacon, Beacons.Item)) return null;
                 return Thing(e, Sightline.NameOf(e), feet);
             case TrackCategory.People:
-                if (ScopeView.Classify(e) is not (SightKind.Person or SightKind.Player) || Is(beacon, Beacons.Vehicle)) return null;
-                var kind = ScopeView.Classify(e)!.Value;
-                return new Tracked(e.Id, ScopeView.NameOf(e, kind), at, at.Y, Vector3.Distance(feet, at));
+                if (SightKinds.Classify(e) is not (SightKind.Person or SightKind.Player) || Is(beacon, Beacons.Vehicle)) return null;
+                var kind = SightKinds.Classify(e)!.Value;
+                return new Tracked(e.Id, SightKinds.NameOf(e, kind), at, at.Y, Vector3.Distance(feet, at));
             case TrackCategory.Vehicles:
             {
                 // A parked car is a vehicle beacon; one being driven is heard by its engine.
                 bool vehicle = Is(beacon, Beacons.Vehicle)
-                    || ScopeView.Classify(e) is SightKind.Vehicle or SightKind.Aircraft or SightKind.Train;
+                    || SightKinds.Classify(e) is SightKind.Vehicle or SightKind.Aircraft or SightKind.Train;
                 if (!vehicle) return null;
-                var k = ScopeView.Classify(e);
+                var k = SightKinds.Classify(e);
                 string name = k is { } sk && sk != SightKind.Player && sk != SightKind.Person
-                    ? ScopeView.NameOf(e, sk) : Sightline.NameOf(e);
+                    ? SightKinds.NameOf(e, sk) : Sightline.NameOf(e);
                 return Thing(e, name, feet);
             }
             case TrackCategory.Places:
             {
-                // A region: a room, a floor of a stairwell, a street. Gather only asks of regions.
-                string name = def.Region.FriendlyName ?? "";
+                // A region: a room, a floor of a stairwell, a street.
+                string name = e.RegionName ?? "";
                 if (string.IsNullOrWhiteSpace(name)) return null;
                 // A place is as near as its nearest edge, and you are in it at nought: a room as far as its flood's
                 // air reaches, a place (and a room that did not flood) as far as its box.
                 Vector3 min, max;
-                var cells = world.AcousticMap?.RoomCells;
+                var cells = world.Rooms?.RoomCells;
                 if (cells != null && cells.TryAir(e.Id, out var lo, out var hi, out _))
                 {
                     if (cells.TryRoomAt(feet + new Vector3(0f, 1f, 0f), out int inRoom) && inRoom == e.Id)
@@ -262,8 +254,8 @@ public sealed class MapTracker
                 }
                 else
                 {
-                    var size = def.Collider.Size != Vector3.Zero ? def.Collider.Size : def.Region.RoomSize;
-                    (min, max) = Bounds(e.Transform, size);
+                    var size = e.Size != Vector3.Zero ? e.Size : e.RoomSize;
+                    (min, max) = Bounds(e.Position, e.Rotation, size);
                 }
                 var near = Vector3.Clamp(feet, min, max);
                 return new Tracked(e.Id, name.Trim(), near, near.Y, Vector3.Distance(feet, near));
@@ -272,25 +264,24 @@ public sealed class MapTracker
         return null;
     }
 
-    /// <summary>The axis-aligned box round a box of this size, placed and turned as the transform says.</summary>
-    private static (Vector3 Min, Vector3 Max) Bounds(in Transform t, Vector3 size)
+    /// <summary>The axis-aligned box round a box of this size, placed and turned as the body says.</summary>
+    private static (Vector3 Min, Vector3 Max) Bounds(Vector3 position, Quaternion rotation, Vector3 size)
     {
         var half = size * 0.5f;
-        var r = Matrix4x4.CreateFromQuaternion(t.Rotation);
+        var r = Matrix4x4.CreateFromQuaternion(rotation);
         var ext = new Vector3(
             MathF.Abs(r.M11) * half.X + MathF.Abs(r.M21) * half.Y + MathF.Abs(r.M31) * half.Z,
             MathF.Abs(r.M12) * half.X + MathF.Abs(r.M22) * half.Y + MathF.Abs(r.M32) * half.Z,
             MathF.Abs(r.M13) * half.X + MathF.Abs(r.M23) * half.Y + MathF.Abs(r.M33) * half.Z);
-        return (t.Position - ext, t.Position + ext);
+        return (position - ext, position + ext);
     }
 
     /// <summary>A thing with a body: spoken from its middle, its floor under its lowest point.</summary>
-    private static Tracked Thing(in EntitySnapshot e, string name, Vector3 feet)
+    private static Tracked Thing(in AcousticBody e, string name, Vector3 feet)
     {
-        var at = e.Transform.Position;
+        var at = e.Position;
         float floor = at.Y;
-        var size = e.Definition.Collider.Size;
-        if (size.Y > 0f) floor = Sightline.WorldBounds(e).Min.Y;
+        if (e.Size.Y > 0f) floor = Sightline.WorldBounds(e).Min.Y;
         return new Tracked(e.Id, name, at, floor, Vector3.Distance(feet, at));
     }
 
@@ -302,12 +293,11 @@ public sealed class MapTracker
     /// through; an opening with no leaf is one where a person can (<see cref="WalkedThrough"/>), so a car park's open
     /// side over its parapet is not a way in and the hangar's open front is.
     /// </summary>
-    internal static bool IsEntrance(WorldSnapshot world, in EntitySnapshot e)
+    internal static bool IsEntrance(IAcousticWorld world, in AcousticBody e)
     {
-        var def = e.Definition;
-        string beacon = def.Identity.BeaconCategory ?? "";
+        string beacon = e.Beacon ?? "";
         if (Is(beacon, Beacons.Exit)) return true;
-        int a = def.Portal.RegionAId, b = def.Portal.RegionBId;
+        int a = e.RegionAId, b = e.RegionBId;
         if (a == b || Outdoors(world, a) == Outdoors(world, b)) return false;
         return Is(beacon, Beacons.Door) || WalkedThrough(world, e);
     }
@@ -318,36 +308,36 @@ public sealed class MapTracker
 
     /// <summary>Whether a person can walk through an opening: a floor within a step of its sill on both sides. Its
     /// frame is X across, Y up and Z through.</summary>
-    internal static bool WalkedThrough(WorldSnapshot world, in EntitySnapshot e)
+    internal static bool WalkedThrough(IAcousticWorld world, in AcousticBody e)
     {
-        var size = e.Definition.Collider.Size;
+        var size = e.Size;
         if (size.Y <= 0f) return false;
-        var turn = e.Transform.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : Quaternion.Normalize(e.Transform.Rotation);
+        var turn = e.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : Quaternion.Normalize(e.Rotation);
         var up = Vector3.Transform(Vector3.UnitY, turn);
         var through = Vector3.Transform(Vector3.UnitZ, turn);
-        var sill = e.Transform.Position - up * (size.Y * 0.5f);
-        var spatial = new SpatialService();
+        var sill = e.Position - up * (size.Y * 0.5f);
         foreach (float side in new[] { -1f, 1f })
         {
             var above = sill + through * (side * (size.Z * 0.5f + 0.4f)) + new Vector3(0f, SillStepMetres, 0f);
-            if (!spatial.CastSight(world, above, -Vector3.UnitY, 2f * SillStepMetres, out _, out _, glassBlocks: true)) return false;
+            if (!SightRays.CastSight(world, above, -Vector3.UnitY, 2f * SillStepMetres, out _, out _, glassBlocks: true)) return false;
         }
         return true;
     }
 
     /// <summary>An entrance as it is said: a door by its name, and an opening with no leaf by the room it is the way
     /// into (its own name is its prefab's, "Acoustic Portal").</summary>
-    internal static string EntranceName(WorldSnapshot world, in EntitySnapshot e)
+    internal static string EntranceName(IAcousticWorld world, in AcousticBody e)
     {
-        if (Is(e.Definition.Identity.BeaconCategory ?? "", Beacons.Door) || Is(e.Definition.Identity.BeaconCategory ?? "", Beacons.Exit))
+        string beacon = e.Beacon ?? "";
+        if (Is(beacon, Beacons.Door) || Is(beacon, Beacons.Exit))
             return Sightline.NameOf(e);
-        int a = e.Definition.Portal.RegionAId, b = e.Definition.Portal.RegionBId;
+        int a = e.RegionAId, b = e.RegionBId;
         int room = Outdoors(world, a) ? b : a;
-        return world.Entities.TryGetValue(room, out var r) && !string.IsNullOrWhiteSpace(r.Definition.Region.FriendlyName)
-            ? $"{r.Definition.Region.FriendlyName.Trim()} entrance" : Sightline.NameOf(e);
+        return world.TryGetBody(room, out var r) && !string.IsNullOrWhiteSpace(r.RegionName)
+            ? $"{r.RegionName.Trim()} entrance" : Sightline.NameOf(e);
     }
 
-    private static bool Outdoors(WorldSnapshot world, int regionId)
+    private static bool Outdoors(IAcousticWorld world, int regionId)
         => regionId == AcousticConstants.GlobalRegionId
-           || (world.Entities.TryGetValue(regionId, out var r) && !r.Definition.Region.IsIndoor);
+           || (world.TryGetBody(regionId, out var r) && !r.RegionIndoor);
 }

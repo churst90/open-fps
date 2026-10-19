@@ -131,6 +131,14 @@ public readonly struct AcousticBody
 
     /// <summary>A room's box, for a thing that declares a room and has no collider of its own size.</summary>
     public Vector3 RoomSize { get; init; }
+    /// <summary>The region's own name (open-fps: <c>Region.FriendlyName</c>), or null or empty: not a region.</summary>
+    public string? RegionName { get; init; }
+    /// <summary>Its own region is indoors (open-fps: <c>Region.IsIndoor</c>).</summary>
+    public bool RegionIndoor { get; init; }
+    /// <summary>The regions a portal joins (open-fps: <c>Portal.RegionAId</c>), 0 when it is not a portal.</summary>
+    public int RegionAId { get; init; }
+    /// <summary>The other region a portal joins (open-fps: <c>Portal.RegionBId</c>).</summary>
+    public int RegionBId { get; init; }
 
     /// <summary>What it is voiced as (a vehicle's preset key, a tree's crown), or null or empty: none.</summary>
     public string? SoundId { get; init; }

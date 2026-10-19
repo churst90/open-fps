@@ -11,6 +11,7 @@ OpenFPS.Accessibility/Keys/KeyModifiers.cs	Accessibility
 OpenFPS.Accessibility/LaneGuide.cs	Accessibility	
 OpenFPS.Accessibility/ListMenu.cs	Accessibility	
 OpenFPS.Accessibility/ListeningCalibration.cs	Accessibility	
+OpenFPS.Accessibility/MapTracker.cs	Accessibility	
 OpenFPS.Accessibility/NamedPlaces.cs	Accessibility	
 OpenFPS.Accessibility/PlayerCoordinates.cs	Accessibility	
 OpenFPS.Accessibility/SettingsFolder.cs	Accessibility	
@@ -163,7 +164,6 @@ OpenFPS.Client.Core/Input/InputCommandMapper.cs	game
 OpenFPS.Client.Core/Input/InputStateBuffer.cs	game	
 OpenFPS.Client.Core/LocalPlayerController.cs	game	
 OpenFPS.Client.Core/LocalPlayerState.cs	game	
-OpenFPS.Client.Core/MapTracker.cs	Accessibility	
 OpenFPS.Client.Core/MeshAssetFetcher.cs	game	
 OpenFPS.Client.Core/OtherBodies.cs	game	
 OpenFPS.Client.Core/PickUp.cs	game	
