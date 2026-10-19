@@ -3,6 +3,7 @@ using System.Text;
 using OpenFPS.Audio.Acoustics;
 using OpenFPS.Client.Core;
 using OpenFPS.Materials;
+using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Geometry;
@@ -78,7 +79,7 @@ public class AcousticWorldViewTests
         sb.Append($"air {view.Air} version {view.GeometryVersion} tiles {view.TileMetres} rooms {view.Rooms?.GetHashCode()} bodies {view.BodyCount}\n");
         var all = new List<AcousticBody>();
         view.AllBodies(all);
-        foreach (var b in all) sb.Append($"body {b.Id} {b.Name} {b.Prefab} {b.Beacon} {b.Kind} {b.Named} {b.Announce} {b.Position} {b.Rotation} {b.Size} {b.Material} {b.Solid} {b.DoorLeaf}\n");
+        foreach (var b in all) sb.Append($"body {b.Id} {b.Name} {b.Prefab} {b.Beacon} {b.Kind} {b.Named} {b.Announce} {b.HasWheels} {b.Position} {b.Rotation} {b.Size} {b.Material} {b.Solid} {b.DoorLeaf}\n");
         for (int i = 0; i < view.MovingCount; i++) sb.Append($"moving {view.MovingAt(i).Id} {view.MovingAt(i).Position}\n");
         var leaves = new List<DoorLeaf>();
         view.DoorLeaves(leaves);
@@ -136,6 +137,8 @@ public class AcousticWorldViewTests
         Assert.Contains(markers, m => m.Id == PlaceId && m.Name == "Landing" && m.Prefab == "named_place");
         Assert.DoesNotContain(markers, m => m.Id == WallId || m.Id == BusId);
         Assert.True(view.TryGetBody(BusId, out var bus) && bus.Kind == BodyKind.Npc);
+        Assert.False(bus.HasWheels);
+        Assert.True(EntityAcoustics.BodyOf(new EntitySnapshot { Id = 9007, Wheels = new OpenFPS.Physics.WheelState[4] }).HasWheels);
     }
 
     /// <summary>

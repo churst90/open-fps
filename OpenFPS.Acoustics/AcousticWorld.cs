@@ -129,6 +129,9 @@ public readonly struct AcousticBody
     public string? SoundId { get; init; }
     /// <summary>A vehicle's side windows as the host last sent them, 0 shut to 1 down.</summary>
     public float WindowsOpen { get; init; }
+    /// <summary>It rolls on wheels the host last sent (open-fps: a <c>WheelState</c> array on the snapshot):
+    /// a car, for the bump sound model (<c>StruckThings.Describe</c>).</summary>
+    public bool HasWheels { get; init; }
 
     /// <summary>What it is called (open-fps: <c>Identity.Name</c>), or null or empty: unnamed.</summary>
     public string? Name { get; init; }

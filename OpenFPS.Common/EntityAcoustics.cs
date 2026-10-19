@@ -154,7 +154,7 @@ public static class EntityAcoustics
     {
         var def = snap.Definition;
         if (def == null)
-            return new AcousticBody { Id = snap.Id, Position = snap.Transform.Position, Rotation = snap.Transform.Rotation, Velocity = snap.Velocity };
+            return new AcousticBody { Id = snap.Id, Position = snap.Transform.Position, Rotation = snap.Transform.Rotation, Velocity = snap.Velocity, HasWheels = snap.Wheels != null };
         return new AcousticBody
         {
             Id = snap.Id,
@@ -176,6 +176,7 @@ public static class EntityAcoustics
             RoomSize = def.Region.RoomSize,
             SoundId = def.SoundEmitter.SoundId,
             WindowsOpen = def.SoundEmitter.WindowsOpen,
+            HasWheels = snap.Wheels != null,
             Name = def.Identity.Name,
             Prefab = def.Identity.PrefabId,
             Beacon = def.Identity.BeaconCategory,
