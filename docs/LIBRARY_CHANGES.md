@@ -7,18 +7,20 @@ tag (docs/SOUND_LIBRARY_BOUNDARY.md, stage 8 and decision 8) and references the 
 ## Unreleased
 
 - The scene view says more about each body, for the accessibility aids (open-fps's engine packages stage 9):
-  `AcousticBody` gains `Name`, `Prefab`, `Beacon`, `Team`, `Kind` (the new `BodyKind`), `Named`, `Announce` and
-  `HasWheels`, all `init` properties that default to empty, false or `BodyKind.None`. `IAcousticWorld` gains
-  `Markers(List<AcousticBody>)`, the fixed named markers that are not solid. A host that implements `IAcousticWorld`
-  must add `Markers` (clearing the list is enough if it has none). The audio reads none of the new fields, so
-  nothing heard changes. The body also says `SynthRunning` (a world synth's switch) and, for a vehicle, the
-  surface and water under its worst wheel (`WheelSurface`, `WheelWaterMm`), all `init` properties that default to
-  false or 0; a host need do nothing, and the audio reads none of them. The body also says where the host's
-  triangle world holds it (`Geometry`, the new `BodyGeometry` enum: `None`, `Static`, `SightOnly`, `Mover` or
-  `Unindexed`), its own region's name and whether it is indoors (`RegionName`, `RegionIndoor`), and the two
-  regions a portal joins (`RegionAId`, `RegionBId`), all `init` properties that default to `BodyGeometry.None`,
-  empty or 0. A host that implements `IAcousticWorld` may leave them unfilled: the audio and the aids then see
-  every fixed thing as a box and no regions, as before. `EntityAcoustics` fills them for open-fps.
+  `AcousticBody` gains `Name`, `Prefab`, `Beacon`, `Team`, `Kind` (the new `BodyKind`), `Named`, `Announce`,
+  `HasWheels`, `SynthRunning` and, for a vehicle, every wheel's contact (`Wheels`, a
+  `ReadOnlyMemory<WheelRoadContact>`, each wheel's `Surface` and `WaterMm`; empty without wheels) instead of a
+  single worst wheel, all `init` properties that default to empty, false or 0. `IAcousticWorld`
+  gains `Markers(List<AcousticBody>)`, the fixed named markers that are not solid. A host that implements
+  `IAcousticWorld` must add `Markers` (clearing the list is enough if it has none); it fills `Wheels` from its
+  wheel states if it wants the driving cues to plan braking on the least grip under every wheel, and keeps that
+  memory valid while the view is held. The body also says where the host's triangle world holds it (`Geometry`,
+  the new `BodyGeometry` enum: `None`, `Static`, `SightOnly`, `Mover` or `Unindexed`), its own region's name and
+  whether it is indoors (`RegionName`, `RegionIndoor`), and the two regions a portal joins (`RegionAId`,
+  `RegionBId`), all `init` properties that default to `BodyGeometry.None`, empty or 0. A host that implements
+  `IAcousticWorld` may leave them unfilled: the aids then see every fixed thing as a box and no regions, as
+  before. `EntityAcoustics` fills them for open-fps. The audio reads none of the new fields, so nothing heard
+  changes.
 - A fire and a wood are cut at the ear like running water (changes.md, 2026-10-18; docs/FIRE.md 12.13): new
   `ExtendedSources` members for it (`CutPoints`, `PlacePoints`, `FireOutline`, `FlamesFor` and their kin),
   `ExtendedSources.CutArea` gains optional `fire`, `flames`, `rise`, `origin` and `turn` parameters (a recompile

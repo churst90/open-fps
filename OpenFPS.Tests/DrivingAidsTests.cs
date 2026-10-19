@@ -1,8 +1,12 @@
 using System.Numerics;
+using OpenFPS.Acoustics;
 using OpenFPS.Audio.Core;
 using OpenFPS.Client.Core;
 using OpenFPS.Common.Networking;
 using OpenFPS.Common.Components;
+using OpenFPS.Materials;
+using OpenFPS.Models;
+using OpenFPS.Physics;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using Xunit.Abstractions;
@@ -171,5 +175,35 @@ public class DrivingAidsTests
         _o.WriteLine("Z: " + aids.Readout);
         Assert.Empty(said);
         Assert.StartsWith("Off the road", aids.Readout);
+    }
+
+    /// <summary>
+    /// The braking guide plans on the least grip under the car, not on the deepest water: a loose surface
+    /// drains, so its water costs it nothing, and the wheel with the most water can be the grippier one.
+    /// The view carries every wheel so the plan can see both.
+    /// </summary>
+    [Fact]
+    public void TheGuidePlansTheBrakingOnTheLeastGripUnderEveryWheel()
+    {
+        var profile = ModelKindTable.Vehicle("engine:i4_economy")!;
+        Assert.NotNull(profile);
+        const float speed = 20f;
+        var car = new AcousticBody
+        {
+            HasWheels = true,
+            Wheels = new[]
+            {
+                new WheelRoadContact(RoadSurfaces.IndexOf("Gravel"), 8f),
+                new WheelRoadContact(RoadSurfaces.IndexOf("Asphalt"), 1f),
+            },
+        };
+        float gravel = RoadGripLaw.GripFactor(car.Wheels.Span[0].Surface, car.Wheels.Span[0].WaterMm, speed,
+                                             profile.Tyres.InflationKPa, profile.Tyres.TreadDepthMm);
+        float asphalt = RoadGripLaw.GripFactor(car.Wheels.Span[1].Surface, car.Wheels.Span[1].WaterMm, speed,
+                                              profile.Tyres.InflationKPa, profile.Tyres.TreadDepthMm);
+        Assert.True(car.Wheels.Span[0].WaterMm > car.Wheels.Span[1].WaterMm);
+        Assert.True(gravel > asphalt, $"wet gravel keeps {gravel:F3} of its grip and damp asphalt {asphalt:F3}");
+        float expected = profile.Tyres.PeakGripG * Earth.StandardGravity * MathF.Min(gravel, asphalt);
+        Assert.Equal(expected, DrivingAids.AvailableDecel(car, profile, speed), 3);
     }
 }

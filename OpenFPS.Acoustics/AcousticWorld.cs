@@ -88,6 +88,11 @@ public enum BodyKind : byte { None = 0, Player, Npc, Beacon, StaticObject, Item,
 /// sight's index keeps only what the triangles do not hold.</summary>
 public enum BodyGeometry : byte { None = 0, Static, SightOnly, Mover, Unindexed }
 
+/// <summary>One wheel on the ground: the surface under it as an index into
+/// <see cref="OpenFPS.Materials.RoadSurfaces"/>, and the water on it, mm (open-fps: a <c>WheelState</c>'s
+/// surface and <c>WaterMm</c>). The driving cues take the least grip over every wheel.</summary>
+public readonly record struct WheelRoadContact(byte Surface, float WaterMm);
+
 /// <summary>
 /// A thing in the world with a box, as the sound meets it: a wall, a door leaf, a tree's leaves, a car. The
 /// host fills it from what it holds (open-fps: an entity's collider, material, acoustics and emitter).
@@ -147,12 +152,10 @@ public readonly struct AcousticBody
     /// <summary>It rolls on wheels the host last sent (open-fps: a <c>WheelState</c> array on the snapshot):
     /// a car, for the bump sound model (<c>StruckThings.Describe</c>).</summary>
     public bool HasWheels { get; init; }
-    /// <summary>The surface under its worst wheel, an index into <see cref="OpenFPS.Materials.RoadSurfaces"/>:
-    /// of the wheels the host sent, the one with the most water on it. 0 without wheels.</summary>
-    public byte WheelSurface { get; init; }
-    /// <summary>The water under that wheel, mm (open-fps: <c>WheelState.WaterMm</c>): the driving cues plan
-    /// the braking on the least grip under the car. 0 when dry or without wheels.</summary>
-    public float WheelWaterMm { get; init; }
+    /// <summary>Every wheel's contact, in the host's order (open-fps: one <c>WheelState</c> each): the
+    /// driving cues plan the braking on the least grip among them. Empty without wheels. The memory is the
+    /// host's buffer for the body, filled for this view, so read it while the view is held.</summary>
+    public ReadOnlyMemory<WheelRoadContact> Wheels { get; init; }
 
     /// <summary>A world synth's switch as the host last sent it (open-fps: <c>SoundEmitter.SynthRunning</c>):
     /// a level crossing's bell rings while it is closed.</summary>

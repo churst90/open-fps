@@ -658,17 +658,17 @@ public sealed class DrivingAids
     }
 
     /// <summary>
-    /// What the tyres can give on this road now, m/s²: the car's peak grip, less what the water under
-    /// its worst wheel takes (RoadGripLaw.GripFactor). The view carries the surface and water of the
-    /// wheel with the most water on it; without wheels on the wire, dry.
+    /// What the tyres can give on this road now, m/s²: the car's peak grip, less what the water under every
+    /// wheel takes (RoadGripLaw.GripFactor), the least grip. Without wheels on the wire, dry.
     /// </summary>
-    private static float AvailableDecel(in AcousticBody car, VehicleProfile? profile, float speed)
+    internal static float AvailableDecel(in AcousticBody car, VehicleProfile? profile, float speed)
     {
         float grip = (profile?.Tyres.PeakGripG ?? 0.95f) * Earth.StandardGravity;
         float factor = 1f;
         if (car.HasWheels && profile != null)
-            factor = RoadGripLaw.GripFactor(car.WheelSurface, car.WheelWaterMm, speed,
-                                             profile.Tyres.InflationKPa, profile.Tyres.TreadDepthMm);
+            foreach (var wheel in car.Wheels.Span)
+                factor = MathF.Min(factor, RoadGripLaw.GripFactor(wheel.Surface, wheel.WaterMm, speed,
+                                                                  profile.Tyres.InflationKPa, profile.Tyres.TreadDepthMm));
         return grip * factor;
     }
 

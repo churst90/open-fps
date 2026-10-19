@@ -86,7 +86,12 @@ public class AcousticWorldViewTests
         sb.Append($"air {view.Air} version {view.GeometryVersion} tiles {view.TileMetres} rooms {view.Rooms?.GetHashCode()} bodies {view.BodyCount}\n");
         var all = new List<AcousticBody>();
         view.AllBodies(all);
-        foreach (var b in all) sb.Append($"body {b.Id} {b.Name} {b.Prefab} {b.Beacon} {b.Team} {b.Kind} {b.Named} {b.Announce} {b.HasWheels} {b.WheelSurface} {b.WheelWaterMm} {b.SynthRunning} {b.Geometry} {b.RegionName} {b.RegionIndoor} {b.RegionAId} {b.RegionBId} {b.Position} {b.Rotation} {b.Size} {b.Material} {b.Solid} {b.DoorLeaf}\n");
+        foreach (var b in all)
+        {
+            sb.Append($"body {b.Id} {b.Name} {b.Prefab} {b.Beacon} {b.Team} {b.Kind} {b.Named} {b.Announce} {b.HasWheels}");
+            foreach (var w in b.Wheels.Span) sb.Append($" wheel {w.Surface} {w.WaterMm}");
+            sb.Append($" {b.SynthRunning} {b.Geometry} {b.RegionName} {b.RegionIndoor} {b.RegionAId} {b.RegionBId} {b.Position} {b.Rotation} {b.Size} {b.Material} {b.Solid} {b.DoorLeaf}\n");
+        }
         for (int i = 0; i < view.MovingCount; i++) sb.Append($"moving {view.MovingAt(i).Id} {view.MovingAt(i).Position}\n");
         var leaves = new List<DoorLeaf>();
         view.DoorLeaves(leaves);
@@ -155,10 +160,12 @@ public class AcousticWorldViewTests
         wheels[3] = OpenFPS.Physics.WheelState.Encode(4000f, 0f, 0f, 0f, 7, 0.2f, waterMm: 9f);
         var wet = EntityAcoustics.BodyOf(new EntitySnapshot { Id = 9007, Wheels = wheels });
         Assert.True(wet.HasWheels);
-        // The worst wheel is the one with the most water under it, and its surface comes with it.
-        Assert.Equal(7, wet.WheelSurface);
-        Assert.Equal(9f, wet.WheelWaterMm, 2);
-        Assert.False(EntityAcoustics.BodyOf(new EntitySnapshot { Id = 9008 }).HasWheels);
+        Assert.Equal(4, wet.Wheels.Length);
+        Assert.Equal(3, wet.Wheels.Span[0].Surface);
+        Assert.Equal(2.03f, wet.Wheels.Span[0].WaterMm, 2);
+        Assert.Equal(7, wet.Wheels.Span[3].Surface);
+        Assert.Equal(9f, wet.Wheels.Span[3].WaterMm, 2);
+        Assert.True(EntityAcoustics.BodyOf(new EntitySnapshot { Id = 9008 }).Wheels.IsEmpty);
     }
 
     /// <summary>

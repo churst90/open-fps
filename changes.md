@@ -8,16 +8,17 @@ Recent work, newest first. `git log` has the rest.
   `OpenFPS.Accessibility` (docs/ENGINE_PACKAGES.md, stage 9). `DrivingAids` moved first, with `DrivingCues` becoming
   Accessibility's own options; `SightWatch` and `SightGrid` moved together because they are one index (the grid
   takes the marks the watch builds); `MapTracker` moved last, taking its categories from `SightKinds`. To serve
-  them, the view's bodies gained the synth's running bit and the worst wheel, the geometry role (`BodyGeometry`)
-  and the regions (a body's own name and indoors flag, and a portal's two regions). Nothing spoken or heard
-  changes; the spoken-lines and emitter-stream replays are unchanged and were not regenerated. The packages
+  them, the view's bodies gained the synth's running bit and every wheel's contact (surface and water), the
+  geometry role (`BodyGeometry`) and the regions (a body's own name and indoors flag, and a portal's two
+  regions). Nothing spoken or heard changes; the spoken-lines and emitter-stream replays are unchanged and were
+  not regenerated. The packages
   ratchet fell from 287 crossings to 10, the game's own sound mapping and parking reader. The wire hash changes
-  (a0961ca3e778 to 57dbfa93d7d0), so the server and the Windows client deploy together. The door fingerprint is
+  (a0961ca3e778 to a3d6f3a6ec76), so the server and the Windows client deploy together. The door fingerprint is
   unchanged. Judgment calls: the view has its own `BodyGeometry` because `GeometryRole` lives in Common; the
-  driving cue uses the one worst wheel the view carries rather than a second view; `MapTracker` calls
-  `SightKinds` directly rather than adding a category interface; and the grid and watch moved in one commit,
-  against the plan's listed order, because neither can leave Client.Core alone. Built by DeepSeek through
-  OpenCode.
+  driving cue takes the least grip over every wheel, as before, so the view carries all their contacts;
+  `MapTracker` calls `SightKinds` directly rather than adding a category interface; and the grid and watch moved
+  in one commit, against the plan's listed order, because neither can leave Client.Core alone. Built by DeepSeek
+  through OpenCode.
 
 ## 2026-10-18
 

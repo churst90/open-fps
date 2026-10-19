@@ -154,13 +154,12 @@ public static class EntityAcoustics
     public static AcousticBody BodyOf(in EntitySnapshot snap)
     {
         var def = snap.Definition;
-        var (wheelSurface, wheelWater) = WorstWheel(snap.Wheels);
+        var wheels = WheelsOf(snap);
         if (def == null)
             return new AcousticBody
             {
                 Id = snap.Id, Position = snap.Transform.Position, Rotation = snap.Transform.Rotation,
-                Velocity = snap.Velocity, HasWheels = snap.Wheels != null, WheelSurface = wheelSurface,
-                WheelWaterMm = wheelWater,
+                Velocity = snap.Velocity, HasWheels = snap.Wheels != null, Wheels = wheels,
             };
         return new AcousticBody
         {
@@ -189,8 +188,7 @@ public static class EntityAcoustics
             SoundId = def.SoundEmitter.SoundId,
             WindowsOpen = def.SoundEmitter.WindowsOpen,
             HasWheels = snap.Wheels != null,
-            WheelSurface = wheelSurface,
-            WheelWaterMm = wheelWater,
+            Wheels = wheels,
             SynthRunning = def.SoundEmitter.SynthRunning,
             Name = def.Identity.Name,
             Prefab = def.Identity.PrefabId,
@@ -202,17 +200,24 @@ public static class EntityAcoustics
         };
     }
 
-    /// <summary>The wheel with the most water under it, and that water, mm: the wet grip the driving cues plan
-    /// the braking on, from what the server sent without the physics that made it. First when tied.</summary>
-    private static (byte Surface, float WaterMm) WorstWheel(WheelState[]? wheels)
+    /// <summary>Every wheel's contact, in the host's order. The buffer is kept for this body on this thread
+    /// and filled again each time, so a car converted every frame allocates nothing once warm; a wheel set
+    /// that grows allocates once.</summary>
+    private static ReadOnlyMemory<WheelRoadContact> WheelsOf(in EntitySnapshot snap)
     {
-        byte surface = 0;
-        float water = 0f;
-        if (wheels == null) return (surface, water);
-        foreach (var w in wheels)
-            if (w.WaterMm > water) { water = w.WaterMm; surface = w.Surface; }
-        return (surface, water);
+        if (snap.Wheels is not { Length: > 0 } wheels) return ReadOnlyMemory<WheelRoadContact>.Empty;
+        var buffers = _wheelBuffers ??= new Dictionary<int, WheelRoadContact[]>();
+        if (!buffers.TryGetValue(snap.Id, out var buffer) || buffer.Length < wheels.Length)
+        {
+            buffer = new WheelRoadContact[wheels.Length];
+            buffers[snap.Id] = buffer;
+        }
+        for (int i = 0; i < wheels.Length; i++)
+            buffer[i] = new WheelRoadContact(wheels[i].Surface, wheels[i].WaterMm);
+        return new ReadOnlyMemory<WheelRoadContact>(buffer, 0, wheels.Length);
     }
+
+    [ThreadStatic] private static Dictionary<int, WheelRoadContact[]>? _wheelBuffers;
 
     /// <summary>The host's entity type as the view's own (<see cref="BodyKind"/>).</summary>
     private static BodyKind KindOf(EntityType type) => type switch
