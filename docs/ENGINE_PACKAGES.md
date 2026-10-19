@@ -1123,7 +1123,7 @@ A session is one working session of an agent, as in docs/GEOMETRY.md.
     committed with the move; before the report, the guard list of CLAUDE.md, the replays one by one, and the
     replays again with `DOTNET_PROCESSOR_COUNT=4`.
 
-- **Built 2026-10-18** (on Linux, in three commits on `stage6-common` from main `80f738b4`; the plan was the
+- **Built 2026-10-18** (on Linux, in four commits on `stage6-common` from main `80f738b4`; the plan was the
   first). The survey found seven files in Common beyond 3.8's list: two were the server's and moved, four stay by
   the plans, one is a choice written out for Cody.
   - `GroundProbeMemo` and `MoverPoses` to `OpenFPS.Server/Core/` with `git mv`, namespaces kept. `MoverPoses`
