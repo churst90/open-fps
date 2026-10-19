@@ -270,7 +270,7 @@ Notes behind the code:
   [AUDIOLAB_NOTES.md](docs/AUDIOLAB_NOTES.md): the reasoning the code points to.
 
 Diagnoses and reports, kept as written:
-- [AUDIO_GHOSTS_AND_STUTTERS.md](docs/AUDIO_GHOSTS_AND_STUTTERS.md), [AUDIO_LOAD_DROPOUTS.md](docs/AUDIO_LOAD_DROPOUTS.md),
+- [AUDIO_GHOSTS_AND_STUTTERS.md](docs/AUDIO_GHOSTS_AND_STUTTERS.md), [AUDIO_LOAD_DROPOUTS.md](docs/AUDIO_LOAD_DROPOUTS.md), [AUDIO_WARM_START.md](docs/AUDIO_WARM_START.md),
   [REPEATS_AND_POPS.md](docs/REPEATS_AND_POPS.md), [THE_MIXER_THREAD_CRASH.md](docs/THE_MIXER_THREAD_CRASH.md),
   [AUDIO_QUALITY_2026-10-06.md](docs/AUDIO_QUALITY_2026-10-06.md): faults found and fixed.
 - [COVERAGE_2026-09-24.md](docs/COVERAGE_2026-09-24.md), [COVERAGE_2026-10-06.md](docs/COVERAGE_2026-10-06.md):
