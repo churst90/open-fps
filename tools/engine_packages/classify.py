@@ -114,7 +114,6 @@ FILE_RULES = [
     ('OpenFPS.Common/EntityGeometry.cs', 'Common', 'entity adapter: geometry'),
     ('OpenFPS.Common/GroundProbeMemo.cs', 'game', 'physics survey: a server cache'),
     ('OpenFPS.Common/Messages.cs', 'Common', 'wire'),
-    ('OpenFPS.Common/MoverPoses.cs', 'game', 'a server counter'),
     ('OpenFPS.Common/PhysicsConstants.cs', 'Common', 'the game\'s reach and bounds, the tick, the input limits (the body: BodyConstants)'),
     ('OpenFPS.Common/PhysicsUtils.cs', 'Common', 'entity adapter: the ground probes of a world and of a snapshot (the question: Footing)'),
     ('OpenFPS.Common/PhysicsViews.cs', 'Common', 'entity adapter: a world and a snapshot as the physics sees them (IPhysicsWorld)'),
@@ -139,6 +138,7 @@ FILE_RULES = [
 
     # ── Server ──
     # The server's hosts: they step a package or adapt the entities to it, and stay.
+    ('OpenFPS.Server/Core/MoverPoses.cs', 'game', 'a server counter (was Common: stage 6)'),
     ('OpenFPS.Server/Systems/VehicleSystem*.cs', 'game', 'host: steps Agents'),
     ('OpenFPS.Server/Systems/CrowdSystem.cs', 'game', 'host: steps Agents'),
     ('OpenFPS.Server/Systems/PedestrianSpeech*.cs', 'game', 'host: steps Agents (the lines are Speech)'),

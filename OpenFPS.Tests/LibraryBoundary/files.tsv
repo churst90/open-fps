@@ -190,7 +190,6 @@ OpenFPS.Common/EntityEmission.cs	host
 OpenFPS.Common/EntityGeometry.cs	host		
 OpenFPS.Common/GroundProbeMemo.cs	host		
 OpenFPS.Common/Messages.cs	host		
-OpenFPS.Common/MoverPoses.cs	host		
 OpenFPS.Common/PhysicsConstants.cs	host		
 OpenFPS.Common/PhysicsUtils.cs	host		
 OpenFPS.Common/PhysicsViews.cs	host		

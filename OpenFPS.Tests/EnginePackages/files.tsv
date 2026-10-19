@@ -196,7 +196,6 @@ OpenFPS.Common/EntityEmission.cs	Common	entity adapter: where an entity sounds f
 OpenFPS.Common/EntityGeometry.cs	Common	entity adapter: geometry
 OpenFPS.Common/GroundProbeMemo.cs	game	physics survey: a server cache
 OpenFPS.Common/Messages.cs	Common	wire
-OpenFPS.Common/MoverPoses.cs	game	a server counter
 OpenFPS.Common/PhysicsConstants.cs	Common	the game's reach and bounds, the tick, the input limits (the body: BodyConstants)
 OpenFPS.Common/PhysicsUtils.cs	Common	entity adapter: the ground probes of a world and of a snapshot (the question: Footing)
 OpenFPS.Common/PhysicsViews.cs	Common	entity adapter: a world and a snapshot as the physics sees them (IPhysicsWorld)
@@ -351,6 +350,7 @@ OpenFPS.Server/Core/MapTemplates.cs	game	host
 OpenFPS.Server/Core/MapTiles.cs	game	host: adapts entities to World's tiles
 OpenFPS.Server/Core/MessageDispatcher.cs	game	
 OpenFPS.Server/Core/MessageLimits.cs	game	
+OpenFPS.Server/Core/MoverPoses.cs	game	a server counter (was Common: stage 6)
 OpenFPS.Server/Core/MudGateway.cs	game	
 OpenFPS.Server/Core/NetworkService.cs	game	
 OpenFPS.Server/Core/OccupancyService.cs	game	
