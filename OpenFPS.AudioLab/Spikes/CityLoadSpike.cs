@@ -73,6 +73,11 @@ public static class CityLoadSpike
         public readonly double[] PassParts;
         public double WorstLoopMs;
         public readonly double[] WorstLoopParts;
+        public readonly double[] WorstLoopOtherParts;
+        public int OtherLandCount, OtherStepCount;
+        public double OtherWorstLandMs, OtherWorstStepMs;
+        public double AudioOtherStepsMs;
+        public int AudioOtherStepsCount;
         public int Started;
         public string StartedKinds = "";
         public int GcCount, GcGen2;
@@ -86,6 +91,7 @@ public static class CityLoadSpike
             PassStages = new double[stages];
             PassParts = new double[parts];
             WorstLoopParts = new double[LoopNames.Length];
+            WorstLoopOtherParts = new double[OtherBodies.LabPartCount];
         }
     }
 
@@ -554,6 +560,13 @@ public static class CityLoadSpike
                     {
                         row.WorstLoopMs = loopMs;
                         Array.Copy(iterationParts, row.WorstLoopParts, iterationParts.Length);
+                        Array.Copy(others.LabPartLastMs, row.WorstLoopOtherParts, others.LabPartLastMs.Length);
+                        row.OtherLandCount = others.LabLandCount;
+                        row.OtherStepCount = others.LabStepCount;
+                        row.OtherWorstLandMs = others.LabWorstLandMs;
+                        row.OtherWorstStepMs = others.LabWorstStepMs;
+                        row.AudioOtherStepsMs = audio.LabOtherStepsLastMs;
+                        row.AudioOtherStepsCount = audio.LabOtherStepsLastCount;
                     }
 
                     if (audio.World.LabTickCount != tickBefore)
@@ -754,6 +767,22 @@ public static class CityLoadSpike
                 sb.AppendLine($"  worst client loop iteration ({worstLoop.Second} s, {worstLoop.WorstLoopMs:F0} ms): "
                             + string.Join(", ", LoopNames.Select((n, i) => $"{n} {worstLoop.WorstLoopParts[i]:F0}"))
                             + $"; unnamed {worstLoop.WorstLoopMs - named:F1} ms");
+                double namedOther = worstLoop.WorstLoopOtherParts.Sum();
+                sb.AppendLine($"    others inside: "
+                            + string.Join(", ", OtherBodies.LabPartNames.Select((n, i) => $"{n} {worstLoop.WorstLoopOtherParts[i]:F0}"))
+                            + $"; unnamed {worstLoop.WorstLoopParts[LoopOthers] - namedOther:F1} ms");
+                sb.AppendLine($"    others events: {worstLoop.OtherStepCount} step(s), worst {worstLoop.OtherWorstStepMs:F0} ms; "
+                            + $"{worstLoop.OtherLandCount} land(s), worst {worstLoop.OtherWorstLandMs:F0} ms");
+                sb.AppendLine($"    audio's other steps: {worstLoop.AudioOtherStepsCount} played in {worstLoop.AudioOtherStepsMs:F0} ms "
+                            + $"of the {worstLoop.WorstLoopParts[LoopAudio]:F0} ms audio part");
+            }
+            var firstOthers = load.Seconds.Where(s => s.Second < 10).OrderByDescending(s => s.WorstLoopParts[LoopOthers]).FirstOrDefault();
+            var steadyOthers = load.Seconds.Where(s => s.Second >= 10).OrderByDescending(s => s.WorstLoopParts[LoopOthers]).FirstOrDefault();
+            if (firstOthers != null && steadyOthers != null)
+            {
+                sb.AppendLine($"  other bodies' worst pass: first ten seconds {firstOthers.WorstLoopParts[LoopOthers]:F0} ms "
+                            + $"(second {firstOthers.Second}, loop {firstOthers.WorstLoopMs:F0} ms), steady state "
+                            + $"{steadyOthers.WorstLoopParts[LoopOthers]:F0} ms (second {steadyOthers.Second}, loop {steadyOthers.WorstLoopMs:F0} ms)");
             }
             sb.AppendLine();
         }

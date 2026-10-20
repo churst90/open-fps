@@ -41,6 +41,20 @@ public sealed class ClientAudioSystem : IAudioHost
     /// <summary>The snapshot before this frame's, for the rooms that moved.</summary>
     private WorldSnapshot? _previous;
 
+    /// <summary>Other bodies' steps waiting for this frame's audio update, and the list being played. A step's
+    /// path is the audio's work (part 3a's placement), not the game loop's per-body pass: the first pass after
+    /// a load makes every walking body's first step at once, and done in OtherBodies.Update it held the loop
+    /// for most of a second. The entry only queues; <see cref="Update"/> plays them before its own work, in
+    /// the same iteration, the same snapshot and the same order, so the step sounds where and when it did.</summary>
+    private List<OtherStep> _queuedSteps = new(128);
+    private List<OtherStep> _playingSteps = new(128);
+    private readonly object _queuedStepsLock = new();
+    private readonly record struct OtherStep(Vector3 Position, string Material, string Variant, StepSlope Slope, int BodyId);
+
+    // Timing only: what the queued steps took of the audio update's time, and how many (--city-load).
+    internal double LabOtherStepsLastMs;
+    internal int LabOtherStepsLastCount;
+
     /// <summary>
     /// The audio update's cap, here so both heads share it (<see cref="AudioWorld.UpdateHz"/>). Their loop polls the
     /// network at about 200 Hz (a 5 ms sleep); nothing in the update resolves faster than a frame.
@@ -117,6 +131,9 @@ public sealed class ClientAudioSystem : IAudioHost
     /// </summary>
     public void Update(WorldSnapshot world)
     {
+        long stepsAt = System.Diagnostics.Stopwatch.GetTimestamp();
+        PlayQueuedOtherSteps();
+        LabOtherStepsLastMs = (System.Diagnostics.Stopwatch.GetTimestamp() - stepsAt) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
         if (!_throttle.ShouldRun(_now())) return;
         // The previous snapshot, kept before assigning: comparing `world` with the last after it compared it
         // with itself and silently disabled the moving-region check. The two may also be the same object (an
@@ -187,7 +204,27 @@ public sealed class ClientAudioSystem : IAudioHost
     /// <summary>...with <paramref name="bodyId"/>, whose foot it was: their own body is not a wall between
     /// their foot and you.</summary>
     public void OnPlayerFootstep(Vector3 pos, string mat, string var, StepSlope slope, int bodyId)
-        => _world.OtherFootstep(pos, mat, StrideAccumulator.SlopeDb(slope), StrideAccumulator.SlopePitch(slope), bodyId);
+    {
+        lock (_queuedStepsLock) _queuedSteps.Add(new OtherStep(pos, mat, var, slope, bodyId));
+    }
+
+    /// <summary>Plays the steps <see cref="OnPlayerFootstep"/> queued this frame, at the top of the audio
+    /// update: the same iteration, before the update's own placement, as if the handler had done it in line,
+    /// but counted with the audio update's work rather than the game loop's.</summary>
+    private void PlayQueuedOtherSteps()
+    {
+        LabOtherStepsLastCount = 0;
+        lock (_queuedStepsLock)
+        {
+            if (_queuedSteps.Count == 0) return;
+            (_queuedSteps, _playingSteps) = (_playingSteps, _queuedSteps);
+        }
+        LabOtherStepsLastCount = _playingSteps.Count;
+        foreach (var step in _playingSteps)
+            _world.OtherFootstep(step.Position, step.Material, StrideAccumulator.SlopeDb(step.Slope),
+                                 StrideAccumulator.SlopePitch(step.Slope), step.BodyId);
+        _playingSteps.Clear();
+    }
 
     /// <summary>Your own step, which rides with you at a fixed offset from your head (AudioWorld.OwnFootstep).</summary>
     public void OnOwnFootstep(Vector3 pos, string mat, string var, StepSlope slope = StepSlope.Level)
