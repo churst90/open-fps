@@ -344,6 +344,8 @@ public partial class AudioWorld
             else _voices.Declare(id, VoiceRegistry.NoEntity, VoiceKind.Rain, Vector3.Zero);
         };
         _engineEchoes.Voiced = (id, engine) => _voices.Declare(id, engine, VoiceKind.EngineEcho, Vector3.Zero);
+        // The image-source search for every engine is built ahead of the frame that uses it (EngineReflections).
+        _engineEchoes.PrecomputeInBackground = !manualAcoustics;
         // The library's voices are given their ids here, by what they are the sound of.
         _rain.SlotVoice = (slot, part) => (_voices.IdFor(VoiceKind.Rain, slot, part), VoiceRegistry.SeedOf(VoiceKind.Rain, slot, part));
         _rain.DropVoice = n => (_voices.IdFor(VoiceKind.RainDrop, VoiceRegistry.NoEntity, n), VoiceRegistry.SeedOf(VoiceKind.RainDrop, VoiceRegistry.NoEntity, n));
@@ -354,7 +356,14 @@ public partial class AudioWorld
         _acousticWorker = new AsyncAcousticWorker(_acoustics, audio.Traced, audio.Clock) { Manual = manualAcoustics, Lab = audio.Lab };
         _oneOffs.Worker = _acousticWorker;
         // The birds: found from the map's foliage and roofs, heard by the worker's answers (P6), quiet at a bang.
-        _birds = new BirdLife(audio, _acoustics, seed) { Voices = _voices, Worker = _acousticWorker };
+        _birds = new BirdLife(audio, _acoustics, seed)
+        {
+            Voices = _voices,
+            Worker = _acousticWorker,
+            // The habitat survey is ~300 ms of roof rays on the city: off the placement thread in the
+            // game, in place where an answer must come out the same every run (tests, replays).
+            SurveyInPlace = manualAcoustics,
+        };
         _oneOffs.Received = sounds => _birds.Heard(sounds, _audio.Clock.Now);
         // The loudest surface of each rain patch is heard by the worker's answer, as every sustained voice is (P6).
         _rain.Worker = _acousticWorker;
@@ -386,6 +395,7 @@ public partial class AudioWorld
     {
         _groundCache.Remove(entityId);
         _linePaths.Remove(entityId);
+        _lastOwnerPaths.Remove(entityId);
         _voices.Stop(entityId);
         // A wood's voice is under an id of its own.
         if (_voices.TryIdOf(VoiceKind.Wood, entityId, 0, out int wood))
@@ -469,6 +479,7 @@ public partial class AudioWorld
         _lastUpdateAt = nowSec;
         long startTicks = System.Diagnostics.Stopwatch.GetTimestamp();
         long stageTicks = startTicks;
+        PathsAwaitingAnswer = 0;
         try
         {
 
@@ -565,6 +576,8 @@ public partial class AudioWorld
         {
             _audio.SetAcousticMap(rooms!);
             _lastAcousticMap = rooms;
+            // A path found on the last map is no answer on this one, whatever the entity ids say.
+            _lastOwnerPaths.Clear();
         }
         // The host's: the rooms that moved, the place's name.
         _host.RoomsSet(visualEyePos, listenerRegionId, newRooms);
@@ -802,7 +815,7 @@ public partial class AudioWorld
         // Every source has been offered to the reflection system: it sets what next frame's reflections
         // must reach to be worth a voice.
         partAt = System.Diagnostics.Stopwatch.GetTimestamp();
-        _engineEchoes.EndFrame();
+        _engineEchoes.EndFrame(visualEyePos);
         _partMs[PartEchoFrame] += Ms(partAt);
         // Every voice let go this frame or before is taken down its fade; then a sustained voice not declared
         // this frame is no longer an entry, nor a one-off that has stopped, nor a fade that has ended.
@@ -862,6 +875,10 @@ public partial class AudioWorld
     // The instrument's view of the last tick: the same figures the five-second census keeps as maxima, but
     // one tick at a time, so --city-load can report each second without resetting the game's census.
     internal int LabTickCount;
+    /// <summary>Owners whose voice waited this tick for the acoustic worker's first answer. Diagnostic:
+    /// the client harness gives the worker a moment when a test's new car asks, as a real frame would.</summary>
+    internal int PathsAwaitingAnswer;
+
     internal double LabLastTickMs, LabLastGapMs, LabLastPartPassMs;
     internal readonly double[] LabStageLastMs = new double[5];
     internal readonly double[] LabPartLastMs = new double[PartCount];
@@ -1812,7 +1829,7 @@ public partial class AudioWorld
         };
         // Its path every frame: it kept the tone it started with, a car turning behind a wall within 20 m
         // still breathing in the open (S1).
-        HandPath(ref e, VoiceKind.Intake, world, src, pos, levelDb, eyePos);
+        if (!HandPath(ref e, VoiceKind.Intake, world, src, pos, levelDb, eyePos)) return;
         ApplyGround(ref e, _groundWorld);
         _voices.Sound(e);
     }
@@ -1870,7 +1887,7 @@ public partial class AudioWorld
             e.FollowsListener = true;
             e.ListenerOffset = offset;
             // A voice on the head still needs a world position: the budget culls by it.
-            HandPath(ref e, VoiceKind.Cabin, world, src, eyePos + offset, engine.EarLevelDb, eyePos);
+            if (!HandPath(ref e, VoiceKind.Cabin, world, src, eyePos + offset, engine.EarLevelDb, eyePos)) continue;
             _voices.Sound(e);
         }
     }
@@ -2591,7 +2608,7 @@ public partial class AudioWorld
             // From the horn where the car is now, turned toward the path's edge only when blocked. The path's
             // own point is the exhaust as of the worker's last answer (up to ten frames old): a moving car's
             // horn would trail behind it, from its tailpipe.
-            HandPath(ref e, VoiceKind.Horn, world, src, pos, levelDb, eyePos);
+            if (!HandPath(ref e, VoiceKind.Horn, world, src, pos, levelDb, eyePos)) continue;
             ApplyGround(ref e, _groundWorld);
             _voices.Sound(e);
         }
@@ -2777,7 +2794,7 @@ public partial class AudioWorld
             EngineRunning = blowing,
         };
         // One apparent position, the horn's: the path pass also handed it the exhaust's (S2).
-        HandPath(ref e, VoiceKind.HeldHorn, world, src, pos, levelDb, eyePos);
+        if (!HandPath(ref e, VoiceKind.HeldHorn, world, src, pos, levelDb, eyePos)) return;
         ApplyGround(ref e, _groundWorld);
         _voices.Sound(e);
     }
@@ -2837,7 +2854,7 @@ public partial class AudioWorld
             PowerLever = (float)(int)mode,
             EngineRunning = true,
         };
-        HandPath(ref e, VoiceKind.Siren, world, src, pos, spec.SourceLevelDb, eyePos);
+        if (!HandPath(ref e, VoiceKind.Siren, world, src, pos, spec.SourceLevelDb, eyePos)) return;
         ApplyGround(ref e, _groundWorld);
         _voices.Sound(e);
         _sirenVoiced.Add(src.Id);
@@ -2995,7 +3012,7 @@ public partial class AudioWorld
         };
         // Placed and pathed as the car it stands for. Re-placed bare, it was never occluded nor told its
         // distance whatever its path said (S3).
-        HandPath(ref e, VoiceKind.Borrowed, world, src, pos, level, eyePos);
+        if (!HandPath(ref e, VoiceKind.Borrowed, world, src, pos, level, eyePos)) return;
         _voices.Sound(e);
     }
 
@@ -3015,7 +3032,9 @@ public partial class AudioWorld
         // The worker's last answer; until it has one, FirstAnswer. Never "nothing in the way". The entity's
         // path for the frame, which its horn, siren, outlets and places are heard through too.
         long pathAt = System.Diagnostics.Stopwatch.GetTimestamp();
-        AcousticPathData acousticPath = PathOf(world, src, eyePos).Raw;
+        OwnerPath ownerPath = PathOf(world, src, eyePos);
+        if (!ownerPath.Ready) return;          // the worker has been asked; the voice starts when it answers
+        AcousticPathData acousticPath = ownerPath.Raw;
         _partMs[PartPaths] += Ms(pathAt);
 
         string resolvedSoundId = "";
@@ -3297,7 +3316,7 @@ public partial class AudioWorld
         // Its path in the emitter the budget holds, the only writer: heard from its point (a machine, a wood),
         // from the edge its path comes round when blocked (an engine, an aeroplane), or from where the path
         // arrives (a recording).
-        HandPath(ref emitter, ownKind, world, src, emitterPosition, earLevel, eyePos, inside: interior);
+        if (!HandPath(ref emitter, ownKind, world, src, emitterPosition, earLevel, eyePos, inside: interior)) return;
 
         // A repeating one-shot (RepeatIntervalSeconds: a PA, a foghorn, a station bell) is built as
         // normal and handed over only when its interval comes round.

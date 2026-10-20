@@ -307,7 +307,7 @@ public partial class AudioWorld
         // Its path every frame, from the registry's pass like every voice of a moving thing. Its ids are not
         // entities', and the path pass once skipped them: a horn begun on a stale outdoor answer played flat
         // through Marlow Tower's brick (2026-10-10, 74 dB in a corridor).
-        HandPath(ref e, kind, world, rep, at, levelDb, eyePos);
+        if (!HandPath(ref e, kind, world, rep, at, levelDb, eyePos)) return;
         ApplyGround(ref e, _groundWorld);
         // A voice let go and still fading is brought back (Sound), not started again.
         _voices.Sound(e);

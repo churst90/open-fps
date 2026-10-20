@@ -282,6 +282,9 @@ public class ClientWorldState
         lock (_metaLock)
         {
             CurrentMapSize = size;
+            // Nothing of the last map's acoustics is left to copy: every region registered before the bake
+            // would have cloned the old region and portal tables (a 534 ms /join instead of 25-37 ms).
+            AcousticMap = null;
             // A refresh still running for the last map is thrown away when it finishes (RefreshAcousticsNow).
             _mapEpoch++;
         }
@@ -311,6 +314,11 @@ public class ClientWorldState
         }
         Touch();
     }
+
+    /// <summary>Region and portal table copies made for definitions arriving on an already baked map.
+    /// Diagnostic (and the test that a cleared world copies nothing): a copy of the old map was what made
+    /// the second registration in one process 534 ms instead of 25-37.</summary>
+    internal int AcousticMapTableCopies { get; private set; }
 
     /// <summary>
     /// A definition arrived or changed. With <paramref name="deferAcoustics"/> (a tile of a streamed map)
@@ -385,6 +393,7 @@ public class ClientWorldState
             var map = AcousticMap;
             if (map == null) return;   // still loading; the bake will pick it up from the stream
 
+            AcousticMapTableCopies++;
             map.Regions = new Dictionary<int, Room>(map.Regions) { [def.EntityId] = OpenFPS.Common.EntityAcoustics.RoomOf(def, def.Moves ? null : map.RoomCells) };
             map.RegionPositions = new Dictionary<int, Vector3>(map.RegionPositions) { [def.EntityId] = def.Transform.Position };
             map.RegionRotations = new Dictionary<int, Quaternion>(map.RegionRotations) { [def.EntityId] = def.Transform.Rotation };
@@ -414,6 +423,7 @@ public class ClientWorldState
             bool known = map.Portals.ContainsKey(def.EntityId);
             if (!openable && !known) return;
 
+            AcousticMapTableCopies++;
             var portals = new Dictionary<int, (Opening Portal, Vector3 Position)>(map.Portals);
             if (openable) portals[def.EntityId] = (def.Portal.ToOpening(), def.Transform.Position);
             else portals.Remove(def.EntityId);
@@ -451,6 +461,7 @@ public class ClientWorldState
                 if (gone.Contains(frame.Room)) (openings ??= new List<int>()).Add(id);
             if (openings != null)
             {
+                AcousticMapTableCopies++;
                 var portals = new Dictionary<int, (Opening Portal, Vector3 Position)>(map.Portals);
                 var frames = new Dictionary<int, OpeningFrame>(map.OpeningFrames);
                 foreach (int id in openings) { portals.Remove(id); frames.Remove(id); }
@@ -473,6 +484,7 @@ public class ClientWorldState
                 if (map.Portals.ContainsKey(id)) (present ??= new List<int>()).Add(id);
             if (present == null) return;
 
+            AcousticMapTableCopies++;
             var portals = new Dictionary<int, (Opening Portal, Vector3 Position)>(map.Portals);
             foreach (int id in present) portals.Remove(id);
             map.Portals = portals;

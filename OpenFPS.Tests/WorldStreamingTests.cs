@@ -818,6 +818,42 @@ public class WorldStreamingTests
         Assert.True(client.AcousticMap!.Regions.ContainsKey(6));
     }
 
+    /// <summary>
+    /// A world reused for the next map (as /join does) must not carry the last map's acoustic map into
+    /// the new registration: every region arriving before the bake cloned the old tables, making the
+    /// second registration 534 ms instead of 25-37. A cleared world copies what a fresh one does: nothing.
+    /// </summary>
+    [Fact]
+    public void A_cleared_world_keeps_no_old_acoustic_map_to_copy()
+    {
+        var size = new Vector3(100, 20, 100);
+        var min = new Vector3(-50, 0, -50);
+        var reused = new ClientWorldState();
+        reused.Clear(size);
+        reused.ConfigureAcoustics(min, 0.5f, 0.2f, 50f);
+        var oldRoom = new EntityDefinition { EntityId = 30, Transform = new Transform { Position = new Vector3(0, 1.5f, 0), Rotation = Quaternion.Identity } };
+        oldRoom.Region.RoomSize = new Vector3(4, 3, 4);
+        oldRoom.Region.IsIndoor = true;
+        reused.SetAcousticMap(ClientWorldState.BuildAcousticMap(new[] { oldRoom }, size, min, 0.5f, 0.2f, false, false));
+
+        reused.Clear(size);
+        Assert.Null(reused.AcousticMap);
+
+        var next = new EntityDefinition { EntityId = 31, Transform = new Transform { Position = new Vector3(0, 1.5f, 0), Rotation = Quaternion.Identity } };
+        next.Region.RoomSize = new Vector3(4, 3, 4);
+        next.Region.IsIndoor = true;
+        reused.RegisterDefinition(next);
+
+        var fresh = new ClientWorldState();
+        fresh.Clear(size);
+        fresh.ConfigureAcoustics(min, 0.5f, 0.2f, 50f);
+        fresh.RegisterDefinition(next);
+
+        // By what it copies, not a clock: no region or portal table was cloned in either.
+        Assert.Equal(0, reused.AcousticMapTableCopies);
+        Assert.Equal(fresh.AcousticMapTableCopies, reused.AcousticMapTableCopies);
+    }
+
     // ── Two clients through the real session code ────────────────────────────────────────────────
 
     private sealed class Speech : ISpeechOutput

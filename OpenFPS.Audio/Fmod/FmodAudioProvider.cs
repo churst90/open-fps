@@ -1456,26 +1456,36 @@ public partial class FmodAudioProvider : IAudioProvider
 
     private void ClearReverbBuses()
     {
-        ReturnReverbVoices(); // while the buses still exist
-        // Each traced stage off its bus while the bus exists: removeDSP waits out a callback in flight,
-        // so after it nothing reads the stage's native memory. An attached unit cannot be released.
-        foreach (var (regionId, (_, dsp, _)) in _traced)
+        // The graph the mixer walks: a bus and its units are freed while it may be in the middle of a
+        // block, and the second city load died in FMOD's DSP creation after these releases (the core's
+        // stack: CreateReverbBus, UpdateActiveReverbs). Locking holds the mixer's own walk out of the
+        // teardown; unlock flushes the commands in order, releases included.
+        bool anything = _reverbBuses.Count > 0 || _reverbDsps.Count > 0 || _traced.Count > 0 || _reverbSaVoices.Count > 0;
+        bool locked = anything && _system.hasHandle() && FmodCheck(_system.lockDSP(), "lockDSP");
+        try
         {
-            if (!dsp.hasHandle()) continue;
-            if (_reverbBuses.TryGetValue(regionId, out var bus) && bus.hasHandle()
-                && bus.removeDSP(dsp) != RESULT.OK) _failedDetaches++;
-            dsp.release();
+            ReturnReverbVoices(); // while the buses still exist
+            // Each traced stage off its bus while the bus exists: removeDSP waits out a callback in flight,
+            // so after it nothing reads the stage's native memory. An attached unit cannot be released.
+            foreach (var (regionId, (_, dsp, _)) in _traced)
+            {
+                if (!dsp.hasHandle()) continue;
+                if (_reverbBuses.TryGetValue(regionId, out var bus) && bus.hasHandle()
+                    && bus.removeDSP(dsp) != RESULT.OK) _failedDetaches++;
+                dsp.release();
+            }
+            ReleaseReverbUnits();
+            _reverbDsps.Clear(); _reverbBuses.Clear(); _reverbVolumes.Clear(); _regionDecaySeconds.Clear();
+            foreach (var (st, _, handle) in _traced.Values)
+            {
+                TracedStages.Free(st);
+                if (handle.IsAllocated) handle.Free();
+            }
+            _traced.Clear(); _tracedRunning.Clear(); _handOvers.Clear();
+            // Another map's rooms: what was worked out for this one's ids means nothing there.
+            _fieldHere.Clear(); _fieldsPending.Clear();
         }
-        ReleaseReverbUnits();
-        _reverbDsps.Clear(); _reverbBuses.Clear(); _reverbVolumes.Clear(); _regionDecaySeconds.Clear();
-        foreach (var (st, _, handle) in _traced.Values)
-        {
-            TracedStages.Free(st);
-            if (handle.IsAllocated) handle.Free();
-        }
-        _traced.Clear(); _tracedRunning.Clear(); _handOvers.Clear();
-        // Another map's rooms: what was worked out for this one's ids means nothing there.
-        _fieldHere.Clear(); _fieldsPending.Clear();
+        finally { if (locked) _system.unlockDSP(); }
     }
 
     private void UpdateActiveReverbs(Vector3 listenerPos)
@@ -2424,42 +2434,51 @@ public partial class FmodAudioProvider : IAudioProvider
         // Checked: FMOD's pools are finite, and using a handle it refused is a null dereference in the
         // native library, no exception and no log line ("it crashes when I walk around").
         string busName = (region.FriendlyName ?? "Unknown") + "_Reverb";
-        if (_system.createChannelGroup(busName, out var bus) != RESULT.OK || !bus.hasHandle())
+        // Made against the mixer's walk, for the same reason the teardown is (ClearReverbBuses): the
+        // second load's crash was here. The head is attached after the unlock, with its own lock.
+        bool locked = _system.hasHandle() && FmodCheck(_system.lockDSP(), "lockDSP");
+        FMOD.ChannelGroup bus = default;
+        float initialVol = 0f;
+        try
         {
-            Log.Warning("Reverb: FMOD would not make a bus for region {Id} ({Name}) — {Count} already exist. "
-                      + "That room will be dry.", regionId, region.FriendlyName, _reverbBuses.Count);
-            return;
-        }
-        // 3D, so UpdateReverbBuses can place a room's reverb at its doorway for a listener outside
-        // (without a 3D mode those calls do nothing). The level is gated by hand per portal, so FMOD's
-        // own rolloff is kept out of the way with a huge max distance.
-        bus.setMode(MODE._3D | Rolloff.Mode);
-        bus.set3DMinMaxDistance(2.0f, 10000.0f);
-        if (_system.createDSPByType(DSP_TYPE.SFXREVERB, out var reverbDsp) != RESULT.OK || !reverbDsp.hasHandle())
-        {
-            Log.Warning("Reverb: FMOD would not make a reverb unit for region {Id} ({Name}) — {Count} already exist.",
-                        regionId, region.FriendlyName, _reverbDsps.Count);
-            bus.release();
-            return;
-        }
+            if (_system.createChannelGroup(busName, out bus) != RESULT.OK || !bus.hasHandle())
+            {
+                Log.Warning("Reverb: FMOD would not make a bus for region {Id} ({Name}) — {Count} already exist. "
+                          + "That room will be dry.", regionId, region.FriendlyName, _reverbBuses.Count);
+                return;
+            }
+            // 3D, so UpdateReverbBuses can place a room's reverb at its doorway for a listener outside
+            // (without a 3D mode those calls do nothing). The level is gated by hand per portal, so FMOD's
+            // own rolloff is kept out of the way with a huge max distance.
+            bus.setMode(MODE._3D | Rolloff.Mode);
+            bus.set3DMinMaxDistance(2.0f, 10000.0f);
+            if (_system.createDSPByType(DSP_TYPE.SFXREVERB, out var reverbDsp) != RESULT.OK || !reverbDsp.hasHandle())
+            {
+                Log.Warning("Reverb: FMOD would not make a reverb unit for region {Id} ({Name}) — {Count} already exist.",
+                            regionId, region.FriendlyName, _reverbDsps.Count);
+                bus.release();
+                return;
+            }
         
-        // No tail of its own, input passed through dry: the traced stage inserted at its index
-        // (AddTracedStage) is the room's answer, and the only thing that leaves the bus.
-        reverbDsp.setParameterFloat(11, -80.0f);
-        reverbDsp.setParameterFloat(12, 0.0f);
+            // No tail of its own, input passed through dry: the traced stage inserted at its index
+            // (AddTracedStage) is the room's answer, and the only thing that leaves the bus.
+            reverbDsp.setParameterFloat(11, -80.0f);
+            reverbDsp.setParameterFloat(12, 0.0f);
 
-        // At the tail (the input end), so the fader and the binaural stage at the head are downstream.
-        // At the head the sends injected past both: a room's reverb at full level, from all
-        // directions, from anywhere on the map.
-        bus.addDSP(CHANNELCONTROL_DSP_INDEX.TAIL, reverbDsp);
+            // At the tail (the input end), so the fader and the binaural stage at the head are downstream.
+            // At the head the sends injected past both: a room's reverb at full level, from all
+            // directions, from anywhere on the map.
+            bus.addDSP(CHANNELCONTROL_DSP_INDEX.TAIL, reverbDsp);
         
-        float initialVol = (regionId == _listenerRegionId) ? 1.0f : 0.0f;
-        bus.setVolume(initialVol);
-        _reverbBuses[regionId] = bus;
-        _reverbDsps[regionId] = reverbDsp;
-        _reverbVolumes[regionId] = initialVol;
-        _system.getMasterChannelGroup(out var master);
-        master.addGroup(bus);
+            initialVol = (regionId == _listenerRegionId) ? 1.0f : 0.0f;
+            bus.setVolume(initialVol);
+            _reverbBuses[regionId] = bus;
+            _reverbDsps[regionId] = reverbDsp;
+            _reverbVolumes[regionId] = initialVol;
+            _system.getMasterChannelGroup(out var master);
+            master.addGroup(bus);
+        }
+        finally { if (locked) _system.unlockDSP(); }
 
         // Your own room's at once; another room's when it is heard (SetReverbDirection).
         if (initialVol > 0f || _lab.FirstComeStages) TryAttachReverbHead(regionId, bus);
@@ -2476,16 +2495,23 @@ public partial class FmodAudioProvider : IAudioProvider
     /// </summary>
     private bool TryAttachReverbHead(int regionId, FMOD.ChannelGroup bus)
     {
-        if (!_steamAudioEnabled || !TryCreateSteamAudioVoice(out var rvState, out var rvDsp, out var rvHandle, _lab.FirstComeStages ? SaDirectReserve : 0))
-            return false;
-        rvState!.GuardName = "(a reverb bus's head)";
-        SetBusPanning(bus, threeD: false);
-        bus.addDSP(CHANNELCONTROL_DSP_INDEX.HEAD, rvDsp);
-        // Never bypassed: the stage crossfades between the reverb's own stereo and its placement
-        // (SpatialBlend), so there is no switch to click. See SetReverbDirection.
-        rvState!.SpatialBlend = 0f;
-        _reverbSaVoices[regionId] = new SaVoice { State = rvState!, Dsp = rvDsp, Handle = rvHandle };
-        return true;
+        if (!_steamAudioEnabled || !bus.hasHandle()) return false;
+        // The head is a unit of the bus's graph: attached while the mixer may be walking it.
+        bool locked = _system.hasHandle() && FmodCheck(_system.lockDSP(), "lockDSP");
+        try
+        {
+            if (!TryCreateSteamAudioVoice(out var rvState, out var rvDsp, out var rvHandle, _lab.FirstComeStages ? SaDirectReserve : 0))
+                return false;
+            rvState!.GuardName = "(a reverb bus's head)";
+            SetBusPanning(bus, threeD: false);
+            bus.addDSP(CHANNELCONTROL_DSP_INDEX.HEAD, rvDsp);
+            // Never bypassed: the stage crossfades between the reverb's own stereo and its placement
+            // (SpatialBlend), so there is no switch to click. See SetReverbDirection.
+            rvState!.SpatialBlend = 0f;
+            _reverbSaVoices[regionId] = new SaVoice { State = rvState!, Dsp = rvDsp, Handle = rvHandle };
+            return true;
+        }
+        finally { if (locked) _system.unlockDSP(); }
     }
 
     /// <summary>
@@ -2497,10 +2523,15 @@ public partial class FmodAudioProvider : IAudioProvider
     private void ReleaseReverbHead(int regionId, FMOD.ChannelGroup bus)
     {
         if (!_reverbSaVoices.TryGetValue(regionId, out var v)) return;
-        bool off = !v.Dsp.hasHandle() || (bus.hasHandle() && bus.removeDSP(v.Dsp) == RESULT.OK) || v.Dsp.disconnectAll(true, true) == RESULT.OK;
-        if (off) { lock (_saPool) { _saPool.Push(v); } }
-        else _failedDetaches++;
-        _reverbSaVoices.Remove(regionId);
+        bool locked = _system.hasHandle() && FmodCheck(_system.lockDSP(), "lockDSP");
+        try
+        {
+            bool off = !v.Dsp.hasHandle() || (bus.hasHandle() && bus.removeDSP(v.Dsp) == RESULT.OK) || v.Dsp.disconnectAll(true, true) == RESULT.OK;
+            if (off) { lock (_saPool) { _saPool.Push(v); } }
+            else _failedDetaches++;
+            _reverbSaVoices.Remove(regionId);
+        }
+        finally { if (locked) _system.unlockDSP(); }
     }
 
     /// <summary>A bus's level under which its head is given back: 60 dB down, where nothing it carries is heard.</summary>
