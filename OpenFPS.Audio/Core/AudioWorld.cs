@@ -353,6 +353,7 @@ public partial class AudioWorld
         _stepRandom = seed is int s ? new Random(s) : Random.Shared;
         _audio.RoutesSource = () => _acoustics.Routes;
         _loudspeakers = new LoudspeakerVoices(audio) { RenderInPlace = manualAcoustics };
+        _stepsTracedInPlace = manualAcoustics;
         _acousticWorker = new AsyncAcousticWorker(_acoustics, audio.Traced, audio.Clock) { Manual = manualAcoustics, Lab = audio.Lab };
         _oneOffs.Worker = _acousticWorker;
         // The birds: found from the map's foliage and roofs, heard by the worker's answers (P6), quiet at a bang.
@@ -3631,8 +3632,74 @@ public partial class AudioWorld
     public void OtherFootstep(Vector3 pos, string mat, float slopeDb, float slopePitch, int bodyId = -1)
     {
         if (Vector3.Distance(pos, Listener.Feet) > FootstepRange(OpenFPS.Sound.Loudness.FootstepDb + slopeDb)) return;
-        SubmitFootstep(pos + new Vector3(0, 0.1f, 0), mat, follows: false, offset: Vector3.Zero, boostDb: 0f, slopeDb, slopePitch,
-                       bodyId: bodyId);
+        Vector3 at = pos + new Vector3(0, 0.1f, 0);
+        if (_stepsTracedInPlace || _groundWorld is not { } world)
+        {
+            SubmitFootstep(at, mat, follows: false, offset: Vector3.Zero, boostDb: 0f, slopeDb, slopePitch, bodyId: bodyId);
+            return;
+        }
+        Vector3 ear = Listener.Feet + new Vector3(0, Listener.EyeHeight, 0);
+        // Their own body is left out; a step with no body leaves out nothing (a voice's id is never a body).
+        var path = System.Threading.Tasks.Task.Factory.StartNew(
+            () => StepPath(world, bodyId, ear, at), default, System.Threading.Tasks.TaskCreationOptions.None, StepTracer);
+        _tracingSteps.Add(new TracingStep(at, mat, slopeDb, slopePitch, bodyId, world, ear, path));
+    }
+
+    /// <summary>
+    /// Whether somebody else's step is traced where it is heard, on the update that hears it: in a test or a
+    /// replay, where the stream must come out the same every run. The game traces it off the placement thread:
+    /// a step's path is a full trace, 3 to 11 ms on the city, and a crowd's steps in one update held every
+    /// sound still for up to a second (--city-load, 2026-10-20).
+    /// </summary>
+    private readonly bool _stepsTracedInPlace;
+
+    /// <summary>A step waiting for its path, and what it is played with when the path lands.</summary>
+    private readonly record struct TracingStep(Vector3 At, string Material, float SlopeDb, float SlopePitch, int BodyId,
+                                               IAcousticWorld World, Vector3 Ear,
+                                               System.Threading.Tasks.Task<AcousticPathData> Path);
+
+    private readonly List<TracingStep> _tracingSteps = new();
+
+    /// <summary>Two steps traced at a time: a crowd arriving does not take every core from the mixer.</summary>
+    private static readonly System.Threading.Tasks.TaskScheduler StepTracer =
+        new System.Threading.Tasks.ConcurrentExclusiveSchedulerPair(System.Threading.Tasks.TaskScheduler.Default, 2).ConcurrentScheduler;
+
+    private AcousticPathData StepPath(IAcousticWorld world, int leaveOut, Vector3 ear, Vector3 at)
+    {
+        PlacementThread.Heavy("Another body's step's path");
+        return _acoustics.CalculateAcousticPath(world, leaveOut, ear, at);
+    }
+
+    /// <summary>
+    /// Plays the steps whose paths have landed, in the order they were heard, a frame or two after their foot
+    /// went down. A step traced for a map since left is dropped. The order is kept: a step whose path is still
+    /// being traced holds back the ones after it, so one walker's feet never swap.
+    /// </summary>
+    public void PlayTracedOtherSteps()
+    {
+        int played = 0;
+        for (; played < _tracingSteps.Count; played++)
+        {
+            var step = _tracingSteps[played];
+            if (!step.Path.IsCompleted) break;
+            // The world is each frame's; its rooms are the map's.
+            if (step.Path.Status != System.Threading.Tasks.TaskStatus.RanToCompletion || !ReferenceEquals(step.World.Rooms, _groundWorld?.Rooms))
+                continue;
+            SubmitFootstep(step.At, step.Material, follows: false, offset: Vector3.Zero, boostDb: 0f, step.SlopeDb, step.SlopePitch,
+                           bodyId: step.BodyId, traced: (step.Path.Result, step.Ear));
+        }
+        if (played > 0) _tracingSteps.RemoveRange(0, played);
+    }
+
+    /// <summary>Other people's steps still waiting for their paths. Diagnostic.</summary>
+    public int OtherStepsTracing => _tracingSteps.Count;
+
+    /// <summary>Waits for every step's path being traced, so the next update plays them all: for a test or
+    /// the lab, which step without real time. Never on a placement thread in the game.</summary>
+    public void WaitForStepPaths()
+    {
+        foreach (var step in _tracingSteps)
+            try { step.Path.Wait(); } catch (AggregateException) { }
     }
 
     /// <summary>
@@ -3710,7 +3777,8 @@ public partial class AudioWorld
 
 
     private void SubmitFootstep(Vector3 nudgePos, string mat, bool follows, Vector3 offset, float boostDb,
-                                float slopeDb, float slopePitch, int bodyId = -1)
+                                float slopeDb, float slopePitch, int bodyId = -1,
+                                (AcousticPathData Path, Vector3 Ear)? traced = null)
     {
         // Your own feet ride with you (follows); anybody else's stay where they fell.
         bool own = follows;
@@ -3748,7 +3816,7 @@ public partial class AudioWorld
             EarLevelDb = OpenFPS.Sound.Loudness.FootstepDb + boostDb + slopeDb,
             TargetRegionId = _listenerRegion,
         };
-        if (!own) CarryThePath(ref footstep, nudgePos, bodyId);
+        if (!own) CarryThePath(ref footstep, nudgePos, bodyId, traced);
         _voices.DeclareEvent(id, own ? OwnEntityId : bodyId >= 0 ? bodyId : VoiceRegistry.NoEntity,
                              stepKind, nudgePos, footstep.EarLevelDb);
         _voices.Submit(footstep);
@@ -3766,11 +3834,17 @@ public partial class AudioWorld
     /// out 8 dB down at occlusion 0.6 (Cody and Sean, 2026-10-05: "I cannot hear his footsteps while he's
     /// walking, only his beacon").
     /// </summary>
-    private void CarryThePath(ref SpatialEmitter step, Vector3 at, int bodyId = -1)
+    private void CarryThePath(ref SpatialEmitter step, Vector3 at, int bodyId = -1, (AcousticPathData Path, Vector3 Ear)? traced = null)
     {
-        if (_groundWorld is not { } world) return;
-        Vector3 ear = Listener.Feet + new Vector3(0, Listener.EyeHeight, 0);
-        var path = _acoustics.CalculateAcousticPath(world, bodyId >= 0 ? bodyId : step.EntityId, ear, at);
+        AcousticPathData path;
+        Vector3 ear;
+        if (traced is { } t) (path, ear) = t;
+        else
+        {
+            if (_groundWorld is not { } world) return;
+            ear = Listener.Feet + new Vector3(0, Listener.EyeHeight, 0);
+            path = _acoustics.CalculateAcousticPath(world, bodyId >= 0 ? bodyId : step.EntityId, ear, at);
+        }
         if (_acousticWorker.TryGetNearby(ear, at, out var near))
         {
             Vector3 moved = at - near.SourcePosition;

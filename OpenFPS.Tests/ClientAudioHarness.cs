@@ -127,6 +127,9 @@ internal sealed class ClientAudioHarness
         // A new voice waits for the worker's first answer (part 3a). A test ticking without real time would
         // never see it; give the worker the moment a frame on the clock would.
         if (Audio.World.PathsAwaitingAnswer > 0) System.Threading.Thread.Sleep(2);
+        // Somebody else's step is traced off the placement thread and played on the update after its path
+        // lands; here always the next, so a test hears every step one frame late, every run.
+        Audio.World.WaitForStepPaths();
     }
 
     /// <summary>Lets time pass with no update in between — the engine hold, for instance.</summary>

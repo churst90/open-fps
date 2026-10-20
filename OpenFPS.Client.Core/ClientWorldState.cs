@@ -912,12 +912,15 @@ public class ClientWorldState
         foreach (var kvp in _definitions)
         {
             var id = kvp.Key;
+            // Only a state sets a velocity: a definition alone puts the transform it came with.
+            bool placed = _serverVelocities.TryGetValue(id, out var velocity);
             var s = new EntitySnapshot
             {
                 Id = id,
                 Definition = kvp.Value,
                 Transform = _serverTransforms.GetValueOrDefault(id, kvp.Value.Transform),
-                Velocity = _serverVelocities.GetValueOrDefault(id, Vector3.Zero),
+                Unplaced = !placed,
+                Velocity = velocity,
                 TyreDemand = _serverTyreDemand.GetValueOrDefault(id, 0f),
                 Signals = _serverSignals.GetValueOrDefault(id),
                 Lever = _serverLevers.GetValueOrDefault(id),

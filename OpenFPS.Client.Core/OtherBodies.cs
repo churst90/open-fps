@@ -131,6 +131,13 @@ public sealed class OtherBodies
                 continue;
             }
 
+            // Nobody is heard before the server has said where they are.
+            if (body.Unplaced)
+            {
+                _partMs[LabClassify] += Ms(partAt);
+                continue;
+            }
+
             if (!_bodies.TryGetValue(body.Id, out var state))
             {
                 _bodies[body.Id] = state = new Body();

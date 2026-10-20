@@ -151,6 +151,30 @@ public class OtherBodiesTests
                     $"the first step came {at.Z + 4f:F2} m in, past a whole step");
     }
 
+    /// <summary>
+    /// A walker's definition comes before its state, and until then the body stands still at the
+    /// definition's transform. Read as standing, it started walking when its state came: the whole city's
+    /// crowd stepped on one update after a load. A body the server has not placed is not heard yet.
+    /// </summary>
+    [Fact]
+    public void SomebodyNotYetPlacedIsNotHeardStartingToWalk()
+    {
+        var others = new OtherBodies();
+        int steps = 0;
+        others.OnStepTriggered += (_, _, _, _, _) => steps++;
+
+        var unplaced = Frame(new Vector3(0, 0, 0), Vector3.Zero);
+        var body = unplaced.DynamicEntities[0];
+        body.Unplaced = true;
+        unplaced.DynamicEntities[0] = body;
+        unplaced.Entities[Walker] = body;
+        others.Update(unplaced, Listener);
+        Assert.Equal(0, others.Count);
+
+        others.Update(Frame(new Vector3(0, 0, 3f), new Vector3(0, 0, 1.4f)), Listener);
+        Assert.Equal(0, steps);
+    }
+
     /// <summary>Somebody first heard standing still starts a walk with a foot down, as a tap does.</summary>
     [Fact]
     public void SomebodyFirstHeardStandingStepsWhenTheyStart()

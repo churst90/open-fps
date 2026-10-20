@@ -214,6 +214,7 @@ public sealed class ClientAudioSystem : IAudioHost
     private void PlayQueuedOtherSteps()
     {
         LabOtherStepsLastCount = 0;
+        _world.PlayTracedOtherSteps();
         lock (_queuedStepsLock)
         {
             if (_queuedSteps.Count == 0) return;

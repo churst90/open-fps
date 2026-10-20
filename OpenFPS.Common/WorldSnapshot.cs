@@ -231,6 +231,11 @@ public struct EntitySnapshot
     /// (EntityState.Grounding); Unknown for anything no step stands.</summary>
     public Grounding Grounding;
 
+    /// <summary>The server has sent no state for it yet, only its definition: it stands at the definition's
+    /// transform, still, wherever it really is. A walker read that way stood until its state came and then
+    /// started walking, every walker on the city at once.</summary>
+    public bool Unplaced;
+
     /// <summary>An entity is a body to the sound (<see cref="EntityAcoustics.BodyOf"/>).</summary>
     public static implicit operator AcousticBody(EntitySnapshot snap) => EntityAcoustics.BodyOf(snap);
 }
