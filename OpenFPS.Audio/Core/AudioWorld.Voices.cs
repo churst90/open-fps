@@ -85,6 +85,14 @@ public partial class AudioWorld
             });
             if (_lastOwnerPaths.TryGetValue(owner.Id, out var last))
                 p = new OwnerPath(last.Raw, last.Heard, fresh: false);
+            else if (LatestDirect(owner.Id) is { } latest)
+            {
+                // Answered, but never for where it is asked now: asked every tenth frame by an ear moving
+                // faster than its speed says, every answer is a few metres out. It is still this source's
+                // answer, and waiting for one that fits dropped a wood's pieces on each of its frames.
+                p = new OwnerPath(latest, latest, fresh: false);
+                _lastOwnerPaths[owner.Id] = p;
+            }
             else
             {
                 p = new OwnerPath(default, default, fresh: false, ready: false);
@@ -93,6 +101,15 @@ public partial class AudioWorld
         }
         _ownerPaths[owner.Id] = p;
         return p;
+    }
+
+    /// <summary>The worker's newest direct path for this owner, wherever it was traced from; null if it has none.</summary>
+    private AcousticPathData? LatestDirect(int ownerId)
+    {
+        if (!_acousticWorker.TryGetResult(ownerId, out var paths)) return null;
+        foreach (var p in paths)
+            if (!p.IsReflection) return p;
+        return null;
     }
 
     /// <summary>
