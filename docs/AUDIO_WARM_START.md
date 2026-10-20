@@ -95,7 +95,8 @@ The same burst comes wherever the set of sources changes at once, so the fix cov
        `OtherBodies.Update`'s first state for every body (744–841 ms of 908–1,100) outweighs the audio update
        (32–297 ms). Both are first-time work: load 2's same passes are 126–150 ms and 181–258 ms. The mixer
        over-100 % block did not reproduce here; the 2026-10-17 log's 1,287 ms placement pass did, as 561–659 ms,
-       and the missing second is now named.
+       and the missing second is now named. One later 10 s sanity run segfaulted in native code while the second
+       load's acoustics were built; the repeat of that run completed, and all three measured 30 s runs completed.
 2. **No first-time cost.**
    - The Windows client is compiled ahead (`PublishReadyToRun` in `publish-windows.sh`), so code does not run
      slow while it is being compiled. ReadyToRun applies only to a publish, so the GTK client that
