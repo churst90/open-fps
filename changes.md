@@ -4,6 +4,19 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-19
 
+- Engine packages stage 10, the five law moves: `Pavements`, `Haunts`, `DoorRules`, `AlexDay` and `HomelessLines`
+  now live in `OpenFPS.Agents`, one commit each, and the server's hosts keep every body, seat, door and sound
+  write. `Haunt.Door` is an entity id now; `DoorRules` takes the view and the outside region id while
+  `DoorManners` keeps the passage, the pause and thin wrappers; `AlexDay.Leave` returns the ride or the walk; and
+  `HomelessLines` took `OutburstChance` and `MutterDb` with it. The people replay's stored files, the spoken
+  lines and the emitter streams are unchanged line for line, and the people and traffic replays pass with
+  `DOTNET_PROCESSOR_COUNT=4`. The packages ratchet stays at 10 crossings with 614 files, and the sound survey's
+  files list gained the five moved files. The wire hash stays `a3d6f3a6ec76`, so the server and the Windows
+  client do not deploy together, and the door fingerprint is unchanged. Judgment calls: `Pavements` walks the
+  view's boxes backwards to keep Arch's store order, because the guard stores edge numbers and route tie-breaks;
+  the door wrappers build a grid-less view; and the person, player and vehicle records, and several door, region,
+  portal and box fields, are still unread by these laws and stay for the next stage. Built by DeepSeek through
+  OpenCode.
 - Engine packages stage 10, the guard and the view: `PeopleReplayTests` now stores an hour of the city
   (3,600 s, pace 6, parking every 20 s, 23:00) and ten minutes with a player on Market Square, covering
   `HauntFinder`'s places, every door's manner and `GoingIn`, Alex's `ViewOf` and body every 0.1 s, every door

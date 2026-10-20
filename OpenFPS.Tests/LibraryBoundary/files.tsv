@@ -56,12 +56,17 @@ OpenFPS.Acoustics/Systems/AcousticVolumeGenerator.cs	lib	Acoustics
 OpenFPS.Acoustics/Systems/FaceOpenings.cs	lib	Acoustics	
 OpenFPS.Acoustics/WallTransmission.cs	lib	Acoustics	
 OpenFPS.Agents/AircraftGroundRun.cs	host		
+OpenFPS.Agents/AlexDay.cs	host		
 OpenFPS.Agents/CarFollowing.cs	host		
 OpenFPS.Agents/CrossingRules.cs	host		
+OpenFPS.Agents/DoorRules.cs	host		
+OpenFPS.Agents/Haunts.cs	host		
+OpenFPS.Agents/HomelessLines.cs	host		
 OpenFPS.Agents/JunctionRules.cs	host		
 OpenFPS.Agents/LaneRoutes.cs	host		
 OpenFPS.Agents/LineFollower.cs	host		
 OpenFPS.Agents/MachinePower.cs	host		
+OpenFPS.Agents/Pavements.cs	host		
 OpenFPS.Agents/PeopleWorld.cs	host		
 OpenFPS.Agents/RaceLine.cs	host		
 OpenFPS.Agents/RouteRules.cs	host		

@@ -1418,17 +1418,20 @@ each with its own artifacts. **Decided by Cody, 2026-10-19:** the extension inte
 stage; `Parking`, `CrowdSystem` and `CrossingSystem` stay where they are; and the two city runs as the guard, with
 Alex's day at `Pace = 6` and positions stored to the centimetre.
 
-**Built so far (2026-10-19).** The guard and the view are in, and no law has moved. `PeopleReplayTests` stores an
-hour of the city and ten minutes on Market Square: `HauntFinder`'s places, every door's manner and `GoingIn`,
-Alex's `ViewOf` and body every 0.1 s, every door state change, and every line said, with seeds 20261006 and
-20261019. It passes three times without regenerating, once with `DOTNET_PROCESSOR_COUNT=4`, and a deliberate
-`LingerSeconds` 60.0 to 61.0 change altered Alex's hour as it should. `OpenFPS.Agents/PeopleWorld.cs` carries
-`IPeopleWorld` and the plan's records; `ServerPeopleView` fills them from the map and delegates the physics
-questions to `ServerPhysicsView`. Nothing reads it yet, so the wire hash stays `a3d6f3a6ec76` and the door
-fingerprint stays. Judgment calls: all the plan's records are kept though the first five moves read only the
-doors, regions, portals and named boxes; door closing animations carry no tick because `DoorManners.Through`
-derives its pause from `HashCode.Combine`, whose seed .NET picks per process (the states and animation lengths
-are stored); and `VehicleBody` is named `VehicleView` because `OpenFPS.Sound` already has a `VehicleBody`.
+**Built (2026-10-19).** The guard, the view and all five laws are in. The moves, one commit each and namespaces
+kept: `Pavements` walks `IPeopleWorld.NamedBoxes`; `HauntKind`, `Haunt` and `HauntFinder` moved with `Haunt.Door`
+an entity id; `DoorRules` holds the door law with `DoorManners` keeping the passage and thin `KindOf`/`GoingIn`
+wrappers; `AlexDay` holds the choices and returns the next ride or walk from `Leave`; and `HomelessLines` moved
+with `OutburstChance` and `MutterDb`. Every host keeps its writes and the day's state. `PeopleReplayTests`'
+stored files, `SpokenLinesReplayTests` and `EmitterStreamReplayTests` are unchanged line for line; the people and
+traffic replays pass with `DOTNET_PROCESSOR_COUNT=4`. The packages ratchet stays at 10 crossings with 614 files
+(the three new Agents files), and the sound survey's files list took the five moved files. The wire hash stays
+`a3d6f3a6ec76` and the door fingerprint does not change. The pause in `DoorManners.Through` is untouched.
+Judgment calls: `Pavements` walks `NamedBoxes` backwards because Arch returns the store's query order newest
+entity first, and the guard stores the network's edge numbers and route tie-breaks; the door wrappers build a
+grid-less `ServerPeopleView`; and the person, player and vehicle records, the door's kind, openness, target, hand
+and dead bit, the doorway's width and slide bit, the region's size, the portal's id and the box's id are not read
+by the five laws (kept for the state machines and the next stage).
 
 ### What can run beside what
 
