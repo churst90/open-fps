@@ -69,6 +69,26 @@ public class ProbableBugsTests
         Assert.Equal(0, h.Audio.WorldAudio.Sounds.Outstanding);
     }
 
+    /// <summary>A /join's load is not a placement stall: the first frame on the new map does not count the time
+    /// since the last frame on the old one. Every second load of --city-load reported it as one (2026-10-20).</summary>
+    [Fact]
+    public void TheLoadBetweenTwoMapsIsNotAStall()
+    {
+        var h = new ClientAudioHarness();
+        h.StandAt(Vector3.Zero);
+        h.Tick(3);
+        h.Wait(0.6);
+        h.Tick();
+        Assert.True(h.Audio.World.LabLastGapMs > 500, $"a frame 0.6 s late is a stall: {h.Audio.World.LabLastGapMs:F0} ms");
+
+        h.Tick();
+        h.Audio.LeaveWorld(Array.Empty<int>());
+        h.Wait(0.6);
+        h.Tick();
+
+        Assert.True(h.Audio.World.LabLastGapMs < 100, $"the load counted as a stall: {h.Audio.World.LabLastGapMs:F0} ms");
+    }
+
     // ── 6. The engine's per-sample loop skips tier 0 ─────────────────────────────────────────────
 
     /// <summary>

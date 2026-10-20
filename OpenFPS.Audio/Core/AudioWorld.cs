@@ -448,6 +448,8 @@ public partial class AudioWorld
         _talkersVoiced.Clear();
         _talkerRooms.Clear();
         _audio.TalkerStreams.Clear();
+        // The load between two maps is not a stall: no source is placed in it, so none is held.
+        _lastUpdateAt = 0;
     }
 
     /// <summary>How far past the audio clock's now a position's stamp may be before it is taken as another
