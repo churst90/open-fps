@@ -160,8 +160,10 @@ The same burst comes wherever the set of sources changes at once, so the fix cov
        replays still trace in place.
      - Two clean runs after all three: load 1's worst loop iteration 60 and 58 ms (snapshot 20–22, audio 17–19,
        pump 12–14), sources held at most 63 and 58 ms, worst placement pass 23 and 25 ms, mixer at most 69–70 %.
-       Load 2's worst loop was 33–35 ms, but sources were still held 481–647 ms, as before these parts; that is
-       open. Steady state from 10 s: worst loop 17–24 ms, worst pass 12–17 ms, mixer at most 58–65 %. Two
+       Load 2's worst loop was 33–35 ms, but sources were still held 481–647 ms, as before these parts. That was
+       the load itself: `LeaveWorld` left the last update's time standing, so the first update on the new map
+       counted the load as a hold. With the gap clock started again on leaving, load 2 held at most 44 ms.
+       Steady state from 10 s: worst loop 17–24 ms, worst pass 12–17 ms, mixer at most 58–65 %. Two
        further runs taken while another build used the machine had the mixer over 100 % throughout; the steps
        cost 0 ms of the loop in those too.
 4. **A settled start, heard in one go.** After a load or a jump of the listener, the mix stays silent while
