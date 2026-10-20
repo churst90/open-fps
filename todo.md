@@ -72,6 +72,9 @@ fingerprint changed too, so the door renders are made again once.
    measured cost during play; no garbage collection in the first seconds; a guard test. Six to nine sessions on
    two tracks (instrument, attribution, settled start; compiled ahead, collection, start budget). Client only,
    no wire change, no sound changed.
+   - Parts 1, 2 and 3 DONE 2026-10-20 (measured in the doc): the login's worst loop iteration 1.1 s to 60 ms,
+     its worst placement pass 0.6 s to 25 ms. Open: load 2 (a second login) still holds sources 0.5 s. Next:
+     part 4, the settled start.
    - A candidate for part 3, from Resonance's list of 2026-10-18: a vehicle's sound is made on whatever thread
      asks for it. In Resonance's copy one vehicle takes 32 to 92 ms, the first of each preset the longest, and
      its game ticks spent up to 210 ms on it arriving in town. `VoiceBuilds.Makes` builds sirens, bells, horns,

@@ -143,6 +143,27 @@ The same burst comes wherever the set of sources changes at once, so the fix cov
    - creating 50 to 60 voices' FMOD effects at once;
    - the birds' first pass (143 ms);
    - a model still built in line.
+   - **Measured (2026-10-20).** Same instrument and settings as part 1, `warm=1`.
+     - Part 3a moved the birds' survey, engine reflections and their geometry to the acoustic worker, and new
+       voices wait for the worker instead of tracing in place. Load 1's worst placement pass fell from 561–705 ms
+       to 12–62 ms, and load 2's to 9–23 ms. Eight combined runs completed without the native crash, after the
+       reverb buses were made and torn down under FMOD's DSP lock.
+     - Part 3b moved `OtherBodies.Update`'s first-state cost out of the body pass. The game loop's worst
+       iteration did not fall: 1,081 ms, of which the audio update was 1,035 ms and 83 other people's steps played
+       in one frame 1,030 ms of it. Each step's acoustic path (occlusion, the ground, routes) costs 3–11 ms.
+     - Why 83 at once: a body's definition sets its transform but no velocity, so every walker read as standing
+       until its first state came, and then all started walking in the same frame. A body the server has sent
+       no state for is now `Unplaced` and not heard. A walker first heard walking is mid-stride, its phase spread
+       by its id, so a crowd does not march in step.
+     - Other people's steps now trace their paths on two worker threads and play, in order, on the first frame
+       their path is ready: a frame or two later than before. A step whose map has changed is dropped. Tests and
+       replays still trace in place.
+     - Two clean runs after all three: load 1's worst loop iteration 60 and 58 ms (snapshot 20–22, audio 17–19,
+       pump 12–14), sources held at most 63 and 58 ms, worst placement pass 23 and 25 ms, mixer at most 69–70 %.
+       Load 2's worst loop was 33–35 ms, but sources were still held 481–647 ms, as before these parts; that is
+       open. Steady state from 10 s: worst loop 17–24 ms, worst pass 12–17 ms, mixer at most 58–65 %. Two
+       further runs taken while another build used the machine had the mixer over 100 % throughout; the steps
+       cost 0 ms of the loop in those too.
 4. **A settled start, heard in one go.** After a load or a jump of the listener, the mix stays silent while
    every voice in earshot is started and rendered silently: engines turning, machines running, birds placed,
    echoes found.
