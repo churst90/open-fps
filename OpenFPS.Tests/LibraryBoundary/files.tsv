@@ -151,6 +151,7 @@ OpenFPS.Audio/SteamAudio/TracedEchoes.cs	lib	Audio
 OpenFPS.Audio/SteamAudio/TracedReverb.cs	lib	Audio	
 OpenFPS.Audio/SteamAudio/TracedReverbDsp.cs	lib	Audio	
 OpenFPS.Client.Core/AudioDiagnostics.cs	host		
+OpenFPS.Client.Core/AudioWarmUp.cs	host		
 OpenFPS.Client.Core/ChatCues.cs	host		
 OpenFPS.Client.Core/ClientAudioPaths.cs	host		
 OpenFPS.Client.Core/ClientAudioSystem.cs	host		

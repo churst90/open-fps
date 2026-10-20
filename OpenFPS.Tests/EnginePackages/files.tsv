@@ -157,6 +157,7 @@ OpenFPS.Audio/SteamAudio/TracedEchoes.cs	Audio
 OpenFPS.Audio/SteamAudio/TracedReverb.cs	Audio	
 OpenFPS.Audio/SteamAudio/TracedReverbDsp.cs	Audio	
 OpenFPS.Client.Core/AudioDiagnostics.cs	game	
+OpenFPS.Client.Core/AudioWarmUp.cs	game	
 OpenFPS.Client.Core/ChatCues.cs	game	
 OpenFPS.Client.Core/ClientAudioPaths.cs	game	
 OpenFPS.Client.Core/ClientAudioSystem.cs	game	the audio world's host: sources from the snapshot, the game's sound features, the place's name

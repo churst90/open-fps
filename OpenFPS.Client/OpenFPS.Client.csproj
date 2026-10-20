@@ -12,6 +12,11 @@
     <!-- Compiles (does not run) on Linux, so the Windows head is checked against the shared session
          on the machine the Linux head is built on. Without it the SDK refuses with NETSDK1100. -->
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <!-- A publish is the only place ReadyToRun applies; a plain build stays untouched. The script passes
+         the runtime identifier, which this needs. Per-assembly images, not composite: the client is
+         self-contained and cross-published, and composite adds nothing a per-assembly image lacks here.
+         docs/AUDIO_WARM_START.md, part 2. -->
+    <PublishReadyToRun Condition="'$(RuntimeIdentifier)' != ''">true</PublishReadyToRun>
   </PropertyGroup>
 
   <ItemGroup>

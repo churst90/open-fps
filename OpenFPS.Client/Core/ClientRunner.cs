@@ -93,7 +93,8 @@ public class ClientRunner
         // Escape while connecting: said, and focus stays where it was; the form only shows it.
         _session.ConnectCancelled += () => _navigation.EnqueueUIAction(() => _navigation.Menu?.ShowConnectCancelled());
         // Preloading the sound library is the long pole; it runs on the session's audio thread and the
-        // menu is usable meanwhile, as on Linux.
+        // menu is usable meanwhile, as on Linux. The login screen's warm-up runs beside it.
+        _session.BeginAudioWarmUp();
         _session.BeginAudioInit(ApplyAudioSettings);
 
         _network.Start();

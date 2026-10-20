@@ -105,9 +105,38 @@ The same burst comes wherever the set of sources changes at once, so the fix cov
    - The Windows client is compiled ahead (`PublishReadyToRun` in `publish-windows.sh`), so code does not run
      slow while it is being compiled. ReadyToRun applies only to a publish, so the GTK client that
      `run-gtk-client.sh` builds relies on the warm-up below.
-   - At the login screen, a warm-up renders each kind of voice once on a background thread and throws the sound
-     away: an engine, a machine, rail, water, fire, birds, the binaural and reverb effects. This covers the
+   - At the login screen, a warm-up renders each kind of voice once on a background thread and throws the
+     sound away: an engine, a machine, rail, water, fire, birds, the binaural and reverb effects. This covers the
      GTK client and development runs, which are not compiled ahead.
+   - **Measured (2026-10-20).** The Windows publish ran from Linux with the client's runtime identifier and
+     `PublishReadyToRun`, per-assembly rather than composite (the client is self-contained and cross-published;
+     composite adds nothing an image per assembly lacks here). Reading each published PE's CLR header (the
+     optional header's data directory 14, then `IMAGE_COR20_HEADER.ManagedNativeHeader` at offset 64) found the
+     ReadyToRun `RTR\0` signature in `OpenFPS.Client`, `Client.Core`, `Audio`, `Sound`, `Common`, `Models`,
+     `Geometry`, `Acoustics` and `Physics`: 156 of the publish's 242 managed assemblies are images, 86 are IL and
+     19 are native. The full `publish-windows.sh` stops in this checkout before the zip because the Windows
+     `lib/phonon.dll` is not here (only `libphonon.so`); the publish step itself, run with the same settings,
+     completed.
+     The login warm-up starts on a background thread after the live mixer has read its output settings, renders
+     on a mixer of its own that writes a temporary WAV file (deleted afterwards), and stops when a map arrives.
+     It took 3.1–4.1 s and rendered an engine, a machine, rail, running water, fire, trees, birds, a horn, a
+     siren, footsteps, echoes and reverb buses, with Steam Audio's HRTF stages in use (the run's log says
+     "Steam Audio HRTF binaural enabled ... 160 voices pooled"). Its acoustic worker uses the hand-rolled tracer:
+     the simulator's native scene build is the crash `--city-load` still sees (part 3a), and a login must not
+     risk it. On `--city-load warm=1 repeat=2 sec=30`, Release, the build script's twelve cores, with the lab
+     output linked to the checkout's sound bank so the city's birds and steps are audible:
+     - Without the warm-up, load 1's worst placement pass was 663 and 692 ms and load 2's 110 and 129; with it,
+       load 1's was 201 and 320 and load 2's 114 and 116. The first-time cost (load 1 minus load 2) fell from
+       553–563 ms to 84–207 ms. Load 1 was five to six times load 2's pass before and one and a half to three
+       times after; what is left is the city's own bird survey on its first pass (102–190 ms, more habitat than a
+       small made-up scene has) and the echo budget.
+     - The worst client loop iteration in the first ten seconds was 945 and 1,241 ms without the warm-up and
+       937 and 954 ms with it. `OtherBodies.Update`'s first state for every body was 686–691 ms of the latter,
+       which is part 3b's and not this warm-up's; the audio update was 194–229 ms in load 1 against 103–114 in
+       load 2, mostly the same bird survey.
+     - The steady state from 10 s did not change: worst pass 31–36 ms, worst loop 66–89 ms, mixer at most
+       63–67 % with the warm-up and 63–66 % without. Several further loads crashed in the known native fault
+       (part 3a), before and after the change.
 3. **Nothing heavy where sounds are placed or in the game loop.** Whatever the instrument names in the missing
    second is moved off those threads, the way the train horn and car-door freezes were on 2026-10-12
    (`VoiceBuilds`, `PlacementThread.Heavy()`). Likely candidates:
