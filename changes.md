@@ -2,6 +2,29 @@
 
 Recent work, newest first. `git log` has the rest.
 
+## 2026-10-20
+
+- Sound that starts clean, part 2: the Windows client is published ReadyToRun (`PublishReadyToRun` in the
+  project when the script gives it `-r win-x64`, per-assembly rather than composite), and both clients warm the
+  sound path at the login screen. `AudioWarmUp` runs on a background thread after the live mixer has started,
+  renders an engine, a machine, rail, running water, fire, trees, birds, a horn, a siren, footsteps, echoes and
+  reverb buses on a small made-up scene, writes to a temporary WAV file of its own and throws it away, logs one
+  line, and stops when a map arrives; its acoustic worker uses the hand-rolled tracer because the Steam Audio
+  simulator's native scene build is part 3a's crash. `--city-load` gains `warm=1`. Release, twelve cores,
+  `repeat=2 sec=30`: load 1's worst placement pass fell from 663/692 ms without the warm-up to 201/320 ms with
+  it, and the first-time cost from 553–563 ms to 84–207 ms; load 2 stayed 110–129 ms. The worst client loop
+  iteration was 937–954 ms with the warm-up, of which `OtherBodies` was 686–691 ms (part 3b); the steady state
+  did not change (worst pass 31–36 ms, worst loop 66–89 ms, mixer 63–67 %). What the warm-up does not reach is
+  the city-sized bird survey, the echo budget, the Steam Audio scene and pathing, and `OtherBodies`' first pass.
+  Several further loads crashed in the known native fault (part 3a), before and after. No sound changes: emitter
+  streams, spoken lines and render fingerprints are unchanged and were not regenerated. The wire hash stays
+  `a3d6f3a6ec76`, so the server and the Windows client do not deploy together, and the door fingerprint is
+  unchanged (`c8fa0894bef3`). Ratchets: engine packages 10 crossings and 615 files (the new class); sound
+  boundary 0 crossings, 6,655 layering, 349 statics, 0 unsorted. Guards: 51 (stream/spoken/render/placement
+  thread), 52 (boundary/wire/environment/map/ricochet), 89 (voice/binaural/reverb/table/material/law), 86
+  (session, footsteps, streaming), 40 (audio system/login/lifecycle/door), and 37 replays with
+  `DOTNET_PROCESSOR_COUNT=4`. Built by DeepSeek through OpenCode.
+
 ## 2026-10-19
 
 - Sound that starts clean, part 1: `OpenFPS.AudioLab` gains `--city-load`, which loads the real city as a login

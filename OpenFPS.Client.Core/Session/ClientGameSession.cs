@@ -44,6 +44,12 @@ public sealed partial class ClientGameSession : IDisposable
     private readonly SoundMappingService _sounds;
     private readonly ClientAudioSystem _audioSystem;
     internal ClientAudioSystem AudioSystemForTest => _audioSystem;
+    /// <summary>Renders every kind of voice once at the login screen, on a mixer of its own: the first
+    /// city load's voices are then not the first the process has ever made. Stopped when a map arrives.</summary>
+    private volatile AudioWarmUp? _warmUp;
+    /// <summary>The thread that waits for the live mixer before the warm-up replaces its silent output.</summary>
+    private Thread? _warmUpGate;
+    private volatile bool _warmUpStopped;
     private readonly PredictionReconciler _reconciler;
     private readonly ChatManager _chat;
 
@@ -205,6 +211,37 @@ public sealed partial class ClientGameSession : IDisposable
         WireConnection();
 
         RegisterBindings();
+    }
+
+    /// <summary>
+    /// Starts the login screen's warm-up (AudioWarmUp) on a thread of its own. Both heads call it once, as
+    /// the menu comes up: it is what makes the first map's voices cheap on a build not compiled ahead.
+    /// Without sound there is nothing to warm, and without a map it warms; a map arriving stops it.
+    /// </summary>
+    public void BeginAudioWarmUp()
+    {
+        if (!_enableAudio || _warmUpGate != null) return;
+        _warmUpGate = new Thread(() =>
+        {
+            // The live mixer reads OPENFPS_FMOD_WAV as it starts, and the warm-up's own mixer replaces that
+            // variable to write its silent file. Starting first would make the game itself silent.
+            var deadline = System.Diagnostics.Stopwatch.StartNew();
+            while (!_audioEngine.IsInitialized && !_warmUpStopped && deadline.Elapsed.TotalSeconds < 30)
+                Thread.Sleep(10);
+            if (_warmUpStopped) return;
+            var warm = new AudioWarmUp(_audioEngine.Paths);
+            _warmUp = warm;
+            warm.Start();
+        })
+        { IsBackground = true, Name = "AudioWarmUpGate" };
+        _warmUpGate.Start();
+    }
+
+    /// <summary>The map is arriving: the login screen's warm-up gives the machine back and stops.</summary>
+    private void StopAudioWarmUp()
+    {
+        _warmUpStopped = true;
+        _warmUp?.Stop();
     }
 
     /// <summary>
@@ -845,6 +882,8 @@ public sealed partial class ClientGameSession : IDisposable
                 break;
 
             case MapManifest manifest:
+                // The login is over: the warm-up yields the machine to the load from here on.
+                StopAudioWarmUp();
                 Serilog.Log.Information("MapManifest: {Map}, expecting {Count} entities, spawn {Spawn}.",
                     manifest.MapName, manifest.ExpectedEntityCount, manifest.SpawnPoint.Position);
                 _mapName = manifest.MapName;
@@ -1972,6 +2011,7 @@ public sealed partial class ClientGameSession : IDisposable
         _microphone.PacketReady -= OnVoicePacketReady;
         _microphone.SamplesCaptured -= _audioEngine.OwnVoice.Write;
         _microphone.Dispose();
+        StopAudioWarmUp();
         _audioEngine.Dispose();
     }
 }

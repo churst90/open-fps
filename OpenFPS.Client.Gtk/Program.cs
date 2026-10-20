@@ -156,6 +156,8 @@ internal static partial class GtkClientProgram
         _settings = ClientSettings.Load();
         _settings.ApplyNavigationAids();
         _settings.ApplyHearing(_session.Audio.Hearing);
+        // The login screen's warm-up, beside the sound library's preload.
+        _session.BeginAudioWarmUp();
         _session.BeginAudioInit(ApplyAudioSettings);
 
         var loop = new Thread(GameLoop) { IsBackground = true, Name = "GameLoop" };

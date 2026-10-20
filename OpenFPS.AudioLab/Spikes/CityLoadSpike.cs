@@ -26,12 +26,13 @@ using OpenFPS.Sound.Core;
 namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
-/// --city-load [out=DIR] [at=x,y,z] [sec=30] [repeat=2] [prerun=20]: the city arriving at a login, as the
-/// client receives it (BusyStreetSpike's server, the whole map sent at once, then the client world, its
-/// acoustic bake, the spawn, and ClientAudioSystem through the real mixer), reported second by second:
+/// --city-load [out=DIR] [at=x,y,z] [sec=30] [repeat=2] [prerun=20] [warm=1]: the city arriving at a login,
+/// as the client receives it (BusyStreetSpike's server, the whole map sent at once, then the client world,
+/// its acoustic bake, the spawn, and ClientAudioSystem through the real mixer), reported second by second:
 /// the mixer's load and overrun blocks, capture gaps, the worst placement pass and client loop iteration
 /// with their named parts, voices started by kind, and garbage collection pauses. repeat=2 loads the city
-/// again in the same process: the difference between the two is first-time cost.
+/// again in the same process: the difference between the two is first-time cost. warm=1 runs AudioWarmUp,
+/// as the login screen does, before the first load.
 /// </summary>
 public static class CityLoadSpike
 {
@@ -133,6 +134,16 @@ public static class CityLoadSpike
         System.Environment.SetEnvironmentVariable("OPENFPS_DITHER", "0");
 
         AcousticRegistry.Initialize();
+
+        // The login screen's warm-up, before the real mixer: every kind of voice rendered once and thrown
+        // away, so load 1 is measured against load 2 rather than against the JIT.
+        if (args.Contains("warm=1"))
+        {
+            var warm = new AudioWarmUp(new AudioDataPaths(LabPaths.Sounds(), null, null));
+            var warmClock = Stopwatch.StartNew();
+            bool completed = warm.RunToCompletion();
+            Console.WriteLine($"  warm-up: {(completed ? "completed" : "stopped")} in {warmClock.Elapsed.TotalSeconds:F1} s");
+        }
 
         string baseDir = AppContext.BaseDirectory;
         var prefabs = new PrefabRepository(Path.Combine(baseDir, "prefabs"));

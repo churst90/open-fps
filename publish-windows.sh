@@ -25,9 +25,12 @@ for f in fmod.dll fmodstudio.dll phonon.dll nvdaControllerClient64.dll; do
 done
 
 rm -rf "$OUT" "$ART/obj/OpenFPS.Common" "$ART/obj/OpenFPS.Sound"   # one WireContract.g.cs and one DoorModelFingerprint.g.cs, this build's
+# ReadyToRun (the project turns it on for a runtime identifier): code that runs for the first time has
+# already been compiled, so the first city load is not competing with the JIT. A plain `dotnet build`
+# (the GTK client, a development run) does not get it and relies on the login screen's warm-up instead.
 DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1 DOTNET_CLI_USE_MSBUILD_SERVER=0 \
   "$DOTNET" publish "$REPO/OpenFPS.Client/OpenFPS.Client.csproj" -c Release -r win-x64 --self-contained true \
-  --artifacts-path "$ART" -nodeReuse:false -p:UseSharedCompilation=false -v minimal
+  --artifacts-path "$ART" -nodeReuse:false -p:UseSharedCompilation=false -p:PublishReadyToRun=true -v minimal
 
 BUILD=$(grep -rho '"[0-9a-f]\{12\}"' "$ART"/obj/OpenFPS.Common/*/WireContract.g.cs | head -1 | tr -d '"')
 
