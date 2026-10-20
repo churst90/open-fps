@@ -1,3 +1,4 @@
+# maths 8;e39fea91ef91332c21b478ff;avx512+fma+v512;7ae9ca4cf97a9f93
 # name	kind	stand x,y,z	facing deg	door	access x,z	edge
 the bus stop, Main Street northbound, by the shelter	BusStop	8.45,0.12,-60.00	-90	-1	7.75,-60	169
 the bus stop, Main Street southbound, by the shelter	BusStop	-8.45,0.12,86.00	90	-1	-7.75,86	180
