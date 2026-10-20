@@ -173,10 +173,10 @@ public class AsyncAcousticWorker : IDisposable
     internal bool WaitForAnswers(int timeoutMs)
     {
         long asked = Interlocked.Read(ref _asked);
-        long until = System.Environment.TickCount64 + timeoutMs;
+        var waited = System.Diagnostics.Stopwatch.StartNew();
         while (Interlocked.Read(ref _answered) < asked)
         {
-            if (System.Environment.TickCount64 > until) return false;
+            if (waited.ElapsedMilliseconds > timeoutMs) return false;
             Thread.Sleep(1);
         }
         return true;
