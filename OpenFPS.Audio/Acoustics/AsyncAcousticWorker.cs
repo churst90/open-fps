@@ -159,6 +159,27 @@ public class AsyncAcousticWorker : IDisposable
     public void EnqueueRequest(AcousticRequest req)
     {
         _requestQueue.Enqueue(req);
+        // Counted after it is queued: a run that reads the count finds every request it counts.
+        Interlocked.Increment(ref _asked);
+    }
+
+    /// <summary>Requests queued, and of those the ones a finished run has taken: a test ticking without real
+    /// time waits on them (<see cref="WaitForAnswers"/>).</summary>
+    private long _asked, _answered;
+
+    /// <summary>Waits until every request queued so far has been through a run, or the timeout; whether it
+    /// was. For a test ticking without real time, where a frame on the clock would give the worker that
+    /// moment.</summary>
+    internal bool WaitForAnswers(int timeoutMs)
+    {
+        long asked = Interlocked.Read(ref _asked);
+        long until = System.Environment.TickCount64 + timeoutMs;
+        while (Interlocked.Read(ref _answered) < asked)
+        {
+            if (System.Environment.TickCount64 > until) return false;
+            Thread.Sleep(1);
+        }
+        return true;
     }
 
     /// <summary>Lab only (--pop-hunt): fills <see cref="Provenance"/>. Off in the game.</summary>
@@ -324,8 +345,10 @@ public class AsyncAcousticWorker : IDisposable
             // them. What the pool had no room for last tick is still first in _pending.
             bool any = false;
             AcousticRequest newest = default;
+            long asked = Interlocked.Read(ref _asked);
             while (_requestQueue.TryDequeue(out var req)) { _pending[req.EntityId] = req; newest = req; any = true; }
-            if (!any && _pending.Count == 0) { if (once) return; Thread.Sleep(1); continue; }
+            // Nothing waiting: whatever was counted was taken by an earlier run, even one counted after it was taken.
+            if (!any && _pending.Count == 0) { Interlocked.Exchange(ref _answered, asked); if (once) return; Thread.Sleep(1); continue; }
             // One ear a tick, the newest: the simulator runs against one listener, and an answer is stamped
             // with the ear it was traced for. Taken from whichever request came first, a tick that drained
             // requests from both sides of a teleport traced them all from the old place. A carried request
@@ -341,7 +364,7 @@ public class AsyncAcousticWorker : IDisposable
 
             IAcousticWorld? world;
             lock (_worldLock) { world = _latestWorld; }
-            if (world == null) { _pending.Clear(); if (once) return; continue; }
+            if (world == null) { _pending.Clear(); Interlocked.Exchange(ref _answered, asked); if (once) return; continue; }
 
             if (_saEnabled && _saSim != null)
             {
@@ -405,6 +428,7 @@ public class AsyncAcousticWorker : IDisposable
                 ReportRayBudget(_pending.Count);
                 _pending.Clear();
                 foreach (var c in _carried) _pending[c.EntityId] = c;
+                Interlocked.Exchange(ref _answered, asked);
                 if (once) return;
                 continue;
             }
@@ -416,6 +440,7 @@ public class AsyncAcousticWorker : IDisposable
             }
 
             _pending.Clear();
+            Interlocked.Exchange(ref _answered, asked);
             if (once) return;
         }
     }

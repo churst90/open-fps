@@ -124,9 +124,10 @@ internal sealed class ClientAudioHarness
         // Twice: a submitted voice is queued as a direct play, which the next pump hands to the mixer.
         Facade.PumpForTest();
         Facade.PumpForTest();
-        // A new voice waits for the worker's first answer (part 3a). A test ticking without real time would
-        // never see it; give the worker the moment a frame on the clock would.
-        if (Audio.World.PathsAwaitingAnswer > 0) System.Threading.Thread.Sleep(2);
+        // A new voice waits for the worker's first answer (part 3a) and starts on the update after it. A test
+        // ticking without real time would never see it; wait for the answer, so it is always the next update.
+        if (Audio.World.PathsAwaitingAnswer > 0 && !Audio.World.WaitForWorkerAnswers())
+            throw new TimeoutException("The acoustic worker did not answer a new voice's path in 2 s.");
         // Somebody else's step is traced off the placement thread and played on the update after its path
         // lands; here always the next, so a test hears every step one frame late, every run.
         Audio.World.WaitForStepPaths();

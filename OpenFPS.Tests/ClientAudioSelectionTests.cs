@@ -47,12 +47,13 @@ public class ClientAudioSelectionTests
         for (int i = 0; i < 9; i++) h.AddCar(i + 1, Preset, new Vector3(10f + i * 5f, 0f, 0f));
 
         int LiveCars() => Enumerable.Range(1, 9).Count(h.Mixer.Live.Contains);
+        // A new voice starts on the update after the worker answers its path (part 3a): the first two are
+        // built on the first update and start on the second, with the next two.
         h.Tick();
-        Assert.Equal(2, LiveCars());
-        Assert.Contains(1, h.Mixer.Live);
-        Assert.Contains(2, h.Mixer.Live);
+        Assert.Equal(0, LiveCars());
         h.Tick();
         Assert.Equal(4, LiveCars());
+        for (int car = 1; car <= 4; car++) Assert.Contains(car, h.Mixer.Live);
         h.Tick(3);
         Assert.Equal(9, LiveCars());
         // Nobody was voiced from afar on the way: there was room for every car.
@@ -887,7 +888,8 @@ public class ClientAudioSelectionTests
         h.World.RegisterDefinition(def);
 
         int Starts() => h.Mixer.Started.Count(e => e.EntityId == Pa);
-        h.Tick();
+        // Its stagger counts from the update its path is answered on, the second (part 3a).
+        h.Tick(2);
         Assert.Equal(0, Starts());
         h.Wait(1.0); h.Tick();
         Assert.Equal(0, Starts());
@@ -931,7 +933,8 @@ public class ClientAudioSelectionTests
         h.World.RegisterDefinition(def);
 
         int Starts() => h.Mixer.Started.Count(e => e.EntityId == Pa);
-        h.Tick();
+        // Its stagger counts from the update its path is answered on, the second (part 3a).
+        h.Tick(2);
         h.Wait(2.0); h.Tick();
         Assert.Equal(1, Starts());
         Assert.Contains(Pa, h.Mixer.Live);

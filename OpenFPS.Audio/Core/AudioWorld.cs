@@ -882,6 +882,10 @@ public partial class AudioWorld
     /// the client harness gives the worker a moment when a test's new car asks, as a real frame would.</summary>
     internal int PathsAwaitingAnswer;
 
+    /// <summary>Waits for the acoustic worker to have answered everything asked of it, up to two seconds: for a
+    /// test ticking without real time. Whether it had.</summary>
+    internal bool WaitForWorkerAnswers() => _acousticWorker.WaitForAnswers(2000);
+
     internal double LabLastTickMs, LabLastGapMs, LabLastPartPassMs;
     internal readonly double[] LabStageLastMs = new double[5];
     internal readonly double[] LabPartLastMs = new double[PartCount];
