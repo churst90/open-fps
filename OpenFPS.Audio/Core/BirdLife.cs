@@ -104,18 +104,71 @@ public sealed class BirdLife
 
     // ── Where they live ────────────────────────────────────────────────────────────────────────
 
-    /// <summary>Looks for habitat once the map's static geometry has arrived, and again if it changes.
+    /// <summary>
+    /// Looks for habitat once the map's static geometry has arrived, and again if it changes.
     /// Keyed on the scenery alone: keyed on the entity count, it reran every few seconds on the city as
-    /// people and cars came and went (16 rays a roof on the game thread, 150 ms, 850 ms the first time)
-    /// and threw away the birds already calling.</summary>
+    /// people and cars came and went (16 rays a roof, 150 ms, 850 ms the first time) and threw away the
+    /// birds already calling. The survey is ~300 ms of roof rays on the city, so the game builds it off
+    /// the thread that places sounds and the birds start when it lands; a test or a replay builds it in
+    /// place (SurveyInPlace), where the answer must come out the same every run.
+    /// </summary>
     private void Survey(IAcousticWorld world)
     {
         long scenery = ScenerySignature(world, _bodies);
         if (scenery == _foundFrom) return;
         _foundFrom = scenery;
+        // The old map's birds stop now rather than calling on the new one's streets until it is surveyed.
+        _perched.Clear();
+        if (SurveyInPlace)
+        {
+            Install(BuildGroups(world, _bodies));
+            return;
+        }
+        var bodies = new List<AcousticBody>(_bodies);
+        _surveyMap = world.Rooms;
+        _survey = System.Threading.Tasks.Task.Run(() => BuildGroups(world, bodies));
+    }
+
+    /// <summary>The survey runs on the caller's thread, so its answer is taken up on the update that asks
+    /// for it every time (the tests and the emitter-stream replay). The game runs it in the background and
+    /// takes it up when it lands.</summary>
+    internal bool SurveyInPlace { get; init; } = true;
+
+    /// <summary>The habitat survey being built off the placement thread, and the map it is for.</summary>
+    private System.Threading.Tasks.Task<List<Group>>? _survey;
+    private object? _surveyMap;
+
+    /// <summary>Takes up a background survey when it has landed, and drops one for a map already left.</summary>
+    private void TakeSurvey(IAcousticWorld world)
+    {
+        if (_survey is not { IsCompleted: true } done) return;
+        _survey = null;
+        if (!ReferenceEquals(_surveyMap, world.Rooms))
+        {
+            // The map was left before the survey landed. Its scenery may have the same signature as the
+            // next one (a reload), so forget the signature too: the next look surveys the map it is on.
+            _foundFrom = -1;
+            return;
+        }
+        Install(done.Status == System.Threading.Tasks.TaskStatus.RanToCompletion ? done.Result : new List<Group>());
+    }
+
+    /// <summary>Puts a surveyed set of groups in place, on the thread that places sounds.</summary>
+    private void Install(List<Group> groups)
+    {
         SurveysRun++;
         _perched.Clear();
-        foreach (var e in _bodies)
+        _perched.AddRange(groups);
+        Serilog.Log.Information("Birds: {Census}", string.Join(", ", CensusText()));
+    }
+
+    /// <summary>Every perch the map offers, found from its scenery. Safe off the placement thread: the
+    /// snapshot it reads never changes.</summary>
+    private List<Group> BuildGroups(IAcousticWorld world, List<AcousticBody> bodies)
+    {
+        PlacementThread.Heavy("The birds' habitat survey");
+        var groups = new List<Group>();
+        foreach (var e in bodies)
         {
             if (!IsScenery(e)) continue;
             var size = e.Size;
@@ -125,8 +178,8 @@ public sealed class BirdLife
             if (AcousticRegistry.IsLeaves(e.Material))
             {
                 // A sparrow group in one hedge in six, a dove in one in twelve.
-                if (hash < 0.16f) _perched.Add(Settle(BirdSpecies.HouseSparrow, e, size, onTop: false));
-                else if (hash > 0.92f) _perched.Add(Settle(BirdSpecies.Dove, e, size, onTop: false));
+                if (hash < 0.16f) groups.Add(Settle(BirdSpecies.HouseSparrow, e, size, onTop: false));
+                else if (hash > 0.92f) groups.Add(Settle(BirdSpecies.Dove, e, size, onTop: false));
                 continue;
             }
 
@@ -134,13 +187,13 @@ public sealed class BirdLife
             float top = e.Position.Y + size.Y * 0.5f;
             if (top < RoofMinHeight || size.X * size.Z < RoofMinArea) continue;
             if (!NothingAbove(world, e, top)) continue;
-            if (hash < 0.5f) _perched.Add(Settle(BirdSpecies.Pigeon, e, size, onTop: true));
-            else if (hash > 0.85f) _perched.Add(Settle(BirdSpecies.Crow, e, size, onTop: true));
+            if (hash < 0.5f) groups.Add(Settle(BirdSpecies.Pigeon, e, size, onTop: true));
+            else if (hash > 0.85f) groups.Add(Settle(BirdSpecies.Crow, e, size, onTop: true));
         }
         // By perch, not the order the world listed them in (which follows the processor count): the groups
         // draw their timings from one generator in this order.
-        _perched.Sort(static (a, b) => a.Perch.CompareTo(b.Perch));
-        Serilog.Log.Information("Birds: {Census}", string.Join(", ", CensusText()));
+        groups.Sort(static (a, b) => a.Perch.CompareTo(b.Perch));
+        return groups;
     }
 
     /// <summary>A fixed box a bird could live on: not a vehicle, a person or anything else that moves.</summary>
@@ -248,6 +301,7 @@ public sealed class BirdLife
     public void Update(IAcousticWorld world, Vector3 listener, double now)
     {
         if (now >= _nextSurvey) { _nextSurvey = now + 2.0; Survey(world); }
+        TakeSurvey(world);
         _askFrame++;
 
         foreach (var g in _perched)

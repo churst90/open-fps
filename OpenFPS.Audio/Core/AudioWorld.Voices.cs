@@ -36,26 +36,60 @@ public partial class AudioWorld
         /// <summary>An answer for this source and this ear. A stand-in places the voice and leaves its tone
         /// as it was: refused, a voice keeps what it has.</summary>
         public readonly bool Fresh;
+        /// <summary>The worker has answered for this source (now or on an earlier frame). False: there is
+        /// nothing to place the voice with yet, and its start waits a frame or two for the answer.</summary>
+        public readonly bool Ready;
 
-        public OwnerPath(AcousticPathData raw, AcousticPathData heard, bool fresh) { Raw = raw; Heard = heard; Fresh = fresh; }
+        public OwnerPath(AcousticPathData raw, AcousticPathData heard, bool fresh, bool ready = true)
+        {
+            Raw = raw; Heard = heard; Fresh = fresh; Ready = ready;
+        }
     }
 
     /// <summary>This frame's paths by owner, so every voice of one thing is heard through the same answer.</summary>
     private readonly Dictionary<int, OwnerPath> _ownerPaths = new();
 
-    /// <summary>The owner's path this frame, worked out once.</summary>
+    /// <summary>Each owner's last real answer, for the frames between two answers: tone and level hold
+    /// while the worker catches up, instead of the placement thread tracing every voice itself.</summary>
+    private readonly Dictionary<int, OwnerPath> _lastOwnerPaths = new();
+
+    /// <summary>
+    /// The owner's path this frame, worked out once. When the worker has no answer yet the tracer is not
+    /// run here (it cost 2-3 ms a voice, 100-230 ms on the city's first passes): the request is queued and
+    /// the voice waits a frame or two for the worker's answer. A voice already sounding keeps its last
+    /// answer meanwhile. The replay runs the tracer in place (Manual), where every run must answer the same.
+    /// </summary>
     private OwnerPath PathOf(IAcousticWorld world, AudioSource owner, Vector3 ear)
     {
         if (_ownerPaths.TryGetValue(owner.Id, out var known)) return known;
         // A line is asked about from its point nearest the ear (HeardPoint), which moves as the ear does.
         var at = HeardPoint(owner, ear, out bool alongLine);
+        float speed = alongLine ? MathF.Max(owner.State.Velocity.Length(), _earSpeed) : owner.State.Velocity.Length();
         OwnerPath p;
-        if (_acousticWorker.TryGetDirectFor(owner.Id, at, alongLine ? MathF.Max(owner.State.Velocity.Length(), _earSpeed) : owner.State.Velocity.Length(), ear, _earSpeed, out var direct))
+        if (_acousticWorker.TryGetDirectFor(owner.Id, at, speed, ear, _earSpeed, out var direct))
+        {
             p = Shadowed(world, owner.Id, direct, at, ear);
-        else
+            _lastOwnerPaths[owner.Id] = p;
+        }
+        else if (_acousticWorker.Manual)
         {
             var standIn = FirstAnswer(world, owner, ear);
             p = new OwnerPath(standIn, standIn, fresh: false);
+        }
+        else
+        {
+            // Ask for an answer now; the worker's next run makes it, and the voice starts then.
+            _acousticWorker.EnqueueRequest(new AcousticRequest
+            {
+                EntityId = owner.Id, ListenerPos = ear, SourcePos = at, SourceRadius = owner.ProbeRadius,
+            });
+            if (_lastOwnerPaths.TryGetValue(owner.Id, out var last))
+                p = new OwnerPath(last.Raw, last.Heard, fresh: false);
+            else
+            {
+                p = new OwnerPath(default, default, fresh: false, ready: false);
+                PathsAwaitingAnswer++;
+            }
         }
         _ownerPaths[owner.Id] = p;
         return p;
@@ -85,9 +119,13 @@ public partial class AudioWorld
     /// (<see cref="VoiceRegistry.HeardFromOf"/>), and everything the path does to it, in the one emitter
     /// that places it. The caller starts or re-places it as it always has.
     /// </summary>
-    private void HandPath(ref SpatialEmitter e, VoiceKind kind, IAcousticWorld world, AudioSource owner,
+    private bool HandPath(ref SpatialEmitter e, VoiceKind kind, IAcousticWorld world, AudioSource owner,
                           Vector3 at, float levelDb, Vector3 ear, bool inside = false)
     {
+        var path = PathOf(world, owner, ear);
+        // A new voice waits for the worker's first answer (PathOf); false means it is asked for again
+        // next frame, not that it is silent.
+        if (!path.Ready) return false;
         _voices.Declare(e.EntityId, owner.Id, kind,
                         VoiceRegistry.MountOf(owner.State.Position, owner.State.Rotation, at), levelDb, _frameCount);
         if (kind is VoiceKind.Horn or VoiceKind.HeldHorn or VoiceKind.Siren or VoiceKind.TrainField or VoiceKind.TrainSignal)
@@ -107,9 +145,8 @@ public partial class AudioWorld
             e.TargetRegionId = _listenerRegion;
             e.RoomGain = 1f;
             e.CarriesPath = true;
-            return;
+            return true;
         }
-        var path = PathOf(world, owner, ear);
         var heard = path.Heard;
         e.ApparentPosition = VoiceRegistry.HeardFromOf(kind) switch
         {
@@ -126,6 +163,7 @@ public partial class AudioWorld
         e.TargetRegionId = heard.RegionId;
         e.RoomGain = path.Fresh ? heard.RoomGain : 1f;
         e.CarriesPath = path.Fresh;
+        return true;
     }
 
     /// <summary>What an entity's own voice is: a moving thing's engine or aeroplane, a wood, a standing

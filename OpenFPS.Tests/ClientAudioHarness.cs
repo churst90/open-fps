@@ -124,6 +124,9 @@ internal sealed class ClientAudioHarness
         // Twice: a submitted voice is queued as a direct play, which the next pump hands to the mixer.
         Facade.PumpForTest();
         Facade.PumpForTest();
+        // A new voice waits for the worker's first answer (part 3a). A test ticking without real time would
+        // never see it; give the worker the moment a frame on the clock would.
+        if (Audio.World.PathsAwaitingAnswer > 0) System.Threading.Thread.Sleep(2);
     }
 
     /// <summary>Lets time pass with no update in between — the engine hold, for instance.</summary>
