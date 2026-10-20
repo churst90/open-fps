@@ -29,6 +29,10 @@ public sealed class PeopleReplayCollection
 /// the commit that adds the guard, by running the test with OPENFPS_PEOPLE_WRITE=1, and after that never by a
 /// move: a law that changes a stored line is a bug to fix, not a baseline to refresh
 /// (docs/ENGINE_PACKAGES.md, stage 10). OPENFPS_PEOPLE_DUMP=dir writes readable copies beside the run.
+/// Each store starts with the maths it was made on (CrossMachine.MathsFingerprint). On other maths (GitHub's
+/// runner, or OPENFPS_PEOPLE_FOREIGN=1) an hour's last bits drift and a person's choice flips at a near tie, so a
+/// timed store is compared exactly up to the tick the two runs part, which must be at least
+/// <see cref="ForeignHorizonSeconds"/> in.
 /// </summary>
 public static class PeopleStore
 {
@@ -39,6 +43,16 @@ public static class PeopleStore
         => Path.Combine(new[] { RepoRoot(), "OpenFPS.Tests", "PeopleBoundary" }.Concat(parts).ToArray());
 
     public static bool Writing => System.Environment.GetEnvironmentVariable("OPENFPS_PEOPLE_WRITE") == "1";
+
+    public static bool Foreign => System.Environment.GetEnvironmentVariable("OPENFPS_PEOPLE_FOREIGN") == "1";
+
+    /// <summary>How long a run on other maths must match before it may part: the 2026-10-19 runner matched
+    /// Alex's whole hour and parted from the doors' changes somewhere before the hour's last two seconds.</summary>
+    public const double ForeignHorizonSeconds = 300;
+
+    private const string MathsLine = "# maths ";
+
+    private static readonly Lazy<string> MathsOnce = new(CrossMachine.MathsFingerprint);
 
     public static string? DumpFolder => System.Environment.GetEnvironmentVariable("OPENFPS_PEOPLE_DUMP") is { Length: > 0 } dir ? dir : null;
 
@@ -69,14 +83,37 @@ public static class PeopleStore
         File.WriteAllText(Path.Combine(dir, name), text.Replace("\t", "  "));
     }
 
-    /// <summary>Compares a run with its stored copy, or stores it when writing; the first line that differs is shown.</summary>
-    public static void Check(string path, string now, string what)
+    /// <summary>
+    /// Compares a run with its stored copy, or stores it when writing; the first line that differs is shown.
+    /// A timed store names how its lines are read on other maths: each line's group (a door, or the whole store)
+    /// and its tick, null for a line that carries its group's last tick (a closing door's steps).
+    /// </summary>
+    public static void Check(string path, string now, string what, Action<string>? log = null,
+                             double secondsPerTick = 0, Func<string, (string Group, int? Tick)>? timed = null)
     {
-        if (Writing) { Write(path, now); return; }
-        string stored = Read(path);
-        Assert.False(stored.Length == 0, $"no stored {what} at {path}: run with OPENFPS_PEOPLE_WRITE=1 to make it");
+        if (Writing) { Write(path, MathsLine + MathsOnce.Value + "\n" + now); return; }
+        string all = Read(path);
+        Assert.False(all.Length == 0, $"no stored {what} at {path}: run with OPENFPS_PEOPLE_WRITE=1 to make it");
+        string maths = "", stored = all;
+        if (all.StartsWith(MathsLine, StringComparison.Ordinal))
+        {
+            int end = all.IndexOf('\n');
+            (maths, stored) = (all[MathsLine.Length..end], all[(end + 1)..]);
+        }
         var a = stored.TrimEnd('\n').Split('\n');
         var b = now.TrimEnd('\n').Split('\n');
+        if (timed != null && (maths != MathsOnce.Value || Foreign))
+        {
+            int? parted = Parting(a, b, timed);
+            string whose = Foreign ? "OPENFPS_PEOPLE_FOREIGN" : maths.Length == 0 ? "none stored" : maths + " stored";
+            log?.Invoke($"{what}: other maths ({whose}; {MathsOnce.Value} here), "
+                + (parted is { } p ? $"exact until the runs part at tick {p} ({p * secondsPerTick:F1} s)" : "exact throughout"));
+            if (parted is { } t)
+                Assert.True(t * secondsPerTick >= ForeignHorizonSeconds,
+                    $"{what} parted from its stored copy at tick {t} ({t * secondsPerTick:F1} s), before the "
+                    + $"{ForeignHorizonSeconds} s other maths may drift for. If this is a move changing a law, it is a bug.");
+            return;
+        }
         for (int i = 0; i < Math.Min(a.Length, b.Length); i++)
         {
             if (a[i] == b[i]) continue;
@@ -88,6 +125,39 @@ public static class PeopleStore
         if (a.Length != b.Length)
             Assert.Fail($"{what} changed from its stored copy: {a.Length} lines stored, {b.Length} now. First extra: "
                 + (b.Length > a.Length ? b[a.Length] : a[b.Length]));
+    }
+
+    /// <summary>The earliest tick at which two runs' lines differ, group by group; null when they agree.</summary>
+    private static int? Parting(string[] a, string[] b, Func<string, (string Group, int? Tick)> timed)
+    {
+        static Dictionary<string, List<(int Tick, string Line)>> Groups(string[] lines, Func<string, (string Group, int? Tick)> timed)
+        {
+            var groups = new Dictionary<string, List<(int, string)>>();
+            var last = new Dictionary<string, int>();
+            foreach (string line in lines)
+            {
+                var (group, tick) = line.StartsWith('#') ? ("#", 0) : timed(line);
+                int at = tick ?? last.GetValueOrDefault(group);
+                last[group] = at;
+                if (!groups.TryGetValue(group, out var list)) groups[group] = list = new();
+                list.Add((at, line));
+            }
+            return groups;
+        }
+        var ga = Groups(a, timed);
+        var gb = Groups(b, timed);
+        int? parted = null;
+        foreach (string group in ga.Keys.Union(gb.Keys))
+        {
+            var x = ga.GetValueOrDefault(group) ?? new();
+            var y = gb.GetValueOrDefault(group) ?? new();
+            int i = 0;
+            while (i < x.Count && i < y.Count && x[i].Line == y[i].Line) i++;
+            if (i == x.Count && i == y.Count) continue;
+            int t = Math.Min(i < x.Count ? x[i].Tick : int.MaxValue, i < y.Count ? y[i].Tick : int.MaxValue);
+            parted = Math.Min(parted ?? int.MaxValue, t);
+        }
+        return parted;
     }
 }
 
@@ -142,12 +212,24 @@ public class PeopleReplayTests
 
         PeopleStore.Dump("speech-square.txt", square.Speech);
 
+        // Where and how the doors are is read before anyone moves, so it is exact on any maths.
         PeopleStore.Check(PeopleStore.PathOf("haunts.tsv"), day.Haunts, "the places HauntFinder finds");
         PeopleStore.Check(PeopleStore.PathOf("doors.tsv"), day.Doors, "the doors' manner and GoingIn");
-        PeopleStore.Check(PeopleStore.PathOf("alex.tsv.gz"), day.Alex, "Alex's hour");
-        PeopleStore.Check(PeopleStore.PathOf("door-events.tsv.gz"), day.DoorEvents, "the doors' changes");
-        PeopleStore.Check(PeopleStore.PathOf("speech.tsv"), day.Speech, "what was said on the hour");
-        PeopleStore.Check(PeopleStore.PathOf("speech-square.tsv.gz"), square.Speech, "what Alex said on the square");
+        PeopleStore.Check(PeopleStore.PathOf("alex.tsv.gz"), day.Alex, "Alex's hour", _o.WriteLine, Dt, ByTick);
+        PeopleStore.Check(PeopleStore.PathOf("door-events.tsv.gz"), day.DoorEvents, "the doors' changes", _o.WriteLine, Dt, ByDoor);
+        PeopleStore.Check(PeopleStore.PathOf("speech.tsv"), day.Speech, "what was said on the hour", _o.WriteLine, Dt, ByTick);
+        PeopleStore.Check(PeopleStore.PathOf("speech-square.tsv.gz"), square.Speech, "what Alex said on the square", _o.WriteLine, Dt, ByTick);
+    }
+
+    /// <summary>A store in tick order: one group, the tick first.</summary>
+    private static (string Group, int? Tick) ByTick(string line)
+        => ("", int.Parse(line.AsSpan(0, line.IndexOf('\t')), CultureInfo.InvariantCulture));
+
+    /// <summary>The doors' changes: one group per door; a closing step carries the door's last opening.</summary>
+    private static (string Group, int? Tick) ByDoor(string line)
+    {
+        var cols = line.Split('\t');
+        return (cols[2], cols[0] == "-" ? null : int.Parse(cols[0], CultureInfo.InvariantCulture));
     }
 
     // ── The runs ────────────────────────────────────────────────────────────────────────────────
