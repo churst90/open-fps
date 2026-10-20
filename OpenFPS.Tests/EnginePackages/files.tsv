@@ -56,6 +56,7 @@ OpenFPS.Acoustics/Systems/AcousticVolumeGenerator.cs	Acoustics
 OpenFPS.Acoustics/Systems/FaceOpenings.cs	Acoustics	
 OpenFPS.Acoustics/WallTransmission.cs	Acoustics	
 OpenFPS.Agents/AircraftGroundRun.cs	Agents	
+OpenFPS.Agents/AlexDay.cs	Agents	
 OpenFPS.Agents/CarFollowing.cs	Agents	
 OpenFPS.Agents/CrossingRules.cs	Agents	
 OpenFPS.Agents/DoorRules.cs	Agents	

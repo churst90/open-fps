@@ -281,7 +281,7 @@ public sealed partial class WorldEditor
         float total = lines.Sum(l => Flat(l.B - l.A));
         int count = Math.Min(MaxWalkers, (int)MathF.Round(total / 100f * density));
         if (count == 0) return 0;
-        var rng = new Random(CharacterSystem.Seed(20261010, mapId, "walkers", 0, 0));
+        var rng = new Random(AlexDay.Seed(20261010, mapId, "walkers", 0, 0));
         var made = new List<Entity>();
         for (int k = 0; k < count; k++)
         {

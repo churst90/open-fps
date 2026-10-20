@@ -103,7 +103,7 @@ public class AlexTests
     public void At_night_and_in_the_cold_he_goes_to_a_lobby_and_by_day_to_the_street()
     {
         double Share(SpeechConditions c, HauntKind k)
-            => Enumerable.Range(0, 2000).Count(i => CharacterSystem.Choose(Places, null, null, c, new Random(i)).Kind == k) / 2000.0;
+            => Enumerable.Range(0, 2000).Count(i => AlexDay.Choose(Places, null, null, c, new Random(i)).Kind == k) / 2000.0;
         Assert.True(Share(Night, HauntKind.Lobby) > 0.55);
         Assert.True(Share(ColdNoon, HauntKind.Lobby) > 0.55);
         Assert.True(Share(new(12f, 20f, 0.6f, WeatherType.Rain), HauntKind.Lobby) > 0.55);
@@ -115,9 +115,9 @@ public class AlexTests
     public void He_never_chooses_where_he_already_is_and_prefers_somewhere_near()
     {
         for (int i = 0; i < 500; i++)
-            Assert.NotSame(Places[1], CharacterSystem.Choose(Places, Places[1], Vector2.Zero, Noon, new Random(i)));
+            Assert.NotSame(Places[1], AlexDay.Choose(Places, Places[1], Vector2.Zero, Noon, new Random(i)));
         var far = new List<Haunt> { H("near", HauntKind.Doorway, 10, 0), H("far", HauntKind.Doorway, 900, 0) };
-        int near = Enumerable.Range(0, 1000).Count(i => CharacterSystem.Choose(far, null, Vector2.Zero, Noon, new Random(i)).Name == "near");
+        int near = Enumerable.Range(0, 1000).Count(i => AlexDay.Choose(far, null, Vector2.Zero, Noon, new Random(i)).Name == "near");
         Assert.True(near > 750);
     }
 
@@ -127,21 +127,21 @@ public class AlexTests
         for (int i = 0; i < 200; i++)
             foreach (HauntKind k in Enum.GetValues<HauntKind>())
             {
-                double s = CharacterSystem.LingerSeconds(k, Noon, new Random(i));
+                double s = AlexDay.LingerSeconds(k, Noon, new Random(i));
                 Assert.InRange(s, 120, 600);
             }
-        double lobbyNight = Enumerable.Range(0, 200).Average(i => CharacterSystem.LingerSeconds(HauntKind.Lobby, Night, new Random(i)));
-        double lobbyDay = Enumerable.Range(0, 200).Average(i => CharacterSystem.LingerSeconds(HauntKind.Lobby, Noon, new Random(i)));
+        double lobbyNight = Enumerable.Range(0, 200).Average(i => AlexDay.LingerSeconds(HauntKind.Lobby, Night, new Random(i)));
+        double lobbyDay = Enumerable.Range(0, 200).Average(i => AlexDay.LingerSeconds(HauntKind.Lobby, Noon, new Random(i)));
         Assert.True(lobbyNight > 2 * lobbyDay);
     }
 
     [Fact]
     public void His_day_is_the_same_on_the_same_server_and_another_day_differs()
     {
-        Assert.Equal(CharacterSystem.Seed(1, "city", "Alex", 40, 3), CharacterSystem.Seed(1, "city", "Alex", 40, 3));
-        Assert.NotEqual(CharacterSystem.Seed(1, "city", "Alex", 40, 3), CharacterSystem.Seed(1, "city", "Alex", 41, 3));
-        Assert.NotEqual(CharacterSystem.Seed(1, "city", "Alex", 40, 3), CharacterSystem.Seed(1, "city", "Alex", 40, 4));
-        Assert.NotEqual(CharacterSystem.Seed(1, "city", "Alex", 40, 3), CharacterSystem.Seed(2, "city", "Alex", 40, 3));
+        Assert.Equal(AlexDay.Seed(1, "city", "Alex", 40, 3), AlexDay.Seed(1, "city", "Alex", 40, 3));
+        Assert.NotEqual(AlexDay.Seed(1, "city", "Alex", 40, 3), AlexDay.Seed(1, "city", "Alex", 41, 3));
+        Assert.NotEqual(AlexDay.Seed(1, "city", "Alex", 40, 3), AlexDay.Seed(1, "city", "Alex", 40, 4));
+        Assert.NotEqual(AlexDay.Seed(1, "city", "Alex", 40, 3), AlexDay.Seed(2, "city", "Alex", 40, 3));
     }
 
     // ── The pavements ───────────────────────────────────────────────────────────────────────────

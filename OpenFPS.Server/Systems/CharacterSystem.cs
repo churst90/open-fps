@@ -243,12 +243,12 @@ public sealed class CharacterSystem
             ? c.Haunts.Where(h => Vector3.Distance(h.Stand, dead) > 100f).ToList()
             : c.Haunts;
         if (choices.Count == 0) choices = c.Haunts;
-        var at = Choose(choices, null, null, cond, rng);
+        var at = AlexDay.Choose(choices, null, null, cond, rng);
         c.At = at; c.Target = null; c.RideTo = null;
         c.Now = Doing.Lingering;
         c.Passage = null;
         // Part way through a stay, as somebody already there would be.
-        c.Until = now + LingerSeconds(at.Kind, cond, rng) * (0.3 + 0.7 * rng.NextDouble()) / Pace;
+        c.Until = now + AlexDay.LingerSeconds(at.Kind, cond, rng) * (0.3 + 0.7 * rng.NextDouble()) / Pace;
         c.FacingYaw = at.Facing;
         var maps = _maps!;
         c.Entity = maps.SpawnEntity(c.MapId, w => w.Create(
@@ -422,17 +422,16 @@ public sealed class CharacterSystem
         var rng = Draw(c);
         var at = c.At!;
         var here = world.Get<Transform>(c.Entity).Position;
-        var others = c.Haunts.Where(h => h.Kind == HauntKind.BusStop && h != at).ToList();
-        if (at.Kind == HauntKind.BusStop && others.Count > 0 && rng.NextDouble() < RideChance(cond))
+        var move = AlexDay.Leave(c.Haunts, at, new Vector2(here.X, here.Z), cond, rng);
+        if (move.RideTo is { } ride)
         {
-            c.RideTo = others[rng.Next(others.Count)];
+            c.RideTo = ride;
             c.Now = Doing.WaitingForBus;
             c.BusSince = now;
-            Log.Information("CHARACTER {Name}: waiting at {Place} for a bus to {To}.", c.Data.Name, at.Name, c.RideTo.Name);
+            Log.Information("CHARACTER {Name}: waiting at {Place} for a bus to {To}.", c.Data.Name, at.Name, ride.Name);
             return;
         }
-        var next = Choose(c.Haunts, at, new Vector2(here.X, here.Z), cond, rng);
-        WalkTo(c, world, here, next, now);
+        WalkTo(c, world, here, move.WalkTo!, now);
     }
 
     /// <summary>Sets off on foot for a place: out of a lobby by its door if he is in one, along the pavements,
@@ -500,7 +499,7 @@ public sealed class CharacterSystem
         c.Now = Doing.Lingering;
         c.FacingYaw = to.Facing;
         var rng = Draw(c);
-        double stay = LingerSeconds(to.Kind, cond, rng) / Pace;
+        double stay = AlexDay.LingerSeconds(to.Kind, cond, rng) / Pace;
         c.Until = now + stay;
         Log.Information("CHARACTER {Name}: at {Place}, staying {Minutes:F1} min.", c.Data.Name, to.Name, stay / 60);
     }
@@ -592,82 +591,9 @@ public sealed class CharacterSystem
         return p with { Y = MathF.Max(0f, t.Position.Y - size.Y * 0.5f) };
     }
 
-    // ── Choosing ────────────────────────────────────────────────────────────────────────────────
-
-    /// <summary>Night, cold or wet: when somebody with nowhere to live looks for a roof.</summary>
-    public static bool Sheltering(SpeechConditions c)
-        => c.Hour >= 21f || c.Hour < 6f || c.TemperatureC <= 8f
-           || (c.Weather is WeatherType.Rain or WeatherType.Storm or WeatherType.Snow && c.Precipitation >= 0.2f);
-
-    /// <summary>How much a kind of place draws him, at this hour and in this weather.</summary>
-    public static double KindWeight(HauntKind kind, SpeechConditions c)
-    {
-        if (Sheltering(c))
-            return kind switch { HauntKind.Lobby => 6, HauntKind.BusStop => 2, HauntKind.Doorway => 0.6, _ => 0.15 };
-        if (c.Hour >= 17f)
-            return kind switch { HauntKind.Lobby => 1.5, HauntKind.BusStop => 3, HauntKind.Doorway => 2.5, _ => 1 };
-        return kind switch { HauntKind.Lobby => 0.5, HauntKind.BusStop => 3, HauntKind.Doorway => 3, _ => 2 };
-    }
-
-    /// <summary>Of riding the bus from a bus stop rather than walking on: more in the cold and wet.</summary>
-    public static double RideChance(SpeechConditions c) => Sheltering(c) ? 0.6 : 0.4;
-
-    /// <summary>
-    /// The next place, never the one he is at: weighted by kind for the hour and weather, and by
-    /// distance (half as likely 150 m off).
-    /// </summary>
-    public static Haunt Choose(IReadOnlyList<Haunt> haunts, Haunt? current, Vector2? from, SpeechConditions cond, Random rng)
-    {
-        var weights = new double[haunts.Count];
-        double total = 0;
-        for (int i = 0; i < haunts.Count; i++)
-        {
-            var h = haunts[i];
-            if (h == current && haunts.Count > 1) continue;
-            double w = KindWeight(h.Kind, cond);
-            if (from is { } f) w /= 1.0 + Vector2.Distance(f, new Vector2(h.Stand.X, h.Stand.Z)) / 150.0;
-            weights[i] = w;
-            total += w;
-        }
-        double pick = rng.NextDouble() * total;
-        for (int i = 0; i < haunts.Count; i++)
-        {
-            pick -= weights[i];
-            if (weights[i] > 0 && pick <= 0) return haunts[i];
-        }
-        return haunts[^1];
-    }
-
-    /// <summary>How long he stays, seconds: minutes, longer in a lobby when it is night or cold.</summary>
-    public static double LingerSeconds(HauntKind kind, SpeechConditions c, Random rng)
-    {
-        bool shelter = Sheltering(c);
-        var (lo, hi) = kind switch
-        {
-            HauntKind.Lobby => shelter ? (8.0, 20.0) : (3.0, 8.0),
-            HauntKind.BusStop => (3.0, 9.0),
-            HauntKind.Doorway => shelter ? (2.0, 5.0) : (3.0, 8.0),
-            _ => shelter ? (2.0, 4.0) : (4.0, 10.0),
-        };
-        return 60.0 * (lo + (hi - lo) * rng.NextDouble());
-    }
-
     /// <summary>The next draw of a character's day: seeded by the map, their name, the day and how many
     /// choices they have made, so the same day goes the same way.</summary>
-    private Random Draw(Character c) => new(Seed(_seed, c.MapId, c.Data.Name, c.Day, c.Decisions++));
-
-    public static int Seed(int seed, string mapId, string name, int day, int decision)
-    {
-        unchecked
-        {
-            uint h = 2166136261;
-            foreach (char ch in mapId + "/" + name) { h ^= ch; h *= 16777619; }
-            h ^= (uint)seed; h *= 16777619;
-            h ^= (uint)day; h *= 16777619;
-            h ^= (uint)decision; h *= 16777619;
-            return (int)(h & 0x7fffffff);
-        }
-    }
+    private Random Draw(Character c) => new(AlexDay.Seed(_seed, c.MapId, c.Data.Name, c.Day, c.Decisions++));
 
     // ── Asked from outside ──────────────────────────────────────────────────────────────────────
 

@@ -413,7 +413,7 @@ public static class HomelessLines
     /// <summary>What he asks for: mostly money; somewhere to sleep only at night or in the cold and wet.</summary>
     public static string AskCategory(SpeechConditions c, Random rng)
     {
-        bool shelter = CharacterSystem.Sheltering(c);
+        bool shelter = AlexDay.Sheltering(c);
         var weights = new (string Cat, double W)[]
         {
             ("homeless_money", 45), ("homeless_smokes", 20), ("homeless_food", 15),
@@ -433,7 +433,7 @@ public static class HomelessLines
     {
         double r = rng.NextDouble();
         if (r < PedestrianSpeech.OutburstChance) return ("homeless_angry", Speech.RaisedDb);
-        if (CharacterSystem.Sheltering(c) && r < 0.4) return ("homeless_shelter", Speech.NormalDb - 3f);
+        if (AlexDay.Sheltering(c) && r < 0.4) return ("homeless_shelter", Speech.NormalDb - 3f);
         if (atBusStop && r < 0.5) return ("waiting", PedestrianSpeech.MutterDb);
         if (r < 0.8) return ("homeless_mutter", PedestrianSpeech.MutterDb);
         return (r < 0.9 ? "mutter" : "think_aloud", PedestrianSpeech.MutterDb);
