@@ -61,6 +61,7 @@ OpenFPS.Agents/CarFollowing.cs	Agents
 OpenFPS.Agents/CrossingRules.cs	Agents	
 OpenFPS.Agents/DoorRules.cs	Agents	
 OpenFPS.Agents/Haunts.cs	Agents	
+OpenFPS.Agents/HomelessLines.cs	Agents	
 OpenFPS.Agents/JunctionRules.cs	Agents	
 OpenFPS.Agents/LaneRoutes.cs	Agents	
 OpenFPS.Agents/LineFollower.cs	Agents	

@@ -73,8 +73,6 @@ public sealed partial class PedestrianSpeech
     /// <summary>Somebody on their own says something to nobody (mutters, reads a text out, remarks on
     /// the weather) about this often, while somebody is near enough to hear, seconds.</summary>
     public const double RemarkEverySeconds = 150;
-    /// <summary>Muttering is quieter than talking to someone: about 8 dB under a normal voice.</summary>
-    public const float MutterDb = Speech.NormalDb - 8f;
     /// <summary>A remark to nobody is only made with somebody within this, metres.</summary>
     public const float RemarkHeardMetres = 15f;
 
@@ -488,7 +486,7 @@ public sealed partial class PedestrianSpeech
             .Where(l => l != me.LastLine && (offeredWhenTrue || Speech.Find(me.Voice, l) is { } t && HomelessLines.TrueNow(t.Text, cond)))
             .ToList();
         if (lines.Count == 0) return;
-        float db = cat is "mutter" or "think_aloud" ? MutterDb : Speech.NormalDb;
+        float db = cat is "mutter" or "think_aloud" ? HomelessLines.MutterDb : Speech.NormalDb;
         Say(p, me, lines[_rng.Next(lines.Count)], db, 0f, now, say);
     }
 
