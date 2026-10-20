@@ -177,6 +177,8 @@ string[] usage =
     "  --moving-echoes [door|pass] [sound=ring|patio] [before] [out=DIR]  a one-off that moves as it plays, its copies' bearings and clicks",
     "  --busy-street [out=DIR] [at=x,z] [yaw=] [sec=40] [warm=10] [rain=10] [every=1] [prerun=20] [rule=old] [all]",
     "                                                the city's traffic, walkers and rain through the whole client; who holds the binaural pool",
+    "  --city-load [out=DIR] [at=x,y,z] [sec=30] [repeat=2] [prerun=20]",
+    "                                                the city arriving at a login, second by second: the burst named",
     "  --busy-street cost [stages=160] | handover    what a binaural stage costs; whether a voice let go of one leaves click-free",
     "  --stop-clicks [old] [out=DIR]                 a tone let go by every path the game stops a voice by: the step at each end",
     "  --resonance-maybes outlet|overdue|close|track [old] [out=DIR] [sec=] [rounds=]  Resonance's 3.2, 3.1, 3.4 and 3.3 tried on this mixer",
@@ -904,6 +906,12 @@ if (args.Contains("--stop-clicks"))
 if (args.Contains("--busy-street"))
 {
     Environment.Exit(OpenFPS.AudioLab.Spikes.BusyStreetSpike.Run(args));
+}
+if (args.Contains("--city-load"))
+{
+    int cityCode = OpenFPS.AudioLab.Spikes.CityLoadSpike.Run(args);
+    Log.CloseAndFlush();
+    Environment.Exit(cityCode);
 }
 if (args.Contains("--moving-echoes"))
 {

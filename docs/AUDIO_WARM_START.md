@@ -66,6 +66,36 @@ The same burst comes wherever the set of sources changes at once, so the fix cov
      collection pauses.
    - Its first job is to name the missing second of the placement pass and the 1.4 s game-loop iteration. Every
      part below is judged against it, before and after.
+   - **Measured (2026-10-19).** `--city-load out=… sec=30 repeat=2`, Release, the build script's twelve
+     cores (`DOTNET_PROCESSOR_COUNT=12`), spawn at the map's Brandt Court stairwell region (feet −14.20, 0.10,
+     157.10; `/tp` order −14.2 157.1 0.1). Each load arrives as 8,870 definitions, bakes its acoustic map in
+     0.32–0.54 s and spawns 0.34–0.57 s after the manifest. Steam Audio's binaural stages were in use: 88–91
+     binaural places free, no voice without HRTF, none refused.
+     - Load 1's worst placement pass was 561, 659 and 601 ms in the three runs. Its emitters stage cost 491, 589
+       and 533 ms: birds 332, 411 and 375; paths 85, 95 and 95; echoes 37, 46 and 37; budget 42–43; listener+map
+       25–26; voices 7–16; ground 9; trains 4–14; rain 2–3; sweep 3–4. Unnamed was 0.2 ms. Load 2's worst pass was
+       126, 129 and 150 ms (paths 111, 100 and 133; echoes 11–14). The first-time cost is therefore 435, 530 and
+       451 ms, and 126–150 ms is the placement left when nothing is compiled for the first time. Placement per
+       pass over the first ten seconds fell from 29.0–30.0 ms to 15.1–15.6 ms.
+     - The worst client loop iteration was 908, 944 and 1,100 ms. `OtherBodies.Update`'s first pass was 841, 744
+       and 764 ms of it; the audio update 32, 168 and 297; messages 6–7; interpolation 11–13; snapshot 6; pump
+       1–8. Load 2's worst iteration was 235, 258 and 181 ms, with `OtherBodies` 104–239 and audio 11–74. Every
+       millisecond is named.
+     - Sources held their position up to 1,535, 1,542 and 1,453 ms in load 1 (465–564 ms in load 2). The captured
+       mix was 70,228, 74,668 and 79,304 frames short (1.46–1.65 s at 48 kHz) in load 1 and 19,070–23,289
+       (0.40–0.49 s) in load 2; 1–2 % of each steady second is short in both, so about a second of the first
+       load's shortfall is the burst's own gap. The mixer peaked at 69–73 % in load 1 and 53–55 % in load 2, and no block reached 100 % (the
+       2026-10-17 log's 104.5 % did not reproduce). The stall and the capture gap did reproduce.
+     - Load 1 started 101–103 voices: 38 engines, 30–32 borrowed, 22 machines, 4 horns, 3 trains, 3 transients,
+       1 intake. Load 2 started 102: 39 engines, 25 borrowed, 23 machines, 7 transients, 3 intake, 3 horns, 1
+       train, 1 siren. Garbage collection ran 357–363 times in load 1 (15–16 gen2, 592–656 ms paused) and
+       404–418 times in load 2 (12 gen2, 666–744 ms paused) over 30 s; the longest pause was 4–5 ms.
+     - What part 3 should move first: the birds' first pass, the largest named part of the placement pass
+       (332–411 ms of 561–659), then the paths (85–95 ms) and the budget (42–43 ms); on the game loop,
+       `OtherBodies.Update`'s first state for every body (744–841 ms of 908–1,100) outweighs the audio update
+       (32–297 ms). Both are first-time work: load 2's same passes are 126–150 ms and 181–258 ms. The mixer
+       over-100 % block did not reproduce here; the 2026-10-17 log's 1,287 ms placement pass did, as 561–659 ms,
+       and the missing second is now named.
 2. **No first-time cost.**
    - The Windows client is compiled ahead (`PublishReadyToRun` in `publish-windows.sh`), so code does not run
      slow while it is being compiled. ReadyToRun applies only to a publish, so the GTK client that

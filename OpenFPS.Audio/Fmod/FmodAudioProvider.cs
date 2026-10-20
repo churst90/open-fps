@@ -2901,6 +2901,10 @@ public partial class FmodAudioProvider : IAudioProvider
     /// been at the ear and why (BinauralStages.Answer). Null in the game.</summary>
     internal Action<SpatialEmitter, float, BinauralStages.Answer>? RefusedForLab { get; set; }
 
+    /// <summary>The lab: the id and sound of every voice actually started, after its units are in the mixer.
+    /// Null in the game.</summary>
+    internal Action<int, string>? VoiceStartedForLab { get; set; }
+
     /// <summary>The lab: binaural voices taken out of the pool, as a busy street holds them.</summary>
     private readonly List<SaVoice> _heldForLab = new();
 
@@ -3556,6 +3560,7 @@ public partial class FmodAudioProvider : IAudioProvider
                             emitter.EffectiveDistance > 0f ? emitter.EffectiveDistance : Vector3.Distance(_listenerPos, emitter.Position), overDb);
         }
 
+        bool startedForLab = false;
         lock (_lock) { 
             var activeSound = new ActiveSound {
                 LastStrikes = emitter.WheelStrikes, 
@@ -3663,6 +3668,7 @@ public partial class FmodAudioProvider : IAudioProvider
             // Ranked from its first listing, not at the bottom of the render pool until the next update.
             activeSound.Heard = HeardHere(Hearing, activeSound, _listenerPos);
             AddActive(activeSound);
+            startedForLab = true;
 
             // The first block is heard through the voice's path. Until the next attribute pass a new voice
             // played at the emitter's bare volume (a binaural voice gets no distance law from FMOD), with
@@ -3670,6 +3676,8 @@ public partial class FmodAudioProvider : IAudioProvider
             // can be the top end 50 dB too loud for a few milliseconds (AudioLab --floor-render, 2026-10-10).
             if (emitter.Type != EmitterType.UI) StartOnPath(activeSound);
         }
+        // Outside the lock: the lab's counter reads the registry, which may take its own.
+        if (startedForLab) VoiceStartedForLab?.Invoke(emitter.EntityId, emitter.SoundId);
 
         // A 6 ms fade-in on one-shots (an abrupt onset on a recycled HRTF voice clicks) and on
         // reflections (joined mid-file, a step from silence each time a wall starts answering). It
@@ -3956,6 +3964,10 @@ public partial class FmodAudioProvider : IAudioProvider
     /// late is torn audio.</summary>
     public float MixerLoad => _mixerLoad;
     private volatile float _mixerLoad;
+
+    /// <summary>The lab: the master capture tap, for its block cadence and frames written. Null without
+    /// OPENFPS_AUDIO_CAPTURE.</summary>
+    internal MasterTap? MasterTapForLab => _masterTap;
     /// <summary>The load sample's interval timer, restarted every quarter second: never a timebase for
     /// positions (a restart gives a negative age). Timestamps come from <see cref="OpenFPS.Sound.IAudioClock"/>.</summary>
     private readonly System.Diagnostics.Stopwatch _loadSampleClock = System.Diagnostics.Stopwatch.StartNew();

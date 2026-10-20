@@ -463,6 +463,7 @@ public partial class AudioWorld
         if (_lastUpdateAt > 0)
         {
             double gapMs = (nowSec - _lastUpdateAt) * 1000.0;
+            LabLastGapMs = gapMs;
             if (gapMs > _worstGapMs) _worstGapMs = gapMs;
         }
         _lastUpdateAt = nowSec;
@@ -765,37 +766,56 @@ public partial class AudioWorld
                     _voices.Stop(entityId);
                     continue;
                 }
+                // The parts measured inside the call, taken off its total: what is left is the voice's own
+                // resolving and submission, named so a load's missing second is not one unnamed lump.
+                long sourceAt = System.Diagnostics.Stopwatch.GetTimestamp();
+                double pathsBefore = _partMs[PartPaths], groundBefore = _partMs[PartGround], echoesBefore = _partMs[PartEchoes];
                 ProcessAudioEmitter(world, src, visualEyePos, engineDt);
+                double voiceMs = Ms(sourceAt)
+                               - (_partMs[PartPaths] - pathsBefore)
+                               - (_partMs[PartGround] - groundBefore)
+                               - (_partMs[PartEchoes] - echoesBefore);
+                if (voiceMs > 0) _partMs[PartVoices] += voiceMs;
             }
         }
+        long partAt = System.Diagnostics.Stopwatch.GetTimestamp();
         RetireSpreading();
         UpdateCabinVoices();
+        _partMs[PartCabins] += Ms(partAt);
 
-        long partAt = System.Diagnostics.Stopwatch.GetTimestamp();
+        partAt = System.Diagnostics.Stopwatch.GetTimestamp();
         UpdateTrains(world, visualEyePos, engineDt);
         UpdateHorns(world, visualEyePos, _audio.Clock.Now);
         UpdateSirens(world, visualEyePos);
         UpdateOwnVoice(visualEyePos, _audio.Clock.Now);
         UpdateTalkers(world, visualEyePos, _audio.Clock.Now);
-        _partMs[3] += Ms(partAt);
+        _partMs[PartTrains] += Ms(partAt);
         partAt = System.Diagnostics.Stopwatch.GetTimestamp();
         _birds.EarSpeed = _earSpeed;
         _birds.Update(world, visualEyePos, _audio.Clock.Now);
+        _partMs[PartBirds] += Ms(partAt);
+        partAt = System.Diagnostics.Stopwatch.GetTimestamp();
         _rain.EarSpeed = _earSpeed;
         _rain.Update(world, _sources.Falling, visualEyePos, _audio.Clock.Now, listenerRegionId, OwnEntityId, Listener.RidingId);
-        _partMs[2] += Ms(partAt);
+        _partMs[PartRain] += Ms(partAt);
 
         // Every source has been offered to the reflection system: it sets what next frame's reflections
         // must reach to be worth a voice.
+        partAt = System.Diagnostics.Stopwatch.GetTimestamp();
         _engineEchoes.EndFrame();
+        _partMs[PartEchoFrame] += Ms(partAt);
         // Every voice let go this frame or before is taken down its fade; then a sustained voice not declared
         // this frame is no longer an entry, nor a one-off that has stopped, nor a fade that has ended.
+        partAt = System.Diagnostics.Stopwatch.GetTimestamp();
         _voices.Fades();
         _voices.Sweep(_frameCount, _sounding ??= _audio.IsPlaying);
+        _partMs[PartSweep] += Ms(partAt);
 
         {
             double pass = 0; foreach (var v in _partMs) pass += v;
             if (pass > _partWorstPass) { _partWorstPass = pass; Array.Copy(_partMs, _partWorstMs, _partMs.Length); }
+            LabLastPartPassMs = pass;
+            Array.Copy(_partMs, LabPartLastMs, _partMs.Length);
             Array.Clear(_partMs);
         }
         Stage(3, ref stageTicks);     // 6: building an emitter for everything that has a voice
@@ -808,6 +828,8 @@ public partial class AudioWorld
             double ms = (System.Diagnostics.Stopwatch.GetTimestamp() - startTicks) * 1000.0
                       / System.Diagnostics.Stopwatch.Frequency;
             if (ms > _worstUpdateMs) _worstUpdateMs = ms;
+            LabLastTickMs = ms;
+            LabTickCount++;
         }
     }
 
@@ -825,18 +847,31 @@ public partial class AudioWorld
     /// can run 150-250 ms on the city, and every source freezes that long (reflections stepping away and
     /// catching up late).
     /// </summary>
-    private readonly double[] _partMs = new double[4], _partWorstMs = new double[4];
+    private const int PartCount = 10;
+    private const int PartPaths = 0, PartVoices = 1, PartGround = 2, PartEchoes = 3, PartSweep = 4,
+                      PartEchoFrame = 5, PartTrains = 6, PartBirds = 7, PartRain = 8, PartCabins = 9;
+    private readonly double[] _partMs = new double[PartCount], _partWorstMs = new double[PartCount];
     private double _partWorstPass;
-    private readonly string[] PartNames = { "echoes", "ground", "birds", "horns+sirens" };
+    internal static readonly string[] LabPartNames =
+        { "paths", "voices", "ground", "echoes", "voice sweep", "echo frame", "trains/horns/sirens", "birds", "rain", "cabins/retire" };
+    private static IReadOnlyList<string> PartNames => LabPartNames;
     private static double Ms(long from) => (System.Diagnostics.Stopwatch.GetTimestamp() - from) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
     private readonly string[] StageNames =
         { "listener+map", "paths", "budget", "emitters", "mixer" };
+
+    // The instrument's view of the last tick: the same figures the five-second census keeps as maxima, but
+    // one tick at a time, so --city-load can report each second without resetting the game's census.
+    internal int LabTickCount;
+    internal double LabLastTickMs, LabLastGapMs, LabLastPartPassMs;
+    internal readonly double[] LabStageLastMs = new double[5];
+    internal readonly double[] LabPartLastMs = new double[PartCount];
 
     private void Stage(int stage, ref long since)
     {
         long now = System.Diagnostics.Stopwatch.GetTimestamp();
         double ms = (now - since) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
         if (ms > _stageWorstMs[stage]) _stageWorstMs[stage] = ms;
+        LabStageLastMs[stage] = ms;
         since = now;
     }
 
@@ -2979,7 +3014,9 @@ public partial class AudioWorld
 
         // The worker's last answer; until it has one, FirstAnswer. Never "nothing in the way". The entity's
         // path for the frame, which its horn, siren, outlets and places are heard through too.
+        long pathAt = System.Diagnostics.Stopwatch.GetTimestamp();
         AcousticPathData acousticPath = PathOf(world, src, eyePos).Raw;
+        _partMs[PartPaths] += Ms(pathAt);
 
         string resolvedSoundId = "";
         bool interior = false;
@@ -3317,7 +3354,7 @@ public partial class AudioWorld
         Cutting? cutting = linePath != null ? CutOf(src, linePath, ref emitter, eyePos) : woodCut ? CutWood(src, ref emitter, eyePos) : null;
         long groundAt = System.Diagnostics.Stopwatch.GetTimestamp();
         if (engineKey.Length > 0 || physicalKey.Length > 0) ApplyGround(ref emitter, world);
-        _partMs[1] += Ms(groundAt);
+        _partMs[PartGround] += Ms(groundAt);
         Spreading? spreading = extentLayout != null ? SpreadOf(src, extentLayout, ref emitter, eyePos, engineDt, now) : null;
         _placed[src.Id] = (emitter.Volume, emitter.MinDistance, emitter.Range);
         // Every middle goes to the budget; a wood's pieces follow it (PlacePieces), so a wood the budget holds while
@@ -3345,7 +3382,7 @@ public partial class AudioWorld
             _engineEchoes.Update(src.Id, emitter, acousticPath, eyePos, _audio.Atmosphere.SpeedOfSound, engineDt, _audio,
                                  traced: _audio.HasTracedEchoes(src.Id));
             double echoMs = Ms(echoAt);
-            _partMs[0] += echoMs;
+            _partMs[PartEchoes] += echoMs;
             _echoPassMs += echoMs;
         }
 

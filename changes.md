@@ -4,6 +4,24 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-19
 
+- Sound that starts clean, part 1: `OpenFPS.AudioLab` gains `--city-load`, which loads the real city as a login
+  does, spawns at Brandt Court's stairwell, captures the mix and reports each second of both loads
+  (`seconds.csv`, `report.txt`). Attribution adds six named parts to `AudioWorld` and renames the old
+  horns+sirens part (paths, voices, ground, echoes, voice sweep, echo frame, trains/horns/sirens, birds, rain,
+  cabins/retire); the five-second placement line
+  names them too, and a lab-only callback and master-tap cadence measure starts and capture gaps. Three Release
+  runs with `repeat=2` made load 1's worst placement pass 561/659/601 ms, of which birds were 332/411/375 ms and
+  paths 85/95/95; load 2's same pass was 126/129/150 ms, so first-time cost is 435/530/451 ms. The worst client
+  loop iteration was 908/944/1,100 ms, mostly `OtherBodies.Update` (841/744/764 ms). Load 1 held positions up to
+  1,535/1,542/1,453 ms and the capture was 1.46–1.65 s short; the mixer peaked at 69–73 %, so the 104.5 % block
+  from 2026-10-17 did not reproduce, but the stall and gap did. The instrument's unnamed remainder is 0.2 ms of
+  the worst pass and 0 of the worst loop. No sound changes: emitter-stream, spoken-line and render fingerprints
+  are unchanged and were not regenerated. The wire hash stays `a3d6f3a6ec76`, so server and Windows client do not
+  deploy together, and the door fingerprint is unchanged. Ratchets unchanged: engine packages 10 crossings, 614
+  files; sound boundary 0 crossings, 6,655 layering, 349 statics, 0 unsorted. Guards: 51 (stream/spoken/render/
+  placement thread), 141 (boundary/voice/binaural/wire/table/material/law/map/ricochet), 36 replays with
+  `DOTNET_PROCESSOR_COUNT=4`, and PeopleReplay 1. Placement tests 110 passed, 4 skipped and 3 failed, the
+  failures pre-existing on main at 9055cd73. Built by DeepSeek through OpenCode.
 - Engine packages stage 10, the five law moves: `Pavements`, `Haunts`, `DoorRules`, `AlexDay` and `HomelessLines`
   now live in `OpenFPS.Agents`, one commit each, and the server's hosts keep every body, seat, door and sound
   write. `Haunt.Door` is an entity id now; `DoorRules` takes the view and the outside region id while

@@ -21,6 +21,10 @@ public sealed class MasterTap : IDisposable
     private readonly object _lock = new();
     private bool _closed;
 
+    // The mixer calls once a block; a wall-clock gap longer than the block is a block that overran.
+    private long _lastBlockAt, _blocks, _lateBlocks;
+    private double _lastGapMs, _worstGapMs;
+
     private static DSP_READ_CALLBACK? _callback;
     private FMOD.DSP _dsp;
     private ChannelGroup _group;   // the group it was added to, so it can be taken off again
@@ -118,6 +122,17 @@ public sealed class MasterTap : IDisposable
         lock (_lock)
         {
             if (_closed) return;
+            long now = System.Diagnostics.Stopwatch.GetTimestamp();
+            int frames = total / Math.Max(1, channels);
+            double blockMs = frames * 1000.0 / _rate;
+            if (_lastBlockAt != 0)
+            {
+                _lastGapMs = (now - _lastBlockAt) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+                if (_lastGapMs > _worstGapMs) _worstGapMs = _lastGapMs;
+                if (_lastGapMs > blockMs * 1.5) _lateBlocks++;
+            }
+            _lastBlockAt = now;
+            _blocks++;
             _channels = channels;
             if (_float)
                 for (int i = 0; i < total; i++) _writer.Write(src[i]);
@@ -130,6 +145,13 @@ public sealed class MasterTap : IDisposable
                 }
             _frames += total / Math.Max(1, channels);
         }
+    }
+
+    /// <summary>The lab: blocks written, how many overran their block, the last and worst wall-clock gap,
+    /// and the frames written so far.</summary>
+    internal (long Blocks, long LateBlocks, double LastGapMs, double WorstGapMs, long Frames) LabCadence
+    {
+        get { lock (_lock) return (_blocks, _lateBlocks, _lastGapMs, _worstGapMs, _frames); }
     }
 
     public void Dispose()
