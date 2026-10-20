@@ -140,23 +140,23 @@ public class NpcDoorTests : IDisposable
         foreach (bool found in new[] { false, true })
             foreach (bool goingIn in new[] { false, true })
             {
-                Assert.Equal(DoorManners.Then.LetGo, DoorManners.Decide(DoorManners.Kind.ShutsItself, goingIn, found));
-                Assert.Equal(DoorManners.Then.Shut, DoorManners.Decide(DoorManners.Kind.Outside, goingIn, found));
+                Assert.Equal(DoorRules.Then.LetGo, DoorRules.Decide(DoorRules.Kind.ShutsItself, goingIn, found));
+                Assert.Equal(DoorRules.Then.Shut, DoorRules.Decide(DoorRules.Kind.Outside, goingIn, found));
             }
-        Assert.Equal(DoorManners.Then.Shut, DoorManners.Decide(DoorManners.Kind.Inside, goingIn: true, foundOpen: false));
-        Assert.Equal(DoorManners.Then.Leave, DoorManners.Decide(DoorManners.Kind.Inside, goingIn: true, foundOpen: true));
-        Assert.Equal(DoorManners.Then.Shut, DoorManners.Decide(DoorManners.Kind.Inside, goingIn: false, foundOpen: false));
-        Assert.Equal(DoorManners.Then.Shut, DoorManners.Decide(DoorManners.Kind.Inside, goingIn: false, foundOpen: true));
+        Assert.Equal(DoorRules.Then.Shut, DoorRules.Decide(DoorRules.Kind.Inside, goingIn: true, foundOpen: false));
+        Assert.Equal(DoorRules.Then.Leave, DoorRules.Decide(DoorRules.Kind.Inside, goingIn: true, foundOpen: true));
+        Assert.Equal(DoorRules.Then.Shut, DoorRules.Decide(DoorRules.Kind.Inside, goingIn: false, foundOpen: false));
+        Assert.Equal(DoorRules.Then.Shut, DoorRules.Decide(DoorRules.Kind.Inside, goingIn: false, foundOpen: true));
     }
 
     [Theory]
-    [InlineData("door", true, DoorManners.Kind.Outside)]
-    [InlineData("door", false, DoorManners.Kind.Inside)]
-    [InlineData("patio_door", true, DoorManners.Kind.Outside)]
-    [InlineData("steel_door", true, DoorManners.Kind.ShutsItself)]
-    [InlineData("glass_front_door", true, DoorManners.Kind.ShutsItself)]
-    [InlineData("auto_sliding_door", true, DoorManners.Kind.ShutsItself)]
-    public void Each_door_is_known_for_what_it_is(string prefab, bool outside, DoorManners.Kind kind)
+    [InlineData("door", true, DoorRules.Kind.Outside)]
+    [InlineData("door", false, DoorRules.Kind.Inside)]
+    [InlineData("patio_door", true, DoorRules.Kind.Outside)]
+    [InlineData("steel_door", true, DoorRules.Kind.ShutsItself)]
+    [InlineData("glass_front_door", true, DoorRules.Kind.ShutsItself)]
+    [InlineData("auto_sliding_door", true, DoorRules.Kind.ShutsItself)]
+    public void Each_door_is_known_for_what_it_is(string prefab, bool outside, DoorRules.Kind kind)
     {
         var door = Door(prefab, outside);
         Assert.Equal(kind, DoorManners.KindOf(_world, door));
@@ -203,7 +203,7 @@ public class NpcDoorTests : IDisposable
         var door = Door(prefab, outside: true);
         var npc = Npc(InRoom);
         var passage = Pass(door, npc, InRoom, OnStreetPast, OnStreetFar);
-        Assert.Equal(DoorManners.Then.LetGo, passage.Then);
+        Assert.Equal(DoorRules.Then.LetGo, passage.Then);
         Assert.Equal(0, _manners.Waiting);
         Assert.Equal(0f, D(door).Openness);
         Assert.Contains(_heard, h => h.Key.EndsWith(":closer"));
@@ -267,7 +267,7 @@ public class NpcDoorTests : IDisposable
         var door = Door("door", outside: false);
         var npc = Npc(goingIn ? OnStreet : InRoom);
         var passage = goingIn ? Pass(door, npc, OnStreet, InRoomPast, InRoomFar) : Pass(door, npc, InRoom, OnStreetPast, OnStreetFar);
-        Assert.Equal(DoorManners.Kind.Inside, passage.Kind);
+        Assert.Equal(DoorRules.Kind.Inside, passage.Kind);
         Assert.Equal(goingIn, passage.GoingIn);
         Assert.Equal(0f, D(door).Openness);
         Assert.Empty(_shutOnSomebody);
@@ -292,9 +292,9 @@ public class NpcDoorTests : IDisposable
     /// <summary>An automatic door opens for them by its sensor and shuts by its motor; a patio door to the
     /// garden is slid shut behind them.</summary>
     [Theory]
-    [InlineData("auto_sliding_door", DoorManners.Then.LetGo)]
-    [InlineData("patio_door", DoorManners.Then.Shut)]
-    public void A_sliding_door_ends_shut_by_its_motor_or_by_hand(string prefab, DoorManners.Then then)
+    [InlineData("auto_sliding_door", DoorRules.Then.LetGo)]
+    [InlineData("patio_door", DoorRules.Then.Shut)]
+    public void A_sliding_door_ends_shut_by_its_motor_or_by_hand(string prefab, DoorRules.Then then)
     {
         var door = Door(prefab, outside: true);
         var npc = Npc(InRoom);

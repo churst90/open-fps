@@ -58,6 +58,7 @@ OpenFPS.Acoustics/WallTransmission.cs	Acoustics
 OpenFPS.Agents/AircraftGroundRun.cs	Agents	
 OpenFPS.Agents/CarFollowing.cs	Agents	
 OpenFPS.Agents/CrossingRules.cs	Agents	
+OpenFPS.Agents/DoorRules.cs	Agents	
 OpenFPS.Agents/Haunts.cs	Agents	
 OpenFPS.Agents/JunctionRules.cs	Agents	
 OpenFPS.Agents/LaneRoutes.cs	Agents	
@@ -407,7 +408,7 @@ OpenFPS.Server/Systems/CharacterSystem.cs	game	host: steps Agents
 OpenFPS.Server/Systems/ContactStreams.cs	game	
 OpenFPS.Server/Systems/CrossingSystem.cs	game	host: steps Agents
 OpenFPS.Server/Systems/CrowdSystem.cs	game	host: steps Agents
-OpenFPS.Server/Systems/DoorManners.cs	game	host: Agents once it reads a view
+OpenFPS.Server/Systems/DoorManners.cs	game	host: steps Agents
 OpenFPS.Server/Systems/DoorSystem.cs	game	
 OpenFPS.Server/Systems/DrivingSystem.cs	game	
 OpenFPS.Server/Systems/FireSystem.cs	game	host: steps Environment

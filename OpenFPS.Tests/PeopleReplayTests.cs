@@ -323,7 +323,7 @@ public class PeopleReplayTests
 
     private static void DoorLines(World world, StringBuilder sb)
     {
-        var list = new List<(int Id, string Name, DoorManners.Kind Kind, bool Forward, bool Back)>();
+        var list = new List<(int Id, string Name, DoorRules.Kind Kind, bool Forward, bool Back)>();
         world.Query(new QueryDescription().WithAll<Transform, DoorComponent>(), (Entity e) =>
         {
             DoorSystem.Doorway(world, e, out var centre, out var rotation);

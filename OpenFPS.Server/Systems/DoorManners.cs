@@ -2,6 +2,7 @@ using System.Numerics;
 using Arch.Core;
 using OpenFPS.Acoustics;
 using OpenFPS.Common.Components;
+using OpenFPS.Server.Core;
 using Serilog;
 
 namespace OpenFPS.Server.Systems;
@@ -24,30 +25,16 @@ namespace OpenFPS.Server.Systems;
 /// </summary>
 public sealed class DoorManners
 {
-    /// <summary>What kind of door it is, for what is done with it.</summary>
-    public enum Kind { ShutsItself, Outside, Inside }
-
-    /// <summary>What is done with it once they are through.</summary>
-    public enum Then { LetGo, Shut, Leave }
-
     /// <summary>Somebody's way through one door: how they found it, and which way they are going.</summary>
     public sealed class Passage
     {
         public required Entity Door;
-        public required Kind Kind;
+        public required DoorRules.Kind Kind;
         public bool FoundOpen;
         /// <summary>Further from the street: an inside door found open is left open.</summary>
         public bool GoingIn;
-        public Then Then => Decide(Kind, GoingIn, FoundOpen);
+        public DoorRules.Then Then => DoorRules.Decide(Kind, GoingIn, FoundOpen);
     }
-
-    /// <summary>The rule, by itself.</summary>
-    public static Then Decide(Kind kind, bool goingIn, bool foundOpen) => kind switch
-    {
-        Kind.ShutsItself => Then.LetGo,
-        Kind.Outside => Then.Shut,
-        _ => goingIn && foundOpen ? Then.Leave : Then.Shut,
-    };
 
     /// <summary>How long after the doorway is clear the door is pulled to, seconds: a turn and a reach
     /// back, between these two, different for each person and door.</summary>
@@ -97,7 +84,7 @@ public sealed class DoorManners
         var then = passage.Then;
         Log.Debug("Door manners: entity {Who} through door {Door} ({Kind}, found {Found}, going {Way}): {Then}.",
                   who.Id, passage.Door.Id, passage.Kind, passage.FoundOpen ? "open" : "shut", passage.GoingIn ? "in" : "out", then);
-        if (then != Then.Shut) return;
+        if (then != DoorRules.Then.Shut) return;
         _pending.RemoveAll(p => p.MapId == mapId && p.Passage.Door == passage.Door);
         // Each person and door its own pause, the same every time.
         uint h = (uint)HashCode.Combine(passage.Door.Id, who.Id);
@@ -162,94 +149,14 @@ public sealed class DoorManners
 
     // ── What kind of door, and which way is in ──────────────────────────────────────────────────
 
-    /// <summary>
-    /// A door with a closer, a motor or a sensor shuts itself. Otherwise it is an outside door if either
-    /// side of it is the outside (its portal's regions, or the places either side of the doorway), and an
-    /// inside door if both are indoors.
-    /// </summary>
-    public static Kind KindOf(World world, Entity door)
-    {
-        var d = world.Get<DoorComponent>(door);
-        if (d.CloseAfterSeconds > 0f || d.Powered || d.SensorMetres > 0f) return Kind.ShutsItself;
-        var regions = Regions(world);
-        if (world.Has<PortalComponent>(door))
-        {
-            var portal = world.Get<PortalComponent>(door);
-            if (portal.RegionAId != portal.RegionBId)
-                return IsOutside(regions, portal.RegionAId) || IsOutside(regions, portal.RegionBId) ? Kind.Outside : Kind.Inside;
-        }
-        DoorSystem.Doorway(world, door, out var centre, out var rotation);
-        var through = Vector3.Transform(Vector3.UnitZ, rotation);
-        return IsOutside(regions, RegionAt(world, centre + through)) || IsOutside(regions, RegionAt(world, centre - through))
-            ? Kind.Outside : Kind.Inside;
-    }
+    /// <summary>A view over the map, for the law: the wrappers need no grid.</summary>
+    private static IPeopleWorld ViewOf(World world) => ServerPeopleView.Of(world, null);
 
-    /// <summary>
-    /// Whether going from <paramref name="from"/> to <paramref name="to"/> is going in: to a place more
-    /// doorways from the outside than where they were, or, as far from it, a smaller one (a room off a
-    /// hall). Neither is going in, so a door they cannot tell about is left as found.
-    /// </summary>
+    /// <summary>What kind of door it is, through the law (DoorRules.KindOf).</summary>
+    public static DoorRules.Kind KindOf(World world, Entity door)
+        => DoorRules.KindOf(ViewOf(world), door.Id, AcousticConstants.GlobalRegionId);
+
+    /// <summary>Whether this way is going in, through the law (DoorRules.GoingIn).</summary>
     public static bool GoingIn(World world, Vector3 from, Vector3 to)
-    {
-        int a = RegionAt(world, from), b = RegionAt(world, to);
-        if (a == b) return true;
-        var regions = Regions(world);
-        var depth = DepthFromOutside(world, regions);
-        int da = depth.GetValueOrDefault(a, int.MaxValue), db = depth.GetValueOrDefault(b, int.MaxValue);
-        if (da != db) return db > da;
-        float va = regions.TryGetValue(a, out var ra) ? ra.Volume : float.MaxValue;
-        float vb = regions.TryGetValue(b, out var rb) ? rb.Volume : float.MaxValue;
-        return vb <= va;
-    }
-
-    /// <summary>Every region on the map: whether it is indoors, and how big it is (its flood's air where it flooded,
-    /// else its box).</summary>
-    private static Dictionary<int, (bool Indoor, float Volume)> Regions(World world)
-    {
-        var regions = new Dictionary<int, (bool, float)>();
-        var floods = OpenFPS.Server.Core.MapManager.RoomsOf(world);
-        world.Query(new QueryDescription().WithAll<RegionComponent>(), (Entity e, ref RegionComponent r) =>
-        {
-            if (floods != null && floods.TryAir(e.Id, out _, out _, out float air)) { regions[e.Id] = (r.IsIndoor, air); return; }
-            var s = r.RoomSize;
-            regions[e.Id] = (r.IsIndoor, s.X > 0f && s.Y > 0f && s.Z > 0f ? s.X * s.Y * s.Z : float.MaxValue);
-        });
-        return regions;
-    }
-
-    /// <summary>The outside: no region, or a region that is not indoors.</summary>
-    private static bool IsOutside(Dictionary<int, (bool Indoor, float Volume)> regions, int regionId)
-        => regionId == AcousticConstants.GlobalRegionId || regions.TryGetValue(regionId, out var r) && !r.Indoor;
-
-    /// <summary>The region a point is in, as the client finds it (MapManager.RegionAt).</summary>
-    public static int RegionAt(World world, Vector3 p) => OpenFPS.Server.Core.MapManager.RegionAt(world, p);
-
-    /// <summary>How many doorways each region is from the outside, through every portal on the map.</summary>
-    private static Dictionary<int, int> DepthFromOutside(World world, Dictionary<int, (bool Indoor, float Volume)> regions)
-    {
-        var links = new Dictionary<int, List<int>>();
-        void Link(int a, int b)
-        {
-            if (!links.TryGetValue(a, out var list)) links[a] = list = new List<int>();
-            list.Add(b);
-        }
-        world.Query(new QueryDescription().WithAll<PortalComponent>(), (ref PortalComponent p) =>
-        {
-            if (p.RegionAId == p.RegionBId) return;
-            Link(p.RegionAId, p.RegionBId);
-            Link(p.RegionBId, p.RegionAId);
-        });
-        var depth = new Dictionary<int, int>();
-        var queue = new Queue<int>();
-        foreach (int id in links.Keys.Append(AcousticConstants.GlobalRegionId).Concat(regions.Keys).Distinct())
-            if (IsOutside(regions, id)) { depth[id] = 0; queue.Enqueue(id); }
-        while (queue.Count > 0)
-        {
-            int at = queue.Dequeue();
-            if (!links.TryGetValue(at, out var next)) continue;
-            foreach (int n in next)
-                if (!depth.ContainsKey(n)) { depth[n] = depth[at] + 1; queue.Enqueue(n); }
-        }
-        return depth;
-    }
+        => DoorRules.GoingIn(ViewOf(world), from, to, AcousticConstants.GlobalRegionId);
 }

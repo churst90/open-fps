@@ -138,7 +138,7 @@ FILE_RULES = [
     ('OpenFPS.Server/Systems/VehicleSystem*.cs', 'game', 'host: steps Agents'),
     ('OpenFPS.Server/Systems/CrowdSystem.cs', 'game', 'host: steps Agents'),
     ('OpenFPS.Server/Systems/PedestrianSpeech*.cs', 'game', 'host: steps Agents (the lines are Speech)'),
-    ('OpenFPS.Server/Systems/DoorManners.cs', 'game', 'host: Agents once it reads a view'),
+    ('OpenFPS.Server/Systems/DoorManners.cs', 'game', 'host: steps Agents'),
     ('OpenFPS.Server/Systems/CharacterSystem.cs', 'game', 'host: steps Agents'),
     ('OpenFPS.Server/Systems/CrossingSystem.cs', 'game', 'host: steps Agents'),
     ('OpenFPS.Server/Systems/RailSystem.cs', 'game', 'host: steps Agents (physics survey: trains kinematic)'),
