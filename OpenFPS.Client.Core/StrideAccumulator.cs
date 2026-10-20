@@ -141,6 +141,7 @@ public sealed class StrideAccumulator
     private bool _feetMoving;
     private float _fastestFall;
     private double _lastLandAt = double.NegativeInfinity;
+    private float? _joinPhase;
 
     /// <summary>What the body did this update, if anything. Both can be true at once: a body that
     /// lands and keeps running lands and then steps.</summary>
@@ -148,6 +149,14 @@ public sealed class StrideAccumulator
     {
         public bool Anything => Stepped || Landed;
     }
+
+    /// <summary>
+    /// The body was first heard already walking, so its walk did not start here: its first update is
+    /// part way through a step, <paramref name="phase"/> of one (0 to 1), not a foot going down. Without
+    /// it every walker in sight took a step on the first frame after a spawn, 83 in one audio update on
+    /// the city (2026-10-20), and all of them in step after it. A body first seen standing is unchanged.
+    /// </summary>
+    public void JoinMidStride(float phase) => _joinPhase = Math.Clamp(phase, 0f, 1f);
 
     /// <summary>Forgets where the body was, for a spawn, a teleport, or getting in and out of something,
     /// rather than relying on <see cref="MaxStrideStep"/> to catch the jump.</summary>
@@ -198,6 +207,15 @@ public sealed class StrideAccumulator
         // The first footfall of a walk is at its start, so each tap of a movement key (15 cm) is a
         // footstep. Only a body on the ground has stopped, and a landing takes the place of this
         // footfall. See docs/COMMON_NOTES.md, "Walking".
+        if (_joinPhase is float phase)
+        {
+            if (isGrounded && walking)
+            {
+                _feetMoving = true;
+                _accumulatedDistance = phase * StepLength(ownSpeed);
+            }
+            _joinPhase = null;
+        }
         if (isGrounded && ownSpeed < StoppedSpeed) _feetMoving = false;
         bool startedWalking = isGrounded && walking && !_feetMoving && !landed;
         if (isGrounded && walking) _feetMoving = true;

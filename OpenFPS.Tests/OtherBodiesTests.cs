@@ -124,6 +124,61 @@ public class OtherBodiesTests
         Assert.True(steps.Count >= 3, $"eight metres of walking produced {steps.Count} footstep(s)");
     }
 
+    /// <summary>
+    /// Somebody first heard already walking is part way through a step, not starting one: at a spawn on
+    /// the city every walker in sight put a foot down on the first frame, 83 in one audio update, and
+    /// walked in step after it. Their first step comes as the walk brings it, at a phase from the id.
+    /// </summary>
+    [Fact]
+    public void SomebodyFirstHeardWalkingIsMidStride()
+    {
+        var others = new OtherBodies();
+        var steps = new List<Vector3>();
+        others.OnStepTriggered += (p, _, _, _, _) => steps.Add(p);
+        var velocity = new Vector3(0, 0, 1.4f);
+
+        others.Update(Frame(new Vector3(0, 0, -4f), velocity), Listener);
+        Assert.Empty(steps);
+
+        var at = new Vector3(0, 0, -4f);
+        for (int i = 0; i < 20 && steps.Count == 0; i++)
+        {
+            at += new Vector3(0, 0, 0.14f);
+            others.Update(Frame(at, velocity), Listener);
+        }
+        Assert.NotEmpty(steps);
+        Assert.True(at.Z + 4f <= StrideAccumulator.StepLength(1.4f) + 0.15f,
+                    $"the first step came {at.Z + 4f:F2} m in, past a whole step");
+    }
+
+    /// <summary>Somebody first heard standing still starts a walk with a foot down, as a tap does.</summary>
+    [Fact]
+    public void SomebodyFirstHeardStandingStepsWhenTheyStart()
+    {
+        var others = new OtherBodies();
+        int steps = 0;
+        others.OnStepTriggered += (_, _, _, _, _) => steps++;
+
+        others.Update(Frame(new Vector3(0, 0, 0), Vector3.Zero), Listener);
+        others.Update(Frame(new Vector3(0, 0, 0.14f), new Vector3(0, 0, 1.4f)), Listener);
+
+        Assert.Equal(1, steps);
+    }
+
+    /// <summary>A crowd's phases are spread over the step, so a crowd heard at once does not march.</summary>
+    [Fact]
+    public void ACrowdDoesNotMarchInStep()
+    {
+        var tenths = new int[10];
+        for (int id = 1; id <= 83; id++)
+        {
+            float phase = OtherBodies.StridePhase(id);
+            Assert.InRange(phase, 0f, 1f);
+            tenths[Math.Min(9, (int)(phase * 10f))]++;
+        }
+        Assert.All(tenths, n => Assert.InRange(n, 4, 13));
+    }
+
     /// <summary>A step is heard from the body's feet — and from one foot or the other, not from a
     /// point down the middle of it.</summary>
     [Fact]

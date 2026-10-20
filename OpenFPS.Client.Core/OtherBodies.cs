@@ -82,6 +82,10 @@ public sealed class OtherBodies
 
     public void Clear() => _bodies.Clear();
 
+    /// <summary>How far through a step a body first heard walking is, from its id: the same on every
+    /// machine and every run, and spread, so a crowd heard at once does not march in step.</summary>
+    internal static float StridePhase(int id) => (uint)id * 2654435761u / 4294967296f;
+
     public void Update(WorldSnapshot snapshot, int localPlayerId)
     {
         long updateAt = System.Diagnostics.Stopwatch.GetTimestamp();
@@ -128,7 +132,10 @@ public sealed class OtherBodies
             }
 
             if (!_bodies.TryGetValue(body.Id, out var state))
+            {
                 _bodies[body.Id] = state = new Body();
+                state.Stride.JoinMidStride(StridePhase(body.Id));
+            }
             _partMs[LabClassify] += Ms(partAt);
 
             // Lungs run on elapsed time; a body just seen (or back after an absence) gets none.
