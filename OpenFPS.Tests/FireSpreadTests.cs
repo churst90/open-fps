@@ -95,11 +95,9 @@ public class FireSpreadTests
         Assert.Equal("fire:bonfire/lit=5.0/shape=c2", FireSpec.KeyForPlaced("fire:bonfire/lit=5.0/shape=c2", ColliderShape.Box.IsRound(), new Vector3(9f, 1f, 9f), ModelLibrary.Presets.Fire));
         // Not a fire: untouched.
         Assert.Equal("foliage:park_tree", FireSpec.KeyForPlaced("foliage:park_tree", ColliderShape.Box.IsRound(), Vector3.One, ModelLibrary.Presets.Fire));
-        // And the places follow the shape: a round bed's ring is narrower than its square's.
-        var square = Wide.Layout("fire:fire_pit", ModelLibrary.Presets)!;
-        var circle = Wide.Layout(round, ModelLibrary.Presets)!;
-        Assert.Equal(square.Length, circle.Length);
-        Assert.True(circle[1].Length() < 1.2f / 0.9f * square[1].Length());
+        // And both are cut at the ear over their own bed, round or square (FireAndWoodCutTests walks a round pit).
+        Assert.True(Wide.IsCut("fire:fire_pit", ModelLibrary.Presets));
+        Assert.True(Wide.IsCut(round, ModelLibrary.Presets));
     }
 
     [Fact]

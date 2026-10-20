@@ -360,9 +360,10 @@ public class ClientAudioSelectionTests
         Assert.Equal(extent, e.ExtentMetres, 4);
         Assert.True(e.Range >= Law.AudibleRange(level) - 1e-3f, $"range {e.Range} under the level's audible range");
         Assert.Equal("", e.EngineKey);
-        // A line cut into pieces (running water) has its own voice moved to its middle piece at that piece's gain.
+        // A source cut into pieces at the ear (running water, open water, a fire's area) has its own voice moved
+        // to its middle piece at that piece's gain.
         if (Wide.Layout(e.PhysicalKey, ModelLibrary.Presets) == null
-            && Wide.LineLength(e.PhysicalKey, ModelLibrary.Presets) == 0f)
+            && !Wide.IsCut(e.PhysicalKey, ModelLibrary.Presets))
             Assert.Equal(gain * PhysicalVoiceState.HeadroomGain(Headroom(soundId)), e.Volume, 5);
         else
             Assert.True(e.Volume > 0f && float.IsFinite(e.Volume));
@@ -778,7 +779,9 @@ public class ClientAudioSelectionTests
         _o.WriteLine($"from 250 m: the wood stands for {far.Trees:F2} trees, gain {far.Volume:F4}, key {far.PhysicalKey}");
         Assert.Equal(trees.Count, far.Trees, 2);
         Assert.Equal(wood.Key, far.PhysicalKey);
-        Assert.Equal(wood.Extent, far.ExtentMetres, 3);
+        // Cut at the ear by its crowns, each piece is heard by one crown's own law: its size, not the wood's.
+        Assert.True(OpenFPS.Sound.WoodChorus.ParseKey(wood.Key, out string preset, out _, out _));
+        Assert.Equal(ModelLibrary.Presets.Foliage(preset).ExtentMetres, far.ExtentMetres, 3);
 
         // In the middle of it: the nearest trees have their own voices, and the wood stands for the rest.
         h.StandAt(new Vector3(1016f, 0f, 1016f));

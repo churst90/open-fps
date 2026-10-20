@@ -254,12 +254,13 @@ public class OneRankTests
         AddSource(h, Fire, "fire:bonfire", new Vector3(-14f, 0f, 0f), new Vector3(3f, 1f, 3f));
         Assert.True(h.TickUntil(() => h.Mixer.Latest.ContainsKey(Tree) && h.Mixer.Latest.ContainsKey(Fire), 60), "the two were never voiced");
         int treePlaces = Wide.Layout(h.Mixer.Latest[Tree].PhysicalKey, ModelLibrary.Presets)!.Length - 1;
-        int firePlaces = Wide.Layout(h.Mixer.Latest[Fire].PhysicalKey, ModelLibrary.Presets)!.Length - 1;
-        _o.WriteLine($"the tree: {treePlaces} places, {20 * MathF.Log10(h.Audio.World.HeardInRanking(Tree)):F1} dB at 9 m; the fire: {firePlaces} places, {20 * MathF.Log10(h.Audio.World.HeardInRanking(Fire)):F1} dB at 14 m");
+        _o.WriteLine($"the tree: {treePlaces} places, {20 * MathF.Log10(h.Audio.World.HeardInRanking(Tree)):F1} dB at 9 m; the fire: cut at the ear, {20 * MathF.Log10(h.Audio.World.HeardInRanking(Fire)):F1} dB at 14 m");
         Assert.True(h.Audio.World.HeardInRanking(Fire) > h.Audio.World.HeardInRanking(Tree), "the fire is not the louder from here");
-        Assert.True(treePlaces > 0 && firePlaces > 0);
-        // Places for the fire's, and so not for both: given to the tree first, too few are left for the fire.
-        typeof(AudioWorld).GetField("_adaptivePlaces", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.SetValue(h.Audio.World, firePlaces);
+        Assert.True(treePlaces > 0);
+        Assert.True(Wide.IsCut(h.Mixer.Latest[Fire].PhysicalKey, ModelLibrary.Presets));
+        // Places for the tree's alone: a cut fire takes what is left and a crown all or none, so given to the fire
+        // first, what the fire takes leaves too few for the tree; given to the tree first, it would take them all.
+        typeof(AudioWorld).GetField("_adaptivePlaces", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.SetValue(h.Audio.World, treePlaces);
         // Ten seconds: the one that lost its places draws in to its middle, holds them two seconds and fades them.
         for (int i = 0; i < 40; i++) { h.Wait(0.25); h.Tick(2); }
         Assert.True(h.Mixer.Live.Contains(h.Voice(VoiceKind.Place, Fire, 1)), "the louder source has no places");

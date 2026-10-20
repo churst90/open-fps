@@ -43,17 +43,18 @@ public class AudioWorldOptionsTests
     public void ALeverChangedIsHeardByTheNextLayout()
     {
         var wide = new WideSources();
-        var spread = wide.Layout("fire:fire_pit", ModelLibrary.Presets)!;
+        // A tree's crown is laid out in places; a fire is cut at the ear and has no layout.
+        var spread = wide.Layout("foliage:park_tree", ModelLibrary.Presets)!;
         Assert.Contains(spread.Skip(1), p => p.Length() > 0.1f);
 
         // The lab collapses the places onto the middle: the layout asked for next is made under the new scale.
         wide.LayoutScale = 0f;
-        var collapsed = wide.Layout("fire:fire_pit", ModelLibrary.Presets)!;
+        var collapsed = wide.Layout("foliage:park_tree", ModelLibrary.Presets)!;
         Assert.Equal(spread.Length, collapsed.Length);
         Assert.All(collapsed, p => Assert.Equal(Vector3.Zero, p));
         // The one handed out before keeps its places, and another world's are untouched.
         Assert.Contains(spread.Skip(1), p => p.Length() > 0.1f);
-        Assert.Contains(new WideSources().Layout("fire:fire_pit", ModelLibrary.Presets)!.Skip(1), p => p.Length() > 0.1f);
+        Assert.Contains(new WideSources().Layout("foliage:park_tree", ModelLibrary.Presets)!.Skip(1), p => p.Length() > 0.1f);
 
         // The forced spread is the world's too.
         Assert.Equal(0.25f, new WideSources { ForceSpread = 0.25f }.SpreadFor(3f, 200f));
