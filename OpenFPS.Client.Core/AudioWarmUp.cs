@@ -64,7 +64,6 @@ public sealed class AudioWarmUp
         // The scene's mixer writes here and nowhere else: FMOD's WAV writer replaces the sound card, so a
         // warm voice cannot reach the player's ears. The file is deleted on the way out.
         string wav = Path.Combine(Path.GetTempPath(), $"openfps-warmup-{System.Environment.ProcessId}-{Guid.NewGuid():N}.wav");
-        string? previousWav = System.Environment.GetEnvironmentVariable("OPENFPS_FMOD_WAV");
         bool finished = false;
         bool binaural = false;
         try
@@ -75,12 +74,11 @@ public sealed class AudioWarmUp
             MachineRegistry.EnsureLoaded();
             ModelLibrary.EnsureLoaded();
 
-            System.Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", wav);
             var clock = new WarmClock();
             // The worker's Steam Audio simulator is left off: building its scene and traces is the native
             // crash --city-load still sees (docs/AUDIO_WARM_START.md, part 3a), and a login must not risk it.
             // The mixer's HRTF stages and the room's reverb bus are still made and run; the city simulates.
-            var provider = new FmodAudioProvider { Clock = clock, Lab = new LabLevers { WithoutSteamAudio = true } };
+            var provider = new FmodAudioProvider { Clock = clock, Lab = new LabLevers { WithoutSteamAudio = true }, WavPath = wav };
             var facade = new AudioEngineFacade(provider, paths: _paths);
             AsyncAcousticWorker? worker = null;
             try
@@ -113,7 +111,6 @@ public sealed class AudioWarmUp
         }
         finally
         {
-            System.Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", previousWav);
             try { if (File.Exists(wav)) File.Delete(wav); } catch (Exception ex) { Log.Debug(ex, "Warm-up: could not delete its silent output."); }
             double seconds = wall.Elapsed.TotalSeconds;
             string kinds = warmed.Count == 0 ? "nothing" : string.Join(", ", warmed);

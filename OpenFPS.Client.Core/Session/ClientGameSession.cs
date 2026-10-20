@@ -47,7 +47,7 @@ public sealed partial class ClientGameSession : IDisposable
     /// <summary>Renders every kind of voice once at the login screen, on a mixer of its own: the first
     /// city load's voices are then not the first the process has ever made. Stopped when a map arrives.</summary>
     private volatile AudioWarmUp? _warmUp;
-    /// <summary>The thread that waits for the live mixer before the warm-up replaces its silent output.</summary>
+    /// <summary>The thread that waits for the live mixer to start before the warm-up starts its own.</summary>
     private Thread? _warmUpGate;
     private volatile bool _warmUpStopped;
     private readonly PredictionReconciler _reconciler;
@@ -223,8 +223,8 @@ public sealed partial class ClientGameSession : IDisposable
         if (!_enableAudio || _warmUpGate != null) return;
         _warmUpGate = new Thread(() =>
         {
-            // The live mixer reads OPENFPS_FMOD_WAV as it starts, and the warm-up's own mixer replaces that
-            // variable to write its silent file. Starting first would make the game itself silent.
+            // The game's mixer starts first: the two do not build their FMOD systems and binaural stages at
+            // the same moment, and the warm-up never delays the sound the player hears.
             var deadline = System.Diagnostics.Stopwatch.StartNew();
             while (!_audioEngine.IsInitialized && !_warmUpStopped && deadline.Elapsed.TotalSeconds < 30)
                 Thread.Sleep(10);

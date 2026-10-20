@@ -781,6 +781,7 @@ public partial class FmodAudioProvider : IAudioProvider
     private MasterTap? _masterTap;
     private MasterTap? _preLimiterTap;
     private MasterDither? _dither;
+    private bool _writesFile;
 
     // The wind at the listener's ears (EarWindVoice). One generator, flat on the master, for the
     // provider's life; silent while nobody is in a world.
@@ -1000,9 +1001,11 @@ public partial class FmodAudioProvider : IAudioProvider
             // devices' and the renders' rate. Read it back (MixerRate), never a constant.
             FmodCheck(_system.setSoftwareFormat(MixerQuality.RequestedRate, SPEAKERMODE.STEREO, 0), "setSoftwareFormat");
 
-            // OPENFPS_FMOD_WAV=<path> replaces the sound card with a file writer: exact and silent, for
-            // a rig. OPENFPS_AUDIO_CAPTURE taps the master and keeps playing, for finding something by ear.
-            string? wavPath = System.Environment.GetEnvironmentVariable("OPENFPS_FMOD_WAV");
+            // OPENFPS_FMOD_WAV=<path> (or WavPath) replaces the sound card with a file writer: exact and
+            // silent, for a rig. OPENFPS_AUDIO_CAPTURE taps the master and keeps playing, for finding
+            // something by ear.
+            string? wavPath = WavPath ?? System.Environment.GetEnvironmentVariable("OPENFPS_FMOD_WAV");
+            _writesFile = !string.IsNullOrEmpty(wavPath);
             IntPtr extra = IntPtr.Zero;
             if (string.IsNullOrEmpty(wavPath)) MixerQuality.ApplyOutput(_system);
             if (!string.IsNullOrEmpty(wavPath))
@@ -1141,7 +1144,7 @@ public partial class FmodAudioProvider : IAudioProvider
                                                   index: limiterAt + 1, asFloat: MixerQuality.CaptureFloat);
             }
             // Last, after the meter and the capture: dither for the sixteen-bit output.
-            _dither = MasterDither.Attach(_system, master);
+            _dither = MasterDither.Attach(_system, master, _writesFile);
             if (_dither != null) Log.Information("Master dither: triangular, one 16-bit step (OPENFPS_DITHER=0 leaves it out).");
 
             StartEarWind();
@@ -1756,6 +1759,11 @@ public partial class FmodAudioProvider : IAudioProvider
         init { _lab = value; Traced.Lab = value; }
     }
     private readonly OpenFPS.Sound.Core.LabLevers _lab = new();
+
+    /// <summary>A file this mixer writes in place of the sound card, for this mixer alone; null reads
+    /// OPENFPS_FMOD_WAV. The login warm-up's mixer sets it, because a variable would reach the game's mixer
+    /// too.</summary>
+    public string? WavPath { get; init; }
 
     /// <summary>This mixer's live levers (the console's): the reflections' trims, the traced echoes, the cabin's
     /// response, far engines' detail and the valves' rush. The host turns the same one (AudioEngineFacade.Mix).
