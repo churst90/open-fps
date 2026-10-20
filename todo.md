@@ -24,9 +24,9 @@ Where the plans stand (2026-10-17):
   left is under "Left from the special-cases audit", below.
 
 Shipping is outside the order. Push, the VPS and the Windows zip go out together, and only when Cody says so,
-each time. Main is 130 commits over origin (d0116bb5), none pushed. Before the push, run a broad sweep: every
-test class changed since d0116bb5, in filtered runs (the 10-16 sweep: 1,733 passed, 0 failed). The last deploy
-was 3fc38430512b on 2026-10-08. The wire hash has changed many times since (039f03ff964f now), so a client and a
+each time. Main is 49 commits over origin (36033ec6, pushed 2026-10-17), as of 2026-10-19. Before the push, run a
+broad sweep: every test class changed since 36033ec6, in filtered runs (the 10-16 sweep: 1,733 passed, 0 failed). The last deploy
+was 3fc38430512b on 2026-10-08. The wire hash has changed many times since (a3d6f3a6ec76 now), so a client and a
 server from either side refuse each other at login: restart the server and update the clients first. The door
 fingerprint changed too, so the door renders are made again once.
 
@@ -72,6 +72,34 @@ fingerprint changed too, so the door renders are made again once.
    measured cost during play; no garbage collection in the first seconds; a guard test. Six to nine sessions on
    two tracks (instrument, attribution, settled start; compiled ahead, collection, start budget). Client only,
    no wire change, no sound changed.
+   - A candidate for part 3, from Resonance's list of 2026-10-18: a vehicle's sound is made on whatever thread
+     asks for it. In Resonance's copy one vehicle takes 32 to 92 ms, the first of each preset the longest, and
+     its game ticks spent up to 210 ms on it arriving in town. `VoiceBuilds.Makes` builds sirens, bells, horns,
+     machines and aircraft ahead, not engines. Check it in the `--city-load` numbers and move it first if they
+     name it.
+6a. Library 0.2 for hosts (inbox/2026-10-18-resonance-host-needs; agreed 2026-10-19). What a host other than
+   open-fps's own game needs of the library, and three faults that may be open-fps's too. Each change a host
+   must act on gets a line in docs/LIBRARY_CHANGES.md, and the lot a new tag. In this order:
+   - Faults first. A sound behind a barrier is heard round one edge only: `Diffraction` takes the shortest way
+     round a box and `Propagation.Combine` hears that edge alone, so over the middle the direction flips and
+     the turn limit makes the flip a slide. Hear both ways round, each by its own strength; guard: a source
+     under the middle of a 3 m deck, the listener walking across 1 m above, the direction moving smoothly and
+     wide over the middle. Needs Cody's ear.
+   - A car switched off leaves a steady offset in the mix (Resonance measured -0.0395, -28 dBFS, for as long
+     as the car stands, after bursts to -29 dBFS while it dies). Measure a parked car switched off in AudioLab
+     first; fix only if open-fps has it, with a guard on the mix's mean.
+   - One source can silence the whole mix: a `SourceSpec` with its cone left at 0, 0, 0 (the emitter's
+     defaults are 360, 360, 1), or a synthesised source naming a model the catalogue lacks. Give `SourceSpec`
+     the emitter's defaults, `SynthRunning` true among them (item 9 of the list); a missing model silent on
+     its own; and find how one source takes the mix to silence (likely a NaN held in the reverb), so no
+     source can.
+   - Then the host's needs: one dispose that stops and joins every thread and task the audio starts (6);
+     a public headless mode on FMOD's no-sound output, for tests on CI (5); one call playing a recording at a
+     place with a handle to move and stop it (1); the loader reading under `Paths.Sounds` and from bytes or a
+     stream (7); a door for the host's own flat sounds through the master limiter, and master and world volume
+     set while running (2 and 3 as Cody cut them: no music in the library); a muffle over the whole mix, for a
+     head under water (4); Rock, SheetMetal, TimberFloor, HollowDoor and Canvas in the material table (10,
+     realism for open-fps's own houses too); a horn with no vehicle source (8), last.
 7. Engine package stage 6, Common to the wire. Runs alone: it touches every project file. One session.
 8. Engine package stages 9 and 10. Both unblocked now (library stages 6 and 7 and physics stage 3 are done).
    - 9: Accessibility on the scene view. The ten aids read the scene view as the audio does. Check: the
@@ -303,6 +331,16 @@ From inbox/2026-10-17-resonance-audio-open-fps-lacks. Taken: items 1 to 4 and 9 
 - Not taken: 1.5, real-thickness walls (map data); 2.7, overhead and roll doors, and 4.2, 4.3 and 4.5 (the game's
   side, not the library's); 4.4, the ERA5 climate generator, to be agreed with Sean: one weather state in
   Environment fed by live or generated weather; 4.1, runoff: compare with `GroundWater` and converge.
+
+### Resonance's list of 2026-10-18: what a host needs
+
+From inbox/2026-10-18-resonance-host-needs. Taken as "Next, in order", item 6a, and the vehicle sound as a
+candidate for item 6's part 3. Later by Cody's word of 2026-10-18: item 11 (a small machine heard from its
+parts, a compressor that is not an air conditioner, a river's banks apart from its middle, a flow fed from its
+ground, a water feature's taps each at its own level, a vehicle fading at the world's edge, a vehicle sized apart
+from its preset), rain on the head, and geometry stage 5 for Sean's ground ("Next, in order", item 13). Sean's
+questions, Claude's advice, waiting on Cody: his town at 3,700 ft rather than 3,300 (yes: a lake adds space,
+not many boxes); the height said while swimming (the head's, since climbing out is judged from it).
 
 ### Matter
 Cody, 2026-10-10: every material interacts with every other as in real life; wind moves things
