@@ -104,6 +104,26 @@ fingerprint changed too, so the door renders are made again once.
      set while running (2 and 3 as Cody cut them: no music in the library); a muffle over the whole mix, for a
      head under water (4); Rock, SheetMetal, TimberFloor, HollowDoor and Canvas in the material table (10,
      realism for open-fps's own houses too); a horn with no vehicle source (8), last.
+   - Sean's update of 2026-10-20 and 21 (the same inbox file), taken one item at a time as Cody agrees each:
+     - Recordings that never start (agreed 2026-10-21; next after the faults above). In Resonance's copy 58 of
+       about 58,000 recordings in 36 minutes never left their first sample, past their delayed start, not
+       paused and not virtual; footsteps cut off. open-fps starts voices the same way (`setDelay` on the
+       parent's clock, `FmodAudioProvider`). First a check that changes no sound: count and log each voice
+       still on its first sample once its start has passed, naming the sound. If open-fps has it, find the cause
+       in the voice's start (the head DSP, its fade points, its pitch); Resonance's restart a quarter second
+       late hides the fault and is a last resort only.
+     - Ground in narrow strips heard as a small room (proposed, not yet agreed). open-fps has the same rule:
+       `SteamAudioScene.IsOpenGround` leaves ground out of the listener's trace only when a piece is at least
+       1 m each way and level, so kerbs, gutters, thresholds and ramps' sloped tops stay in and the ground
+       under the feet returns about 9 ms late. Sean's fix: judge a piece that is stood on by what it is, not
+       its width.
+     - Traffic (Cody, 2026-10-21): traffic is the library's, and Sean's traffic work is taken in, slowly and one
+       item at a time, each built well and fitting open-fps. Roads carry player drivers as well as NPCs, so
+       nothing may work for NPC cars alone; and an effect needs a thing that exists to cause it (a breakdown
+       needs a battery that runs down or a tyre that meets something on the road, never a dice roll). The
+       faults Sean found that open-fps's traffic may share come first, each shown on open-fps's own roads
+       before it is fixed; then lane changes and junctions that list their roads and ways; breakdowns,
+       flashers and tow trucks last. None of it before the items above.
 7. Engine package stage 6, Common to the wire. Runs alone: it touches every project file. One session.
 8. Engine package stages 9 and 10. Both unblocked now (library stages 6 and 7 and physics stage 3 are done).
    - 9: Accessibility on the scene view. The ten aids read the scene view as the audio does. Check: the
