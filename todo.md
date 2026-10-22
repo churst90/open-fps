@@ -74,7 +74,8 @@ fingerprint changed too, so the door renders are made again once.
    no wire change, no sound changed.
    - Parts 1, 2 and 3 DONE 2026-10-20 (measured in the doc): the login's worst loop iteration 1.1 s to 60 ms,
      its worst placement pass 0.6 s to 25 ms. Load 2's 0.5 s hold was the load counted as a stall, fixed (44 ms).
-     Next: part 4, the settled start.
+     Part 4, the settled start, HELD 2026-10-20 (Cody): a second line of defence now that the login is clean by
+     ear; it would lengthen every load. Parts 5 and 6 only if a measurement names them.
    - A candidate for part 3, from Resonance's list of 2026-10-18: a vehicle's sound is made on whatever thread
      asks for it. In Resonance's copy one vehicle takes 32 to 92 ms, the first of each preset the longest, and
      its game ticks spent up to 210 ms on it arriving in town. `VoiceBuilds.Makes` builds sirens, bells, horns,
