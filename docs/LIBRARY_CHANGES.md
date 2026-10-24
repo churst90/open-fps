@@ -6,6 +6,21 @@ tag (docs/SOUND_LIBRARY_BOUNDARY.md, stage 8 and decision 8) and references the 
 
 ## Unreleased
 
+- The loader reads sounds under the facade's `Paths.Sounds`, where it read only under `ASSETS/SOUNDS` beside the
+  program, so the bank and the loader agree (`FmodAudioProvider.Sounds.Folder`, set by the facade's constructor and by
+  `InitializeSteppedByHand(soundsPath)`). A host whose sounds folder is elsewhere need only give `AudioDataPaths` that
+  folder, and can drop any link it made under the program for development. An id that leaves the folder or names a
+  network share (`\\` or `//`) is still refused and reads as missing; an id naming `ASSETS` is still a path from the
+  program's own folder. The loader does not fall back to the program's folder when a file is not under `Paths.Sounds`.
+- A host can hand the library a sound's bytes or a stream under an id (`AudioEngineFacade.AddSound(id, byte[])`,
+  `AddSound(id, Stream)`, `RemoveSound(id)`; `SoundSource` underneath), for a game that keeps its sounds in an
+  encrypted package in memory. The sound is played by that id like a file's, loaded as a decoded sample without
+  blocking, and wins over a file of the same id; handed in again under an id it replaces the sound for the plays that
+  start after, and a voice already sounding carries on. The library copies the bytes at the call, on the host's thread
+  (a host must not call it from the thread that places sounds), and frees its copy at `Dispose`, after every sound
+  made from it is released; the host may free its own at once. Hand a sound in before its first play. A sound of
+  bytes is not in the sound bank's index (`AudioBank`), which lists files.
+
 - Five materials a host can name: `Canvas`, `HollowDoor`, `Rock`, `SheetMetal` and `TimberFloor` (resonance indices 59
   to 63), each field with a source or a marked estimate on its line in `AcousticRegistry.AddMatter`. Until now a host
   had to play them as the nearest material (Fabric, Wood, Granite, Metal, Wood). A built thing is the single stuff that

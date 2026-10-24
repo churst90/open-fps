@@ -133,6 +133,7 @@ OpenFPS.Audio/Fmod/OwnVoice.cs	Audio
 OpenFPS.Audio/Fmod/RadiatorProcessor.cs	Audio	
 OpenFPS.Audio/Fmod/RailVoice.cs	Audio	
 OpenFPS.Audio/Fmod/RainVoices.cs	Audio	
+OpenFPS.Audio/Fmod/SoundSource.cs	Audio	
 OpenFPS.Audio/Fmod/StoveVoiceState.cs	Audio	
 OpenFPS.Audio/Fmod/SynthProcessor.cs	Audio	
 OpenFPS.Audio/Fmod/TakeLevels.cs	Audio	

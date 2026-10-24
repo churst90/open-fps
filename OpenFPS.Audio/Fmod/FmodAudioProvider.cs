@@ -59,7 +59,20 @@ internal class FmodResourceManager : IDisposable
     private readonly Dictionary<string, FMOD.Sound> _cache = new();
     private readonly HashSet<string> _reportedMissing = new();
 
-    public FmodResourceManager(FMOD.System system) => _system = system;
+    private readonly SoundSource _source;
+
+    /// <summary>Which handed-in copy each cached sound was made from (absent: a file), so a host's new bytes under
+    /// an id are loaded afresh.</summary>
+    private readonly Dictionary<string, long> _madeFrom = new();
+
+    /// <summary>Sounds a host's new bytes replaced, kept (a voice may still play one) and released with the rest.</summary>
+    private readonly List<FMOD.Sound> _retired = new();
+
+    public FmodResourceManager(FMOD.System system, SoundSource? source = null)
+    {
+        _system = system;
+        _source = source ?? new SoundSource();
+    }
 
     /// <summary>Releases a registered synthesised buffer. Stops anything still playing it.</summary>
     public bool ReleasePcm(string soundId)
@@ -166,6 +179,18 @@ internal class FmodResourceManager : IDisposable
 
         string cacheKey = soundId + (loop ? "_L" : "");
         if (loop && _registeredPcm.Contains(soundId)) cacheKey = soundId;
+        if (_cache.TryGetValue(cacheKey, out sound) && (_source.Count > 0 || _madeFrom.Count > 0) && !_registeredPcm.Contains(soundId))
+        {
+            // The host handed in new bytes (or took them back) since this was made: it is made again from what wins now.
+            _madeFrom.TryGetValue(cacheKey, out long was);
+            long now = _source.TryGet(soundId, out var current) ? current.Generation : 0;
+            if (was != now)
+            {
+                _retired.Add(sound);
+                _cache.Remove(cacheKey);
+                _madeFrom.Remove(cacheKey);
+            }
+        }
         if (_cache.TryGetValue(cacheKey, out sound))
         {
             sound.getOpenState(out OPENSTATE openState, out _, out _, out _);
@@ -183,10 +208,38 @@ internal class FmodResourceManager : IDisposable
             return SoundLoadState.Loading;
         }
 
-        string path = FmodAudioProvider.SoundFilePath(soundId);
+        MODE mode = MODE.CREATESAMPLE | MODE._3D | Rolloff.Mode | MODE.NONBLOCKING;
+        if (loop) mode |= MODE.LOOP_NORMAL;
+        RESULT res;
+
+        if (_source.TryGet(soundId, out var held))
+        {
+            // The host's bytes win over a file of the same id. Same mode as a file: a decoded sample, loaded without
+            // blocking; the bytes stay where they are until the mixer is disposed, as that load reads them later.
+            var info = new CREATESOUNDEXINFO
+            {
+                cbsize = System.Runtime.InteropServices.Marshal.SizeOf<CREATESOUNDEXINFO>(),
+                length = (uint)held.Bytes.Length,
+            };
+            res = _system.createSound(held.Address, mode | MODE.OPENMEMORY, ref info, out sound);
+            if (res != RESULT.OK)
+            {
+                sound = default;
+                ReportMissing(soundId, $"createSound from the host's bytes failed: {res}");
+                return SoundLoadState.Missing;
+            }
+            _cache[cacheKey] = sound;
+            _madeFrom[cacheKey] = held.Generation;
+            sound.getOpenState(out OPENSTATE heldState, out _, out _, out _);
+            if (heldState == OPENSTATE.READY || heldState == OPENSTATE.PLAYING) return SoundLoadState.Ready;
+            sound = default;
+            return SoundLoadState.Loading;
+        }
+
+        string path = _source.PathOf(soundId);
         if (path.Length == 0)
         {
-            ReportMissing(soundId, "not a path under ASSETS");
+            ReportMissing(soundId, "not a path under the sounds folder");
             return SoundLoadState.Missing;
         }
 
@@ -202,10 +255,7 @@ internal class FmodResourceManager : IDisposable
             }
         }
 
-        MODE mode = MODE.CREATESAMPLE | MODE._3D | Rolloff.Mode | MODE.NONBLOCKING;
-        if (loop) mode |= MODE.LOOP_NORMAL;
-
-        RESULT res = _system.createSound(path, mode, out sound);
+        res = _system.createSound(path, mode, out sound);
         if (res != RESULT.OK)
         {
             sound = default;
@@ -241,6 +291,9 @@ internal class FmodResourceManager : IDisposable
                 System.Threading.Thread.Sleep(2);
             s.release();
         }
+        foreach (var s in _retired) s.release();
+        _retired.Clear();
+        _madeFrom.Clear();
         _cache.Clear();
     }
 }
@@ -1077,8 +1130,8 @@ public partial class FmodAudioProvider : IAudioProvider
                                 deviceRate > 0 && deviceRate != mixRate ? " (the output resamples)" : "");
             }
 
-            _resources = new FmodResourceManager(_system);
-            _granularBank = new GranularBank(_system);
+            _resources = new FmodResourceManager(_system, Sounds);
+            _granularBank = new GranularBank(_system, Sounds);
             _system.createChannelGroup("Reflections", out _reflectionGroup);
             _system.getMasterChannelGroup(out var master);
             master.addGroup(_reflectionGroup);
@@ -2189,36 +2242,20 @@ public partial class FmodAudioProvider : IAudioProvider
         return $"Echoes {mode}, {Mix.TailDb:F0} dB against physical (the tail level). {_tracedEchoIds.Length} far source(s) traced from where they are; {e.Runs} traces, the last in {e.LastRunMs:F0} ms.";
     }
 
-    /// <summary>The path the loader opens for a sound id; empty if it would leave ASSETS. Ids come from
-    /// the server and a map's owner sets them: a network share would hand Windows' login hash to whoever
-    /// runs it.</summary>
-    internal static string SoundFilePath(string soundId)
-    {
-        if (string.IsNullOrEmpty(soundId)) return "";
-        string baseDir = Path.GetFullPath(AppDomain.CurrentDomain.BaseDirectory);
-        if (soundId.Contains("ASSETS", StringComparison.OrdinalIgnoreCase))
-            return Inside(soundId, baseDir, Path.IsPathFullyQualified(soundId) ? soundId : Path.Combine(baseDir, soundId));
-        string normId = soundId.Replace('/', Path.DirectorySeparatorChar).Replace('\\', Path.DirectorySeparatorChar);
-        string sounds = Path.Combine(baseDir, "ASSETS", "SOUNDS");
-        return Inside(soundId, sounds, Path.Combine(sounds, normId));
-    }
+    /// <summary>The path the loader opens for a sound id in the program's own ASSETS/SOUNDS; empty if it would leave
+    /// it or names a network share (SoundSource). A mixer reads under its own <see cref="Sounds"/> folder.</summary>
+    internal static string SoundFilePath(string soundId) => SoundSource.PathIn(soundId, SoundSource.DefaultFolder);
 
-    /// <summary>The path, if it is inside the folder and names no network share; empty if not.</summary>
-    private static string Inside(string id, string folder, string path)
-    {
-        if (id.StartsWith(@"\\", StringComparison.Ordinal) || id.StartsWith("//", StringComparison.Ordinal)) return "";
-        string full;
-        try { full = Path.GetFullPath(path); } catch (Exception) { return ""; }
-        string root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder)) + Path.DirectorySeparatorChar;
-        return full.StartsWith(root, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal) ? full : "";
-    }
+    /// <summary>Where this mixer finds a sound by its id: the files under the world's <c>Paths.Sounds</c> (the facade sets
+    /// it) and the bytes a host hands in.</summary>
+    public SoundSource Sounds { get; } = new();
 
     /// <summary>A recorded take's correction to its bank's median level (TakeLevels); 1 for anything
     /// synthesized, and for a file that is not one of a bank.</summary>
-    private static float TakeGain(in SpatialEmitter emitter)
+    private float TakeGain(in SpatialEmitter emitter)
     {
-        if (emitter.IsSynth || emitter.IsGranular || string.IsNullOrEmpty(emitter.SoundId)) return 1f;
-        string path = SoundFilePath(emitter.SoundId);
+        if (emitter.IsSynth || emitter.IsGranular || string.IsNullOrEmpty(emitter.SoundId) || Sounds.Has(emitter.SoundId)) return 1f;
+        string path = Sounds.PathOf(emitter.SoundId);
         if (path.Length == 0) return 1f;
         if (!File.Exists(path))
             foreach (var ext in new[] { ".wav", ".ogg", ".mp3" })
@@ -6144,6 +6181,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 if (v.Dsp.hasHandle()) v.Dsp.release();
         _resources?.Dispose();
         _granularBank?.Dispose();
+        Sounds.Close();
         if (_isInitialized) _system.close();   // FMOD requires close() before release()
         if (_earWindHandle.IsAllocated) _earWindHandle.Free();
         _dither?.FreeHandle(); _dither = null;
