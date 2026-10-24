@@ -746,6 +746,23 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     /// <summary>Fades the world and not the interface sounds. See IAudioProvider.SetWorldFade.</summary>
     public void SetWorldFade(float gain) { if (_isInitialized) _provider.SetWorldFade(gain); }
 
+    /// <summary>The level of everything that leaves the mixer, dB, while running: a volume slider. On top of
+    /// OPENFPS_MASTER_DB and the world fade, and it scales the interface and the host's flat sounds too. 0 is as the
+    /// run began; -80 to +12; ramped over one mixer block. See FmodAudioProvider.SetMasterVolumeDb.</summary>
+    public void SetMasterVolumeDb(float db) { if (_isInitialized) _provider.SetMasterVolumeDb(db); }
+
+    /// <summary>The level of everything heard in the world, dB, while running; the interface and the host's flat sounds
+    /// are not touched, and it multiplies <see cref="SetWorldFade"/>. See FmodAudioProvider.SetWorldVolumeDb.</summary>
+    public void SetWorldVolumeDb(float db) { if (_isInitialized) _provider.SetWorldVolumeDb(db); }
+
+    /// <summary>FMOD's system, for a host to create its own flat sounds with, once initialised (no handle without an FMOD
+    /// mixer). See FmodAudioProvider.FmodSystem for what the host may do with it.</summary>
+    public FMOD.System FmodSystem => _isInitialized && _provider is FmodAudioProvider f ? f.FmodSystem : default;
+
+    /// <summary>The group a host plays its own flat sounds into (music, menus): under the master, above the limiter and
+    /// the dither, not faded by the world fade. See FmodAudioProvider.FmodSystem for what the host must not do to it.</summary>
+    public FMOD.ChannelGroup HostGroup => _isInitialized && _provider is FmodAudioProvider f ? f.HostGroup : default;
+
     // The microphone, recorded through the same FMOD system. See IAudioProvider.StartRecording.
     public bool HasRecordingDevice => _isInitialized && _provider.HasRecordingDevice;
     public bool StartRecording(string deviceName, out int sampleRate)

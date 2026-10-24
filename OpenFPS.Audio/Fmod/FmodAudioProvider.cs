@@ -831,6 +831,9 @@ public partial class FmodAudioProvider : IAudioProvider
     private HashSet<int> _activeRegionIds = new();
 
     private FMOD.ChannelGroup _reflectionGroup;
+    /// <summary>The parent of every sound heard in the world (voices, reflections, reverb buses, the wind at the ears), under
+    /// the master beside the interface and the host's groups.</summary>
+    private FMOD.ChannelGroup _worldGroup;
     /// <summary>
     /// The player's own voice into their room's reverberation: a group at zero, so the voice itself is
     /// not heard (a late copy of it would be a slap-back) while the channel's sends, which leave from
@@ -1132,15 +1135,23 @@ public partial class FmodAudioProvider : IAudioProvider
 
             _resources = new FmodResourceManager(_system, Sounds);
             _granularBank = new GranularBank(_system, Sounds);
-            _system.createChannelGroup("Reflections", out _reflectionGroup);
             _system.getMasterChannelGroup(out var master);
-            master.addGroup(_reflectionGroup);
+            // Everything heard in the world sits under one group, so the host can set the world's level and its tone
+            // (WorldMuffle) without touching the interface or its own flat sounds, which sit beside it.
+            _system.createChannelGroup("World", out _worldGroup);
+            master.addGroup(_worldGroup);
+            _system.createChannelGroup("Reflections", out _reflectionGroup);
+            _worldGroup.addGroup(_reflectionGroup);
             _system.createChannelGroup("Own voice, into the room only", out _ownVoiceRoomGroup);
-            master.addGroup(_ownVoiceRoomGroup);
+            _worldGroup.addGroup(_ownVoiceRoomGroup);
             _ownVoiceRoomGroup.setVolume(0f);
             // Interface sounds have their own group so a world fade can leave them alone.
             _system.createChannelGroup("Interface", out _uiGroup);
             master.addGroup(_uiGroup);
+            // The host's own flat sounds (music, menus), beside the interface: not under the world's fade, and through
+            // the master limiter and the dither like everything else.
+            _system.createChannelGroup("Host", out _hostGroup);
+            master.addGroup(_hostGroup);
 
             // How loud the game plays is the makeup's and the balance is the law's; this is a trim for
             // a run. Never per source: nudging presets for loudness undoes what made them agree.
@@ -1250,7 +1261,7 @@ public partial class FmodAudioProvider : IAudioProvider
             Log.Warning("Ear wind: the DSP could not be created; there will be no wind at the ears.");
             return;
         }
-        if (_system.playDSP(dsp, default, false, out var channel) != RESULT.OK)
+        if (_system.playDSP(dsp, _worldGroup, false, out var channel) != RESULT.OK)
         {
             dsp.release();
             if (handle.IsAllocated) handle.Free();
@@ -2556,8 +2567,7 @@ public partial class FmodAudioProvider : IAudioProvider
             _reverbBuses[regionId] = bus;
             _reverbDsps[regionId] = reverbDsp;
             _reverbVolumes[regionId] = initialVol;
-            _system.getMasterChannelGroup(out var master);
-            master.addGroup(bus);
+            _worldGroup.addGroup(bus);
         }
         finally { if (locked) _system.unlockDSP(); }
 
@@ -3185,7 +3195,7 @@ public partial class FmodAudioProvider : IAudioProvider
         // stage is placed by FMOD.
         if (RefusedForHrtf(emitter)) return;
         
-        FMOD.ChannelGroup targetGroup = emitter.IsReflection ? _reflectionGroup : default;
+        FMOD.ChannelGroup targetGroup = emitter.IsReflection ? _reflectionGroup : _worldGroup;
         FMOD.Channel channel;
         FMOD.DSP granularDsp = default;
         System.Runtime.InteropServices.GCHandle granularHandle = default;
@@ -5752,9 +5762,67 @@ public partial class FmodAudioProvider : IAudioProvider
     {
         _raisePending = false;
         _system.getMasterChannelGroup(out var master);
-        master.setVolume(_masterTrim * g);
+        master.setVolume(_masterTrim * _hostMasterGain * g);
         if (_uiGroup.hasHandle()) _uiGroup.setVolume(1f / g);
+        if (_hostGroup.hasHandle()) _hostGroup.setVolume(1f / g);
     }
+
+    /// <summary>The host's master gain (<see cref="SetMasterVolumeDb"/>), on top of the run's trim; 1 until asked.</summary>
+    private float _hostMasterGain = 1f;
+
+    /// <summary>The loudest and quietest the host's volume calls go, dB: 80 down is the world fade's floor.</summary>
+    public const float VolumeMinDb = -80f, VolumeMaxDb = 12f;
+
+    private static float DbToGain(float db)
+        => MathF.Pow(10f, Math.Clamp(float.IsFinite(db) ? db : 0f, VolumeMinDb, VolumeMaxDb) / 20f);
+
+    /// <summary>
+    /// The level of everything that leaves the mixer, dB, set while running: the host's volume slider. On top of
+    /// OPENFPS_MASTER_DB (which stays the run's starting trim) and of the world fade, and it scales the interface sounds
+    /// and the host's own flat sounds with the world, since it is the master's fader, ahead of the limiter and the
+    /// dither. 0 is as the run began. FMOD ramps the change over one mixer block (about 21 ms), so a step is not a click.
+    /// A non-finite number is taken as 0; the range is <see cref="VolumeMinDb"/> to <see cref="VolumeMaxDb"/>.
+    /// </summary>
+    public void SetMasterVolumeDb(float db)
+    {
+        if (!_isInitialized) return;
+        lock (_lock)
+        {
+            _hostMasterGain = DbToGain(db);
+            // Under the floor the fade is held; the new gain is applied with it when it is let up.
+            if (!_raisePending) ApplyWorldFade(_worldFade);
+        }
+    }
+
+    /// <summary>
+    /// The level of everything heard in the world (every voice, reflection, reverb and the wind at the ears), dB, set
+    /// while running. It is a fader of its own on the world group, beside <see cref="SetWorldFade"/> (the fade is the
+    /// game's: the load screen and leaving a map, 0 to 1 and never above 1), and the two multiply. The interface and
+    /// the host's flat sounds are not touched. 0 is as authored; ramped over one mixer block.
+    /// </summary>
+    public void SetWorldVolumeDb(float db)
+    {
+        if (!_isInitialized || !_worldGroup.hasHandle()) return;
+        _worldGroup.setVolume(DbToGain(db));
+    }
+
+    /// <summary>
+    /// What a host is handed to play its own flat (non-spatial) sounds, such as music and menus: FMOD's system, to create
+    /// its sounds, and a channel group under the master, beside the interface's. A sound played into the group passes the
+    /// master fader, the limiter and the dither like every other, and the world's fade, world volume and muffle leave it
+    /// alone. The library adds no player and no music logic. The host must not release the group, remove it from the
+    /// master, add DSPs to the master, set the master's volume (use <see cref="SetMasterVolumeDb"/>) or the group's (the
+    /// library holds that against the world fade; set each channel's volume instead); it may add its own units to the group
+    /// and stop what it played. Both are valid from the
+    /// mixer's initialisation to its <see cref="Dispose"/>; the host stops its channels first. Default (no handle) before
+    /// the mixer is up.
+    /// </summary>
+    public FMOD.System FmodSystem => _isInitialized ? _system : default;
+
+    /// <summary>The host's flat group, see <see cref="FmodSystem"/>. The sounds it plays are not faded by the world fade.</summary>
+    public FMOD.ChannelGroup HostGroup => _isInitialized ? _hostGroup : default;
+
+    private FMOD.ChannelGroup _hostGroup;
 
     /// <summary>The world fade last set (<see cref="SetWorldFade"/>): 1, or down to <see cref="WorldFadeFloor"/>.</summary>
     private float _worldFade = 1f;
