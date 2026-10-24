@@ -6,6 +6,13 @@ tag (docs/SOUND_LIBRARY_BOUNDARY.md, stage 8 and decision 8) and references the 
 
 ## Unreleased
 
+## library/v0.2.0 (2026-10-24)
+
+What Resonance asked for in October (inbox/2026-10-18-resonance-host-needs): the faults it found, recordings that never
+start, a dispose, a headless mode, sounds from a host's folder or bytes, a recording played at a place with a handle, a
+door for the host's own flat sounds with master and world volume, a muffle over the world, five materials and a horn at
+a place. The wire hash is 053dd7700918.
+
 - A host can play its own flat (non-spatial) sounds, such as music and menus, through one door, and set the master and
   the world's volume while running. The library adds no player and no music logic. `AudioEngineFacade.FmodSystem` (FMOD's
   system, to create the host's sounds with) and `HostGroup` (a channel group under the master, beside the interface's) are

@@ -15,6 +15,7 @@ Where the plans stand (2026-10-17):
 - Sound library (docs/SOUND_LIBRARY_BOUNDARY.md): stages 0 to 7 done, and the namespace rename (decision 6,
   section 21), the engine packages under the library included (21.1), and stage 8: the first version tagged,
   `library/v0.1.0`, with docs/LIBRARY_CHANGES.md (2026-10-17). Resonance takes it as a submodule pinned to the tag.
+  Then `library/v0.2.0` (2026-10-24): todo 6a, the host's needs.
 - Engine packages (docs/ENGINE_PACKAGES.md): stages 0 to 5, 7 and 8 done. Left: 6, 9 and 10.
 - Physics (docs/PHYSICS_BOUNDARY.md): stages 0 to 3 done, with stage 2's leftovers (16.6). Left: 4 to 6.
 - Geometry (docs/GEOMETRY.md): stages 1 to 4 done, and stage 6's first half (each vehicle's body as one closed

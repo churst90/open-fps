@@ -2,6 +2,16 @@
 
 Recent work, newest first. `git log` has the rest.
 
+## 2026-10-24
+
+- The sound library's second version, tag `library/v0.2.0` (docs/LIBRARY_CHANGES.md): what Resonance asked for in
+  October. Two faults fixed (a source that could silence the mix, and a parked car's DC), the barrier heard from both
+  sides, a public dispose and a headless mode, sounds from a host's folder or bytes, a recording played at a place with
+  a handle, a door for the host's own flat sounds with master and world volume, a muffle over the world, a horn at a
+  place, and five materials (Canvas, HollowDoor, Rock, SheetMetal, TimberFloor). open-fps's own sound changes in three
+  places: a sound behind a barrier bends round it from either side, walls within 3 m now colour world sounds only,
+  not the interface sounds, and a car switched off no longer leaves DC in the mix. Wire hash 053dd7700918; door renders are made again.
+
 ## 2026-10-20
 
 - Sound that starts clean, part 2: the Windows client is published ReadyToRun (`PublishReadyToRun` in the
