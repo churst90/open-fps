@@ -90,6 +90,7 @@ OpenFPS.Audio/Core/AudioBank.cs	Audio
 OpenFPS.Audio/Core/AudioDataPaths.cs	Audio	
 OpenFPS.Audio/Core/AudioEngineFacade.cs	Audio	
 OpenFPS.Audio/Core/AudioHost.cs	Audio	
+OpenFPS.Audio/Core/AudioWorld.Hosted.cs	Audio	
 OpenFPS.Audio/Core/AudioWorld.Trains.cs	Audio	
 OpenFPS.Audio/Core/AudioWorld.Voices.cs	Audio	
 OpenFPS.Audio/Core/AudioWorld.cs	Audio	
@@ -133,6 +134,7 @@ OpenFPS.Audio/Fmod/OwnVoice.cs	Audio
 OpenFPS.Audio/Fmod/RadiatorProcessor.cs	Audio	
 OpenFPS.Audio/Fmod/RailVoice.cs	Audio	
 OpenFPS.Audio/Fmod/RainVoices.cs	Audio	
+OpenFPS.Audio/Fmod/SoundSource.cs	Audio	
 OpenFPS.Audio/Fmod/StoveVoiceState.cs	Audio	
 OpenFPS.Audio/Fmod/SynthProcessor.cs	Audio	
 OpenFPS.Audio/Fmod/TakeLevels.cs	Audio	

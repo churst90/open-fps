@@ -17,9 +17,13 @@ public class GranularBank : IDisposable
     private readonly ConcurrentDictionary<string, int> _channelsCache = new();
     private readonly ConcurrentDictionary<string, int> _sampleRateCache = new();
 
-    public GranularBank(FMOD.System system)
+    private readonly SoundSource _source;
+
+    /// <param name="source">Where sound ids are found; none: the program's own ASSETS/SOUNDS.</param>
+    public GranularBank(FMOD.System system, SoundSource? source = null)
     {
         _system = system;
+        _source = source ?? new SoundSource();
     }
 
     /// <summary>A sound's PCM, decoded on first use and kept.</summary>
@@ -52,14 +56,24 @@ public class GranularBank : IDisposable
         channels = 0;
         sampleRate = 0;
 
-        string path = ResolvePath(soundId);
-        if (string.IsNullOrEmpty(path)) return false;
-
         // CREATESAMPLE decodes the whole file, which is what `lock` hands back. Never add OPENONLY: it
         // parses only the header, and `lock` then returns a buffer of the right size holding silence,
         // with the right channels, rate and length logged as a success.
         MODE mode = MODE.CREATESAMPLE | MODE.ACCURATETIME;
-        RESULT res = _system.createSound(path, mode, out FMOD.Sound sound);
+        RESULT res;
+        FMOD.Sound sound;
+        if (_source.TryGet(soundId, out var held))
+        {
+            // The host's bytes win over a file; decoded in this call, so nothing outlives it.
+            var info = new CREATESOUNDEXINFO { cbsize = Marshal.SizeOf<CREATESOUNDEXINFO>(), length = (uint)held.Bytes.Length };
+            res = _system.createSound(held.Address, mode | MODE.OPENMEMORY, ref info, out sound);
+        }
+        else
+        {
+            string path = ResolvePath(soundId);
+            if (string.IsNullOrEmpty(path)) return false;
+            res = _system.createSound(path, mode, out sound);
+        }
         if (res != RESULT.OK)
         {
             Log.Error("GranularBank: Failed to open sound {SoundId} for PCM extraction. FMOD Error: {Res}", soundId, res);
@@ -101,7 +115,7 @@ public class GranularBank : IDisposable
 
     private string ResolvePath(string soundId)
     {
-        string path = FmodAudioProvider.SoundFilePath(soundId);
+        string path = _source.PathOf(soundId);
         if (path.Length == 0) return string.Empty;
         if (soundId.Contains("ASSETS", StringComparison.OrdinalIgnoreCase)) return path;
 

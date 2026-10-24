@@ -395,6 +395,7 @@ public partial class AudioWorld : IDisposable, IAudioShutdown
         if (_stopRan) return _stoppedClean;
         _stopRan = true;
         _oneOffs.StopPrewarming();
+        EndHosted(forget: false);
         bool ok = _acousticWorker.Stop(waitMs);
         var late = _work.Wait(waitMs);
         foreach (var name in late) Serilog.Log.Warning("Audio shutdown: {Name} did not finish within {Ms} ms.", name, waitMs);
@@ -487,6 +488,7 @@ public partial class AudioWorld : IDisposable, IAudioShutdown
     public void LeaveWorld(IEnumerable<int> entityIds)
     {
         foreach (int id in entityIds) ForgetEntity(id);
+        EndHosted(forget: true);
         ForgetTrains();
         _voices.LeaveWorld();
         _ownerPaths.Clear();
@@ -540,7 +542,9 @@ public partial class AudioWorld : IDisposable, IAudioShutdown
         _frameCount++;
         _voices.Frame = _frameCount;
         _lastWorld = world;
-        _sources = sources;
+        // The sounds a host played at places join its own sources, placed by the same pass (AudioWorld.Hosted.cs).
+        _sources = _hosted.Begin(sources, _sounding ??= _audio.IsPlaying, _now(), _audio.Clock.Now, _hostedGone);
+        foreach (int id in _hostedGone) ForgetEntity(id);
         _acousticWorker.UpdateWorld(world);
 
         // A position stamped after now was stamped on another clock: its age, and so where the mixer reckons
@@ -3472,7 +3476,8 @@ public partial class AudioWorld : IDisposable, IAudioShutdown
         _placed[src.Id] = (emitter.Volume, emitter.MinDistance, emitter.Range);
         // Every middle goes to the budget; a wood's pieces follow it (PlacePieces), so a wood the budget holds while
         // its pieces still sound cannot leave its pieces naming a voice that is not playing.
-        _voices.Submit(emitter);
+        // A played once sound that has been heard is placed and never started over (AudioWorld.Play).
+        if (_hosted.PlacedOnly(src.Id)) _voices.Refresh(emitter); else _voices.Submit(emitter);
         // ...and its other places, after its middle, so the synth they read already exists.
         if (spreading != null) PlaceOuter(src.Id, spreading, emitter, world, now);
         if (cutting != null) PlacePieces(src.Id, cutting, emitter, world, eyePos, now, woodCut);

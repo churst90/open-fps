@@ -80,6 +80,8 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         _provider = provider;
         Paths = paths ?? AudioDataPaths.Beside(AppContext.BaseDirectory);
         DoorRenders = new DoorRenderCache(Paths);
+        // The loader reads where the bank does.
+        if (provider is FmodAudioProvider fmod) fmod.Sounds.Folder = Paths.Sounds;
         Options = (provider as FmodAudioProvider)?.Options ?? options ?? new AudioWorldOptions();
         Clock = (provider as FmodAudioProvider)?.Clock ?? clock ?? new StopwatchAudioClock();
         Weather = (provider as FmodAudioProvider)?.Weather ?? new WorldWeather { Clock = Clock };
@@ -129,6 +131,20 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     /// mixer's voices do: the mixer's when there is one (FmodAudioProvider.Options); otherwise one of the facade's
     /// own, the shipped world.</summary>
     public AudioWorldOptions Options { get; }
+
+    /// <summary>Hands the mixer a sound's bytes (a whole file's, in any format FMOD reads) under an id, for a game that
+    /// keeps its sounds in a package in memory. Played by that id like a file's, and heard instead of a file of the same
+    /// id. The library copies the bytes, so the host may free its own; the copy lives until <see cref="Dispose"/>. Call it
+    /// from the host's own thread, before the sound's first play (a second call under the same id replaces it for the
+    /// plays that start after). False without an FMOD mixer, for an empty id or no bytes, or after the dispose.</summary>
+    public bool AddSound(string id, byte[] bytes) => _provider is FmodAudioProvider f && f.Sounds.Add(id, bytes);
+
+    /// <summary><see cref="AddSound(string, byte[])"/> from a stream, read to its end.</summary>
+    public bool AddSound(string id, Stream stream) => _provider is FmodAudioProvider f && f.Sounds.Add(id, stream);
+
+    /// <summary>Takes back the bytes handed in under an id: a file of that name under <c>Paths.Sounds</c>, if there is
+    /// one, is heard from the next play. A voice already playing the bytes carries on.</summary>
+    public bool RemoveSound(string id) => _provider is FmodAudioProvider f && f.Sounds.Remove(id);
 
     /// <summary>Where this world's data is, as the host said (or what ships beside the program).</summary>
     public AudioDataPaths Paths { get; }
@@ -344,7 +360,11 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         lock (_lifecycle)
         {
             if (_closing != 0 || !_provider.Initialize()) return;
-            if (soundsPath != null) _bank.Initialize(soundsPath);
+            if (soundsPath != null)
+            {
+                _bank.Initialize(soundsPath);
+                if (_provider is FmodAudioProvider fmod) fmod.Sounds.Folder = soundsPath;
+            }
             _isInitialized = true;
             _voiceManager = new VoiceManager(this, _bank, 256) { Hearing = Hearing };
         }
