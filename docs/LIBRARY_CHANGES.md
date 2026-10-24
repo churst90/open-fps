@@ -12,6 +12,15 @@ tag (docs/SOUND_LIBRARY_BOUNDARY.md, stage 8 and decision 8) and references the 
   towards the source), where it was the one nearer edge and flipped between two steps. Levels over the middle rise by up
   to 3 dB; near one edge by under 1.5 dB. A host that places a voice from `edge` need do nothing; it
   gets a point, not a width, so a host that wants the wide image of a footbridge must widen the voice itself.
+- One bad source can no longer take the mix with it. `SourceSpec` now starts as an emitter does (cone 360, 360, 1 and
+  `SynthRunning` true) when made with `new SourceSpec()`; a host that filled one from `default(SourceSpec)` should use
+  `new SourceSpec()` or set the fields. A source whose level, range, size, cone or aim is not a finite number is not
+  placed (one log line, by source id), a synthesised source naming a model that did not resolve is silent instead of
+  playing as a plain oscillator, and a voice whose cone lets nothing out is logged once and sends nothing to the reverb.
+  A host must do nothing; an emitter that relied on the old plain oscillator for an unresolved model id will be silent.
+- A switched-off engine no longer leaves a steady level (a DC offset) in the mix: the live engine voice
+  (`EngineVoiceState`) fades out the block tap's slow part, the cylinders' trapped gas, over half a second once the
+  engine stops. `EngineSynth` and its stored renders are unchanged. The model kinds gain `ModelKind.DeclaresLevel`.
 - The scene view says more about each body, for the accessibility aids (open-fps's engine packages stage 9):
   `AcousticBody` gains `Name`, `Prefab`, `Beacon`, `Team`, `Kind` (the new `BodyKind`), `Named`, `Announce`,
   `HasWheels`, `SynthRunning` and, for a vehicle, every wheel's contact (`Wheels`, a

@@ -86,7 +86,7 @@ public sealed class SnapshotSources : IAudioSources
     /// with no definition.</summary>
     public static SourceSpec SpecOf(EntityDefinition? def)
     {
-        if (def == null) return default;
+        if (def == null) return new SourceSpec();
         var em = def.SoundEmitter;
         return new SourceSpec
         {

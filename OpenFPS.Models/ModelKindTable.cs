@@ -45,6 +45,8 @@ public sealed class ModelKind
     /// engine, a siren, a horn, the rain) or an id that names no source of it (a train's index past its
     /// layout). Throws when the id names a model that is not there.</summary>
     internal Func<string, (float LevelDb, float ExtentMetres)?>? Level { get; init; }
+    /// <summary>Whether ids of this kind declare a level, so that one which does not resolve is a model that is missing.</summary>
+    public bool DeclaresLevel => Level != null;
     /// <summary>Headroom its voice renders with, dB; null for the shared one.</summary>
     internal Func<string, float?>? Headroom { get; init; }
     /// <summary>The places it is heard from (ExtendedSources.Layout), before the lab's scale and the cap.</summary>

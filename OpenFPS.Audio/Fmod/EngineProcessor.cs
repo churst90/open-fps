@@ -1213,6 +1213,10 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     /// <summary>This sample's strike on each wheel, pascals at a metre, for the cabin's paths.</summary>
     private readonly float[] _strikeNow;
     private bool _strikesLeftOver;
+    // The block's steady part, followed slowly. Gas trapped in a stopped engine's cylinders pushes steadily and a steady push
+    // is no sound; passed on, it stood as a pressure offset on a car switched off (a bike -55 dB, a hatchback -43 dB, pure DC).
+    // Taken off only once the key is off, so a running engine is as it was.
+    private float _blockSlow, _restMix;
 
     /// <summary>Integrates <paramref name="count"/> samples of engine into the rings. Producer thread.</summary>
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
@@ -1292,6 +1296,8 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
         double blockSum = 0, tyreSum = 0, outSum = 0;
         float windLpA = 1f - MathF.Exp(-2f * MathF.PI * 1200f * dt);
         float windHpA = MathF.Exp(-2f * MathF.PI * 180f * dt);
+        float blockSlowA = 1f - MathF.Exp(-2f * MathF.PI * 1f * dt);
+        float restStep = dt / 0.5f;
         for (int i = 0; i < count; i++)
         {
             // Smooth the network's speed steps over about 80 ms.
@@ -1299,6 +1305,9 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
             Driver.TargetSpeed = _speedSmooth;
             Driver.Apply(dt);
             Driveline.Step(Engine, dt);
+            _blockSlow += blockSlowA * (Engine.Block - _blockSlow);
+            _restMix = Math.Clamp(_restMix + (Running ? -restStep : restStep), 0f, 1f);
+            float block = Engine.Block - _restMix * _blockSlow;
             // The shift chirp, which only this voice can see: a big ratio step with the throttle open
             // puts the driven wheels briefly out of step with the road.
             if (Driveline.Gear != _tyreGear && _tyreGear >= 1 && Driveline.Gear >= 1)
@@ -1403,7 +1412,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
             // engine: on the school bus the block is 97.7 dB against an 83 dB silenced pipe, and out of
             // the back an idling bus was one sound at its tail. It leaves by the grille and the open
             // floor, shaded by the body (BayRadiation); `bayLevel` is before shading, for the loudness law.
-            float bayLevel = _bayLeak > 0f ? (Engine.Block - Engine.StarterOut + FrontMix * _bayIntake.Process(Engine.Intake)) * _bayLeak : 0f;
+            float bayLevel = _bayLeak > 0f ? (block - Engine.StarterOut + FrontMix * _bayIntake.Process(Engine.Intake)) * _bayLeak : 0f;
             float bay = _bayRadiation.Process(bayLevel);
             // The starter hangs under the car on the bellhousing, in no enclosure: through the bay
             // leak it was 16 dB down and a big V8's start could not be heard from the kerb.
@@ -1466,7 +1475,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
                 var lay = _cabinLayout!;
                 Array.Clear(_pathNow);
                 // The bulkhead: the block and the intake through the firewall and the dash.
-                float bulkSrc = Engine.Block + Engine.Intake;
+                float bulkSrc = block + Engine.Intake;
                 _pathLp[0] += (bulkSrc - _pathLp[0]) * panelA;
                 _pathNow[0] = _pathLp[0] + _sealLeak * bulkSrc;
                 // The exhaust along the floor.
@@ -1570,7 +1579,7 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
             {
                     // At the outside of the cabin: the bay ahead of the firewall, the exhaust along the
                     // floor, and all four tyres at the power the single signal had.
-                    float atPanels = Engine.Block + Engine.Intake + 0.5f * Engine.Exhaust + (tyreRear + tyreFront) * 0.6f * 0.70710678f * TyreMix;
+                    float atPanels = block + Engine.Intake + 0.5f * Engine.Exhaust + (tyreRear + tyreFront) * 0.6f * 0.70710678f * TyreMix;
                     _panelLp += (atPanels - _panelLp) * panelA;
                     float inCabin = _panelLp + _sealLeak * atPanels;
                     // The starter through the mounts and the floor (VehicleBody.StarterPathLossDb): two

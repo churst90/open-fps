@@ -15,6 +15,9 @@ namespace OpenFPS.Audio.Data;
 /// </summary>
 public readonly record struct SourceSpec
 {
+    /// <summary>A struct's own constructor is needed for the defaults below to apply to `new SourceSpec()`.</summary>
+    public SourceSpec() { }
+
     public string? SoundId { get; init; }
     /// <summary>Played when the source starts and when it stops.</summary>
     public string? StartSoundId { get; init; }
@@ -25,9 +28,9 @@ public readonly record struct SourceSpec
     public float MinDistance { get; init; }
     /// <summary>Its aim in its own frame; zero is straight ahead.</summary>
     public Vector3 Direction { get; init; }
-    public float ConeInsideAngle { get; init; }
-    public float ConeOutsideAngle { get; init; }
-    public float ConeOutsideVolume { get; init; }
+    public float ConeInsideAngle { get; init; } = 360f;
+    public float ConeOutsideAngle { get; init; } = 360f;
+    public float ConeOutsideVolume { get; init; } = 1f;
     /// <summary>Replayed every so many seconds; zero is not a repeater.</summary>
     public float RepeatIntervalSeconds { get; init; }
 
@@ -55,7 +58,7 @@ public readonly record struct SourceSpec
     public float ExtentMetres { get; init; }
     /// <summary>Whether a synthesised source is sounding, for what the host cannot see from here (a crossing's
     /// bell for a train a kilometre off).</summary>
-    public bool SynthRunning { get; init; }
+    public bool SynthRunning { get; init; } = true;
     /// <summary>Standing at a stop that takes passengers.</summary>
     public bool ServingStop { get; init; }
     /// <summary>Where a vehicle's side windows are going, 0 shut to 1 down.</summary>
@@ -102,7 +105,7 @@ public sealed class AudioSource
 
     /// <summary>The host's id for it (open-fps: the entity id).</summary>
     public int Id { get; }
-    public SourceSpec Spec;
+    public SourceSpec Spec = new();
     public SourceState State;
     /// <summary>Where its sound comes out, in the world (<see cref="AudioEmission.PointFor"/>).</summary>
     public Vector3 Emission;
