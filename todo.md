@@ -89,14 +89,21 @@ fingerprint changed too, so the door renders are made again once.
      the turn limit makes the flip a slide. Hear both ways round, each by its own strength; guard: a source
      under the middle of a 3 m deck, the listener walking across 1 m above, the direction moving smoothly and
      wide over the middle. Needs Cody's ear.
+     Done 2026-10-23 (e96ea3e5): both sides summed by energy, 5 degrees per 10 cm where it was 111. No spot on
+     the city exercises it (a scan of every steady source: over the top always wins), so it is heard only if a
+     place is made for it.
    - A car switched off leaves a steady offset in the mix (Resonance measured -0.0395, -28 dBFS, for as long
      as the car stands, after bursts to -29 dBFS while it dies). Measure a parked car switched off in AudioLab
      first; fix only if open-fps has it, with a guard on the mix's mean.
+     Done 2026-10-24 (54f29162): open-fps had it (a hatchback -42.7 dB of DC); the live engine voice fades the
+     trapped gas's slow push once switched off, now -125 dB. An idling engine's own small offset is untouched.
    - One source can silence the whole mix: a `SourceSpec` with its cone left at 0, 0, 0 (the emitter's
      defaults are 360, 360, 1), or a synthesised source naming a model the catalogue lacks. Give `SourceSpec`
      the emitter's defaults, `SynthRunning` true among them (item 9 of the list); a missing model silent on
      its own; and find how one source takes the mix to silence (likely a NaN held in the reverb), so no
      source can.
+     Done 2026-10-24 (54f29162): no whole-mix silence reproduced; defaults given, a bad number or a missing
+     model silences that source alone, and a dead cone no longer feeds the reverb twenty times over.
    - Then the host's needs: one dispose that stops and joins every thread and task the audio starts (6);
      a public headless mode on FMOD's no-sound output, for tests on CI (5); one call playing a recording at a
      place with a handle to move and stop it (1); the loader reading under `Paths.Sounds` and from bytes or a
@@ -112,6 +119,8 @@ fingerprint changed too, so the door renders are made again once.
        still on its first sample once its start has passed, naming the sound. If open-fps has it, find the cause
        in the voice's start (the head DSP, its fade points, its pitch); Resonance's restart a quarter second
        late hides the fault and is a last resort only.
+       Done 2026-10-24 (af3ad786): open-fps does not have it (0 of 63,000 scattered starts, 0 on the busy
+       street and at login); the check logs `[NEVER-STARTED]` and stands as the guard.
      - Ground in narrow strips heard as a small room (proposed, not yet agreed). open-fps has the same rule:
        `SteamAudioScene.IsOpenGround` leaves ground out of the listener's trace only when a piece is at least
        1 m each way and level, so kerbs, gutters, thresholds and ramps' sloped tops stay in and the ground
