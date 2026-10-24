@@ -491,10 +491,10 @@ public class DspCallbackTests
         for (int i = 0; i < n / 2; i++) Assert.Equal(0f, output.Data[i]);
     }
 
-    // ── The master bus: the boundary reflections, the limiter, the dither, the capture ───────
+    // ── The master bus and the world group: the boundary reflections, the limiter, the dither, the capture ──
 
     /// <summary>
-    /// The near-field boundary stage on the master bus: with no surface near, the mix passes through
+    /// The near-field boundary stage on the world group: with no surface near, the mix passes through
     /// untouched (silence is silence); a block with a NaN in it arriving at the master is silence rather
     /// than the end of the game's sound; and nothing allocates.
     /// </summary>

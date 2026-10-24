@@ -1165,13 +1165,14 @@ public partial class FmodAudioProvider : IAudioProvider
                 Log.Information("Master trim: {Db:F1} dB (OPENFPS_MASTER_DB).", masterDb);
             }
 
-            // Near-field boundary reflections, at the tail so every world sound passes through them.
-            // FMOD runs a chain tail -> head -> output: the tail is processed first, so the limiter goes
-            // at the head, after these, where it can catch a reflection pushing past the ceiling.
+            // Near-field boundary reflections, at the world group's tail so every world sound passes through them
+            // and the interface and the host's flat sounds do not (walls are in the world; a menu is not). FMOD runs
+            // a chain tail -> head -> output: the world's muffle at its head covers these too, and the master's
+            // limiter after the group can catch a reflection pushing past the ceiling.
             // The mixer's rate, not the sound card's: that put every boundary delay 9 % long at 48 kHz.
             _boundaryState = new BoundaryVoiceState(MixerRate);
             if (BoundaryProximityProcessor.CreateDSP(_system, _boundaryState, out _boundaryDsp, out _boundaryHandle) == RESULT.OK)
-                master.addDSP(CHANNELCONTROL_DSP_INDEX.TAIL, _boundaryDsp);
+                _worldGroup.addDSP(CHANNELCONTROL_DSP_INDEX.TAIL, _boundaryDsp);
             else
                 Log.Warning("Boundary proximity DSP could not be created; walls will not colour the mix.");
 
@@ -6234,10 +6235,10 @@ public partial class FmodAudioProvider : IAudioProvider
             if (_earWindChannel.hasHandle()) _earWindChannel.stop();
             if (_earWindDsp.hasHandle()) _earWindDsp.release();
             // The master's units come off before they are freed: FMOD refuses to release an attached unit.
+            if (_boundaryDsp.hasHandle() && _worldGroup.hasHandle()) _worldGroup.removeDSP(_boundaryDsp);
             _system.getMasterChannelGroup(out var masterOut);
             if (masterOut.hasHandle())
             {
-                if (_boundaryDsp.hasHandle()) masterOut.removeDSP(_boundaryDsp);
                 if (_loudnessMeter.hasHandle()) masterOut.removeDSP(_loudnessMeter);
                 if (_masterLimiter.hasHandle()) masterOut.removeDSP(_masterLimiter);
             }

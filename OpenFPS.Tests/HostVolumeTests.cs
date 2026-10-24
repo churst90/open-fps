@@ -218,6 +218,25 @@ public class HostVolumeTests : IDisposable
     }
 
     [FmodFact]
+    public void A_wall_beside_the_head_colours_the_world_and_not_the_hosts_flat_sound()
+    {
+        var rig = new Rig(_dir);
+        var open = Levels(rig);
+
+        // A wall half a metre to the right and the floor under the ears: the near-field reflections of the world.
+        rig.Facade.UpdateBoundaries(new[]
+        {
+            new OpenFPS.Sound.Core.BoundaryProbe(Vector3.UnitX, 0.5f, "Concrete"),
+            new OpenFPS.Sound.Core.BoundaryProbe(-Vector3.UnitY, 1.6f, "Concrete"),
+        });
+        var walled = Levels(rig);
+        Assert.True(Math.Abs(walled.World - open.World) > 0.3,
+            $"the walls did not reach the world's tone: {walled.World - open.World:F2} dB");
+        Assert.InRange(walled.Host - open.Host, -0.1, 0.1);
+        ClosesClean(rig);
+    }
+
+    [FmodFact]
     public void The_world_muffle_takes_the_high_band_of_the_world_and_leaves_the_low_band_and_the_hosts_sound()
     {
         const float low = 200f, high = 6000f;
