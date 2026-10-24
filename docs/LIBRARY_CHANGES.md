@@ -6,6 +6,12 @@ tag (docs/SOUND_LIBRARY_BOUNDARY.md, stage 8 and decision 8) and references the 
 
 ## Unreleased
 
+- A sound behind one barrier is heard from both its sides, each by its own strength (docs/CLIENT_NOTES.md, "The bearing
+  follows the level"): `OpeningRoutes.BarrierGains` adds the shortest way round the other side of the box that governs,
+  by energy, and its `edge` is one point in the weighted direction of the two (over the middle of a 3 m deck, straight
+  towards the source), where it was the one nearer edge and flipped between two steps. Levels over the middle rise by up
+  to 3 dB; near one edge by under 1.5 dB. A host that places a voice from `edge` need do nothing; it
+  gets a point, not a width, so a host that wants the wide image of a footbridge must widen the voice itself.
 - The scene view says more about each body, for the accessibility aids (open-fps's engine packages stage 9):
   `AcousticBody` gains `Name`, `Prefab`, `Beacon`, `Team`, `Kind` (the new `BodyKind`), `Named`, `Announce`,
   `HasWheels`, `SynthRunning` and, for a vehicle, every wheel's contact (`Wheels`, a

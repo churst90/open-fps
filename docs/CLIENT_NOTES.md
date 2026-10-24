@@ -476,6 +476,12 @@ the car keeps its own direction. A grandstand gives a detour the barrier ceiling
 and any real opening beats it. Nothing in it knows what a wall or a doorway is.
 (AsyncAcousticWorker.RunSteamAudio.)
 
+Over the middle of a wide barrier the shortest way round changes from one edge to the other, and the
+bearing flipped with it (a 3 m deck, the listener a metre above: 111 degrees between two 10 cm steps, then
+a slow slide through the turn limit). BarrierGains now adds the other side's shortest way by energy and gives
+the bearing as the sum of the two edges' directions, each weighted by its own energy: smooth (5 degrees per
+10 cm over the same walk), one direction, not a width. (OpeningRoutes.BarrierGains, DiffractionBothSidesTests.)
+
 ## A shut door leaks by its gaps
 
 A shut door passes most of what it passes through the gaps round its leaf, not through the leaf. A hollow-core leaf
