@@ -114,6 +114,7 @@ OpenFPS.Audio/Fmod/EchoWashProcessor.cs	Audio
 OpenFPS.Audio/Fmod/EngineProcessor.cs	Audio	
 OpenFPS.Audio/Fmod/EngineRenderPool.cs	Audio	
 OpenFPS.Audio/Fmod/FmodAudioProvider.Ear.cs	Audio	
+OpenFPS.Audio/Fmod/FmodAudioProvider.Starts.cs	Audio	
 OpenFPS.Audio/Fmod/FmodAudioProvider.cs	Audio	
 OpenFPS.Audio/Fmod/FmodDebugLog.cs	Audio	
 OpenFPS.Audio/Fmod/GranularBank.cs	Audio	

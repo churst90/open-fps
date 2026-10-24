@@ -6,6 +6,14 @@ tag (docs/SOUND_LIBRARY_BOUNDARY.md, stage 8 and decision 8) and references the 
 
 ## Unreleased
 
+- The mixer checks that every recording leaves its first sample, as Resonance found 58 in about 58,000 that did not:
+  a recording a tenth of a second past its start on the parent's clock, not paused or virtual and still where it
+  began, is counted and logged once (`[NEVER-STARTED]`, with its sound, delay, pitch and fade points), the counts are
+  read from `FmodAudioProvider.StartCheck`, and the mixer says the totals as it closes. No sound changes, and the
+  check costs two FMOD reads once per recording. open-fps did not show the fault: none of 63,000 footsteps started
+  across the clock's edge (with and without pitch and fade points, binaural on and off) stuck, nor any of 2,244 judged
+  on the busy street and at the city's login. A host must do nothing; one that restarts stuck recordings of its own
+  can read this count to see whether it still needs to.
 - A sound behind one barrier is heard from both its sides, each by its own strength (docs/CLIENT_NOTES.md, "The bearing
   follows the level"): `OpeningRoutes.BarrierGains` adds the shortest way round the other side of the box that governs,
   by energy, and its `edge` is one point in the weighted direction of the two (over the middle of a 3 m deck, straight

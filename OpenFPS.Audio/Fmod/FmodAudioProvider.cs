@@ -600,6 +600,8 @@ public partial class FmodAudioProvider : IAudioProvider
         public bool Essential;
         /// <summary>A one-shot (SpatialEmitter.IsEvent).</summary>
         public bool OneShot;
+        /// <summary>A recording's start, watched until its play position moves (FmodAudioProvider.Starts.cs).</summary>
+        public StartWatch Start;
         /// <summary>On its way out (<see cref="Leave"/>): stopped by its owner (<see cref="StopSound"/>) or let go of its
         /// stage by the binaural pool's rank (BinauralStages); stopped, it is no longer its id's voice. Its channel fades
         /// to silence over the budget's 80 ms whatever its budget asks, and the mixer stops it two blocks after.</summary>
@@ -3131,6 +3133,8 @@ public partial class FmodAudioProvider : IAudioProvider
         OwnVoiceTap? ownVoice = null;
         // A shared program joined mid-sound fades in over this (SharedPrograms.JoinFade); 0 from its top.
         double joinFadeSeconds = 0.0;
+        // Played from a sound rather than a unit of ours: its start is watched (WatchStart).
+        bool recording = false;
 
         if (emitter.IsGranular)
         {
@@ -3430,6 +3434,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 else Log.Warning("playSound failed for '{Sound}' on entity {Id}: {Result}", emitter.SoundId, emitter.EntityId, playRes);
                 return;
             }
+            recording = true;
             channel.setMode(MODE._3D | Rolloff.Mode);
             // A sound made in memory has no looping copy: its channel loops instead.
             if (loopNative && _resources.IsRegisteredPcm(emitter.SoundId))
@@ -3709,6 +3714,7 @@ public partial class FmodAudioProvider : IAudioProvider
             activeSound.Heard = HeardHere(Hearing, activeSound, _listenerPos);
             AddActive(activeSound);
             startedForLab = true;
+            if (recording) WatchFrom(activeSound, voiceStartClock, emitter.DelayMs, emitter.Pitch, OnsetFrames(emitter, joinFadeSeconds) > 0UL);
 
             // The first block is heard through the voice's path. Until the next attribute pass a new voice
             // played at the emitter's bare volume (a binaural voice gets no distance law from FMOD), with
@@ -4194,6 +4200,7 @@ public partial class FmodAudioProvider : IAudioProvider
                 UpdateLateField();
                 ApplySimulatedReverb();
 
+                long startTicks = System.Diagnostics.Stopwatch.GetTimestamp();
                 for (int i = _activeSounds.Count - 1; i >= 0; i--)
                 {
                     var active = _activeSounds[i];
@@ -4204,6 +4211,7 @@ public partial class FmodAudioProvider : IAudioProvider
                         _retiring.Add((active, Clock.Now));
                         continue;
                     }
+                    WatchStart(active, startTicks);
                     
                     if (active.Type == EmitterType.UI)
                     {
@@ -6051,6 +6059,7 @@ public partial class FmodAudioProvider : IAudioProvider
     }
 
     public void Dispose() {
+        ReportStartCheck();
         StopRecording();
         FadeOutForClose();
         lock (_lock) {
