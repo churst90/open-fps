@@ -46,6 +46,10 @@ public interface IAudioProvider : IDisposable
     /// <summary>0..1+; 1 is the callback using its whole deadline.</summary>
     float MixerLoad { get; }
 
+    /// <summary>The mix's highest true peak, dBFS, since the mixer's last report reset it. NaN where the provider has
+    /// no meter.</summary>
+    float MixPeakDb => float.NaN;
+
     /// <summary>
     /// Binaural (HRTF) voices still free: what a voice budget really spends. A voice without one still
     /// plays, flat, with no position, which on a map navigated by ear is worse than silence.

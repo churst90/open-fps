@@ -623,7 +623,7 @@ public static class ExtentWalkSpike
     private static Rig MakeRig(IAudioProvider provider, Func<double> now, bool prewarm, string? sounds)
     {
         var facade = new AudioEngineFacade(provider, options: LabOptions);
-        facade.InitializeForTest(sounds);
+        facade.InitializeSteppedByHand(sounds);
         var world = new ClientWorldState();
         world.Clear(new Vector3(4000, 400, 4000));
         world.Clock = facade.Clock;
@@ -696,8 +696,8 @@ public static class ExtentWalkSpike
             var sw = Stopwatch.StartNew();
             rig.Audio.Update(rig.World.GetSnapshot());
             update.Add(sw.Elapsed.TotalMilliseconds);
-            rig.Facade.PumpForTest();
-            rig.Facade.PumpForTest();
+            rig.Facade.StepByHand();
+            rig.Facade.StepByHand();
         }
         // Stood at the start long enough for every voice to be admitted and spread.
         rig.Player.Position = walk.Feet[0];
@@ -776,7 +776,7 @@ public static class ExtentWalkSpike
             {
                 if (at != null) rig.Player.Position = at(clock.Elapsed.TotalSeconds - start);
                 rig.Audio.Update(rig.World.GetSnapshot());
-                rig.Facade.PumpForTest();
+                rig.Facade.StepByHand();
                 if (at != null && ++frame % 10 == 0)
                 {
                     var census = provider.VoiceCensus();

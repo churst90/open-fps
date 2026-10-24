@@ -1,4 +1,5 @@
 using Serilog;
+using OpenFPS.Audio.Core;
 
 namespace OpenFPS.Audio.Fmod;
 
@@ -48,7 +49,7 @@ public sealed class EngineRenderPool : IDisposable
                 Priority = ThreadPriority.Highest,
                 Name = $"EngineRender{id}",
             };
-            _workers[i].Start();
+            _workers[i].Start(); Shutdown.Started(_workers[i]);
         }
 
         _coordinator = new Thread(Refresh)
@@ -57,7 +58,7 @@ public sealed class EngineRenderPool : IDisposable
             Priority = ThreadPriority.Normal,
             Name = "EngineRenderList",
         };
-        _coordinator.Start();
+        _coordinator.Start(); Shutdown.Started(_coordinator);
 
         Log.Information("Engine rendering moved off the mixer: {Threads} dedicated thread(s) of {Cores} cores, {Lead:F0}-{Max:F0} ms ahead.",
                         count, System.Environment.ProcessorCount,
@@ -133,7 +134,7 @@ public sealed class EngineRenderPool : IDisposable
     public void Dispose()
     {
         _running = false;
-        foreach (var t in _workers) t.Join(500);
-        _coordinator.Join(500);
+        foreach (var t in _workers) Shutdown.Join(t, "EngineRenderPool worker", 500);
+        Shutdown.Join(_coordinator, "EngineRenderPool coordinator", 500);
     }
 }

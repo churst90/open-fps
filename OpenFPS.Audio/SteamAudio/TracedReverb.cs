@@ -269,7 +269,7 @@ internal sealed class TracedReverb : IDisposable
         {
             _running = true;
             _thread = new Thread(Loop) { IsBackground = true, Name = "TracedReverb", Priority = ThreadPriority.BelowNormal };
-            _thread.Start();
+            _thread.Start(); OpenFPS.Audio.Core.Shutdown.Started(_thread);
         }
     }
 
@@ -507,7 +507,7 @@ internal sealed class TracedReverb : IDisposable
     {
         _running = false;
         _wake.Set();
-        _thread?.Join(2000);
+        OpenFPS.Audio.Core.Shutdown.Join(_thread, "TracedReverb thread", 2000);
         lock (_gate)
         {
             for (int i = 1; i < MaxReaders; i++)
@@ -887,10 +887,12 @@ internal sealed class TracedReverbSet
     }
 
     /// <summary>Disposes on the thread pool: a trace's Dispose waits for its thread, up to a trace long.</summary>
-    private static void DisposeElsewhere(List<IDisposable>? items)
+    private void DisposeElsewhere(List<IDisposable>? items)
     {
         if (items == null) return;
-        System.Threading.Tasks.Task.Run(() => { foreach (var d in items) d.Dispose(); });
+        var task = System.Threading.Tasks.Task.Run(() => { foreach (var d in items) d.Dispose(); });
+        // Kept with the traces being made: Release waits for it before the context goes.
+        lock (_gate) { _making.RemoveAll(t => t.IsCompleted); _making.Add(task); }
     }
 
     /// <summary>Everything traced so far, for the /reverb readout.</summary>
@@ -910,9 +912,13 @@ internal sealed class TracedReverbSet
     {
         // No new trace is started from here on; those started already find the context gone and drop
         // what they made, and are waited for, so nothing is made on a context after it is released.
+        // A rebuild still being handed over would set the context again after this: wait it out first.
+        System.Threading.Tasks.Task reconfigure;
+        lock (_gate) reconfigure = _reconfigure;
+        OpenFPS.Audio.Core.Shutdown.Wait(reconfigure, "TracedReverbSet reconfigure", 10000);
         System.Threading.Tasks.Task[] making;
         lock (_gate) { _context = IntPtr.Zero; making = _making.ToArray(); }
-        System.Threading.Tasks.Task.WaitAll(making, 10000);
+        try { System.Threading.Tasks.Task.WaitAll(making, 10000); } catch (AggregateException) { }
         var all = new List<IDisposable>();
         lock (_gate)
         {

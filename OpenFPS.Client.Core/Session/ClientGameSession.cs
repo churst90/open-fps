@@ -259,7 +259,7 @@ public sealed partial class ClientGameSession : IDisposable
             return;
         }
 
-        new Thread(() =>
+        _audioInitThread = new Thread(() =>
         {
             try
             {
@@ -276,8 +276,11 @@ public sealed partial class ClientGameSession : IDisposable
             {
                 onReady?.Invoke();
             }
-        }) { IsBackground = true, Name = "AudioInit" }.Start();
+        }) { IsBackground = true, Name = "AudioInit" };
+        _audioInitThread.Start();
     }
+
+    private Thread? _audioInitThread;
 
     // ── Bindings ────────────────────────────────────────────────────────────────
 
@@ -2012,6 +2015,13 @@ public sealed partial class ClientGameSession : IDisposable
         _microphone.SamplesCaptured -= _audioEngine.OwnVoice.Write;
         _microphone.Dispose();
         StopAudioWarmUp();
+        // The warm-up's own mixer first, then ours (whose dispose waits for an init or preload still running), then
+        // the init thread, which has nothing left to do by then.
+        _warmUpGate?.Join(2000);
+        _warmUp?.Join(15000);
         _audioEngine.Dispose();
+        var init = _audioInitThread;
+        if (init is { IsAlive: true } && init != Thread.CurrentThread && !init.Join(5000))
+            Serilog.Log.Warning("Audio shutdown: AudioInit did not stop within 5000 ms.");
     }
 }

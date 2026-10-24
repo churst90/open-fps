@@ -260,7 +260,7 @@ public static partial class WavesSpike
         var provider = new OpenFPS.Audio.Fmod.FmodAudioProvider { Hearing = LabHearing, Options = LabOptions };
         var facade = new AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();
-        facade.InitializeForTest(sounds);
+        facade.InitializeSteppedByHand(sounds);
         if (!facade.IsInitialized) { Console.WriteLine("FAIL: provider init failed"); return 1; }
         provider.EarWindEnabled = false;
         var clock = Stopwatch.StartNew();
@@ -297,7 +297,7 @@ public static partial class WavesSpike
             {
                 perFrame?.Invoke(clock.Elapsed.TotalSeconds);
                 audio.Update(world.GetSnapshot());
-                facade.PumpForTest();
+                facade.StepByHand();
                 loadSum += facade.MixerLoad; loadCount++;
                 Thread.Sleep(4);
             }

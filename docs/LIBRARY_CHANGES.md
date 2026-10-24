@@ -107,6 +107,24 @@ tag (docs/SOUND_LIBRARY_BOUNDARY.md, stage 8 and decision 8) and references the 
 - A map entity (`OpenFPS.Server.Repositories.EntityData`, in OpenFPS.World) gains `DoorGapMetres` and
   `DoorUndercutMetres`, a door's gaps where it is placed, over its prefab's. A host need do nothing; one that loads
   open-fps maps with its own loader may read them into its `DoorLeaf`.
+- `AudioEngineFacade.Dispose()` now stops and joins everything the audio started, and `AudioWorld` is `IDisposable`.
+  In order: the facade's public calls become no-ops (nothing new is queued), the audio thread and every owned world's
+  acoustic worker, door prewarm, thunder and survey tasks are told to stop and waited for (10 s each, a late one logged
+  by name), the FMOD voices, DSPs and system close, and then the Steam Audio traces, scenes and context the mixer thread
+  read are freed. A second call, or a call before `Initialize`, does nothing, and `Initialize` after `Dispose` starts
+  nothing. A world made on a facade is stopped and freed by the facade's dispose; `AudioWorld.Dispose()` alone stops its
+  threads and, while the mixer runs, leaves the shared Steam Audio objects to the facade. If a thread does not stop, what
+  it could be using is left to the process and logged rather than freed under it. Mixer sounds still loading are waited
+  for (3 s) before release. No sound changes. A host must call `facade.Dispose()` when it is done; one that disposed
+  `AsyncAcousticWorker` itself before the facade should stop doing that, since the traces are read until the device closes.
+- Headless mode, three public pieces. `new FmodAudioProvider { NoSound = true }` (or `OPENFPS_FMOD_OUTPUT=nosound`) uses
+  FMOD's NOSOUND output: no sound card is needed and the mixer thread still mixes in real time. (NOSOUND_NRT was not
+  chosen: it mixes inside `System.update`, faster than real time, so a sound would start at other times than on a
+  device.) `facade.InitializeSteppedByHand()` brings the facade up without its audio thread and `facade.StepByHand()`
+  runs one audio frame on the caller's thread; they replace the internal `InitializeForTest` and `PumpForTest`, which
+  are gone. `facade.MixPeakDb` reads the highest true peak of the mix in dBFS (NaN where the mixer has no meter), so a
+  host can check that its mix is not silent. A `WavPath` still wins over `NoSound`. `IAudioProvider` gains
+  `MixPeakDb` with a default of NaN, so providers already written need no change.
 
 ## library/v0.1.0 (2026-10-17)
 

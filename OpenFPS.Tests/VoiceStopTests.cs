@@ -88,7 +88,7 @@ public class VoiceStopTests
 
     private static void Pump(AudioEngineFacade facade, VoiceRegistry? registry = null)
     {
-        for (int i = 0; i < 4; i++) { registry?.Fades(); facade.PumpForTest(); }
+        for (int i = 0; i < 4; i++) { registry?.Fades(); facade.StepByHand(); }
     }
 
     /// <summary>
@@ -111,7 +111,7 @@ public class VoiceStopTests
     {
         var provider = new VoiceLifecycleTests.RecordingProvider();
         var facade = new AudioEngineFacade(provider);
-        facade.InitializeForTest();
+        facade.InitializeSteppedByHand();
         facade.UpdateListener(Ear, Quaternion.Identity, Vector3.Zero, -1);
         var registry = new VoiceRegistry { Mixer = facade };
         const int id = 7101, louder = 7601;

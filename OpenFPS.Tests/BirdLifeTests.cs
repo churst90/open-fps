@@ -45,7 +45,7 @@ public class BirdLifeTests
         if (!Directory.Exists(Path.Combine(TestPaths.Sounds(), "BIRDS"))
             && !Directory.Exists(Path.Combine(Sounds(), "BIRDS")))
             throw new InvalidOperationException("no bird samples");
-        audio.InitializeForTest(Sounds());
+        audio.InitializeSteppedByHand(Sounds());
         var birds = new BirdLife(audio, new OpenFPS.Audio.Acoustics.SpatialAcoustics(), seed: 1);
         return (client.GetSnapshot(), birds, mixer, audio);
     }
@@ -61,7 +61,7 @@ public class BirdLifeTests
         for (double t = from; t < from + seconds; t += 0.05)
         {
             birds.Update(world, ear, t);
-            audio.PumpForTest();
+            audio.StepByHand();
         }
         return near != null ? here : mixer.PlayedSounds.Count(s => s.StartsWith("BIRDS/" + folder, StringComparison.OrdinalIgnoreCase));
     }

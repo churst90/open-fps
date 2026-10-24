@@ -434,7 +434,7 @@ public static class GroundWaterSpike
         var provider = new OpenFPS.Audio.Fmod.FmodAudioProvider { Hearing = LabHearing };
         var facade = new AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();
-        facade.InitializeForTest(sounds);
+        facade.InitializeSteppedByHand(sounds);
         if (!facade.IsInitialized) { Console.WriteLine("FAIL: provider init failed"); return 1; }
         provider.EarWindEnabled = false;
         var clock = Stopwatch.StartNew();
@@ -463,7 +463,7 @@ public static class GroundWaterSpike
             while (clock.Elapsed.TotalSeconds < until)
             {
                 audio.Update(world.GetSnapshot());
-                facade.PumpForTest();
+                facade.StepByHand();
                 Thread.Sleep(4);
             }
         }

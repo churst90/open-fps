@@ -40,7 +40,7 @@ internal sealed class ClientAudioHarness
     {
         World.Clear(new Vector3(4000, 400, 4000));
         Facade = new AudioEngineFacade(Mixer, worldTimeAt is { } at ? new TurnedClock(() => Now, at) : null, options: options);
-        Facade.InitializeForTest(soundsPath);
+        Facade.InitializeSteppedByHand(soundsPath);
         // The hand-rolled tracer, as on every runner without phonon, even in a run that has loaded Steam Audio
         // (the opt-in Steam Audio tests): what the harness's tests hold must not depend on the machine.
         Facade.Lab.WithoutSteamAudio = true;
@@ -122,8 +122,8 @@ internal sealed class ClientAudioHarness
         Now += 1.0 / ClientAudioSystem.UpdateHz;
         Audio.Update(World.GetSnapshot());
         // Twice: a submitted voice is queued as a direct play, which the next pump hands to the mixer.
-        Facade.PumpForTest();
-        Facade.PumpForTest();
+        Facade.StepByHand();
+        Facade.StepByHand();
         // A new voice waits for the worker's first answer (part 3a) and starts on the update after it. A test
         // ticking without real time would never see it; wait for the answer, so it is always the next update.
         if (Audio.World.PathsAwaitingAnswer > 0 && !Audio.World.WaitForWorkerAnswers())

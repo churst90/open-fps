@@ -17,6 +17,9 @@ namespace OpenFPS.Audio.Acoustics;
 /// </summary>
 public sealed class EngineReflections
 {
+    /// <summary>What the world's dispose waits on for this one's background tasks; null when made alone.</summary>
+    internal OpenFPS.Audio.Core.BackgroundWork? Work { get; set; }
+
     /// <summary>A face smaller than this both ways is something sound goes round at engine frequencies,
     /// not a mirror (ImageSource's Fresnel test would give it almost nothing); dropped before the scan.</summary>
     private const float MinFaceHalfExtent = 1.5f;
@@ -77,7 +80,7 @@ public sealed class EngineReflections
         var wants = new Dictionary<int, Want>(_wanted);
         _wanted.Clear();
         var surfaces = _surfaces; var nodes = _faceNodes; var order = _faceOrder; var boxes = _boxes; var world = _world;
-        _finding = System.Threading.Tasks.Task.Run(() => FindAll(wants, surfaces, nodes, order, boxes, world));
+        _finding = BackgroundWork.Run(Work, "EngineReflections find", () => FindAll(wants, surfaces, nodes, order, boxes, world));
     }
 
     /// <summary>The first-order reflections found off the placement thread, by engine. Read and written
@@ -178,7 +181,7 @@ public sealed class EngineReflections
         if (world.BodyCount == _lastEntityCount) return;
         int bodyCount = world.BodyCount;
         int builtFrom = _builtFrom;
-        _building = System.Threading.Tasks.Task.Run(() => BuildGeometry(world, bodyCount, builtFrom));
+        _building = BackgroundWork.Run(Work, "EngineReflections geometry", () => BuildGeometry(world, bodyCount, builtFrom));
     }
 
     private void Apply(GeometryBuild g)

@@ -13,6 +13,9 @@ namespace OpenFPS.Audio.Acoustics;
 /// </summary>
 public class SpatialAcoustics
 {
+    /// <summary>What the world's dispose waits on for this one's background tasks; null when made alone.</summary>
+    internal OpenFPS.Audio.Core.BackgroundWork? Work { get; set; }
+
     /// <summary>
     /// The first solid along a ray and its material (<see cref="AcousticRays.FirstMaterial"/>), for a caller that
     /// needs one plain ray: neither <paramref name="ignoreEntityId"/> nor the listener's own body (<see cref="ListenerBodyId"/>)
@@ -172,7 +175,7 @@ public class SpatialAcoustics
                 if (now - _localRoutesStartedAt < DoorRebuildSeconds * 1000) return current;
                 _localRoutesStartedAt = now;
                 _localRoutesDoors = doors;
-                _localRoutesBuild = System.Threading.Tasks.Task.Run(() =>
+                _localRoutesBuild = BackgroundWork.Run(Work, "Routes through openings", () =>
                 {
                     var built = BuildLocalRoutes(world);
                     lock (_localRoutesLock)
@@ -187,7 +190,7 @@ public class SpatialAcoustics
             {
                 _firstRoutesMap = map;
                 long version = world.GeometryVersion;
-                _firstRoutes = System.Threading.Tasks.Task.Run(() =>
+                _firstRoutes = BackgroundWork.Run(Work, "First routes", () =>
                 {
                     var built = BuildLocalRoutes(world);
                     lock (_localRoutesLock)

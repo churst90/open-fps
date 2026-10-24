@@ -94,6 +94,7 @@ OpenFPS.Audio/Core/AudioWorld.Trains.cs	Audio
 OpenFPS.Audio/Core/AudioWorld.Voices.cs	Audio	
 OpenFPS.Audio/Core/AudioWorld.cs	Audio	
 OpenFPS.Audio/Core/AudioWorldOptions.cs	Audio	
+OpenFPS.Audio/Core/BackgroundWork.cs	Audio	
 OpenFPS.Audio/Core/BirdLife.cs	Audio	
 OpenFPS.Audio/Core/DoorRenderCache.cs	Audio	
 OpenFPS.Audio/Core/LoudspeakerVoices.cs	Audio	

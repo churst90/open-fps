@@ -127,7 +127,7 @@ internal sealed class TracedEchoes : IDisposable
         {
             _running = true;
             _thread = new Thread(Loop) { IsBackground = true, Name = "TracedEchoes", Priority = ThreadPriority.BelowNormal };
-            _thread.Start();
+            _thread.Start(); OpenFPS.Audio.Core.Shutdown.Started(_thread);
         }
         _live = true;
     }
@@ -264,7 +264,7 @@ internal sealed class TracedEchoes : IDisposable
     public void Dispose()
     {
         _running = false;
-        _thread?.Join(2000);
+        OpenFPS.Audio.Core.Shutdown.Join(_thread, "TracedEchoes thread", 2000);
         _live = false;
         lock (_simGate)
         lock (_gate)

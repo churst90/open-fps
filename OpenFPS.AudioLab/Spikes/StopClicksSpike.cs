@@ -46,7 +46,7 @@ public static class StopClicksSpike
         string sounds = LabPaths.Sounds();
         var facade = new AudioEngineFacade(provider, paths: new AudioDataPaths(sounds, null, null));
         var clock = System.Diagnostics.Stopwatch.StartNew();
-        facade.InitializeForTest(sounds);
+        facade.InitializeSteppedByHand(sounds);
         if (!facade.IsInitialized) { Console.WriteLine("FAIL: provider init failed"); return 1; }
         var tone = new float[Rate * 3];
         for (int i = 0; i < tone.Length; i++) tone[i] = 0.3f * MathF.Sin(2f * MathF.PI * ToneHz * i / Rate);
@@ -78,7 +78,7 @@ public static class StopClicksSpike
         void Pump(double seconds)
         {
             double until = clock.Elapsed.TotalSeconds + seconds;
-            while (clock.Elapsed.TotalSeconds < until) { registry.Fades(); facade.PumpForTest(); Thread.Sleep(2); }
+            while (clock.Elapsed.TotalSeconds < until) { registry.Fades(); facade.StepByHand(); Thread.Sleep(2); }
         }
 
         var names = new List<string>();
@@ -121,7 +121,7 @@ public static class StopClicksSpike
                 for (double t = 0; t < Fade; t = clock.Elapsed.TotalSeconds - from)
                 {
                     facade.SetWorldFade(MathF.Pow(10f, -60f * (float)(t / Fade) / 20f));
-                    registry.Fades(); facade.PumpForTest(); Thread.Sleep(2);
+                    registry.Fades(); facade.StepByHand(); Thread.Sleep(2);
                 }
                 facade.SetWorldFade(0f);
                 facade.StopAllWorldSounds();

@@ -129,7 +129,7 @@ public class BeaconAidsMutationTests
         public Rig(BeaconPreferences? prefs = null, SpatialAcoustics? acoustics = null)
         {
             Audio = new AudioEngineFacade(Mixer);
-            Audio.InitializeForTest();
+            Audio.InitializeSteppedByHand();
             Aids = new BeaconAids(Audio, prefs ?? BeaconPreferences.InMemory(), acoustics);
         }
 
@@ -139,7 +139,7 @@ public class BeaconAidsMutationTests
             int before = Mixer.Played.Count;
             Audio.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, -1);
             Aids.Update(world, ear, now);
-            for (int k = 0; k < 3; k++) Audio.PumpForTest();
+            for (int k = 0; k < 3; k++) Audio.StepByHand();
             return Mixer.Played.Skip(before).ToList();
         }
 
@@ -417,7 +417,7 @@ public class BeaconAidsMutationTests
         var world = Fixed(wall, door, open);
         var mixer = new EmitterRecordingProvider();
         var audio = new AudioEngineFacade(mixer);
-        audio.InitializeForTest();
+        audio.InitializeSteppedByHand();
         var aids = new BeaconAids(audio, BeaconPreferences.InMemory(), acoustics);
         Assert.False(aids.Ping(world, 10, TrackCategory.Doors, ear));
         Assert.True(aids.Ping(world, 11, TrackCategory.Doors, ear));

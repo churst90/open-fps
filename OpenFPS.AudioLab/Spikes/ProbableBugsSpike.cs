@@ -68,7 +68,7 @@ public static class ProbableBugsSpike
         var provider = new FmodAudioProvider { Hearing = LabHearing };
         var facade = new AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();
-        facade.InitializeForTest(sounds);
+        facade.InitializeSteppedByHand(sounds);
         if (!facade.IsInitialized) { Console.WriteLine("FAIL: provider init failed"); return 1; }
         var clock = System.Diagnostics.Stopwatch.StartNew();
 
@@ -102,7 +102,7 @@ public static class ProbableBugsSpike
             {
                 perFrame?.Invoke(clock.Elapsed.TotalSeconds);
                 audio.Update(world.GetSnapshot());
-                facade.PumpForTest();
+                facade.StepByHand();
                 Thread.Sleep(4);
             }
         }

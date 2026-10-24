@@ -265,13 +265,13 @@ public class PlayerBeaconTests
     {
         var mixer = new EmitterRecordingProvider();
         var audio = new AudioEngineFacade(mixer);
-        audio.InitializeForTest();
+        audio.InitializeSteppedByHand();
         var aids = new BeaconAids(audio, prefs ?? BeaconPreferences.InMemory());
         for (int i = 0; i < 40; i++)
         {
             audio.UpdateListener(Ear, Quaternion.Identity, Vector3.Zero, -1);
             aids.Update(world, Ear, 10 + i * 0.1, self);
-            for (int k = 0; k < 3; k++) audio.PumpForTest();
+            for (int k = 0; k < 3; k++) audio.StepByHand();
         }
         return mixer.Played;
     }

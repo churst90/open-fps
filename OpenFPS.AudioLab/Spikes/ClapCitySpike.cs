@@ -57,7 +57,7 @@ public static class ClapCitySpike
         var facade = new AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();
         var clock = System.Diagnostics.Stopwatch.StartNew();
-        facade.InitializeForTest(sounds);
+        facade.InitializeSteppedByHand(sounds);
         if (!facade.IsInitialized) { Console.WriteLine("FAIL: provider init failed"); return 1; }
         // The tap starts with the mixer: a clap's place in the capture against when it was received.
         double tapStart = clock.Elapsed.TotalSeconds;
@@ -82,7 +82,7 @@ public static class ClapCitySpike
             while (clock.Elapsed.TotalSeconds < until)
             {
                 audio.Update(world.GetSnapshot());
-                facade.PumpForTest();
+                facade.StepByHand();
                 Thread.Sleep(4);
             }
         }

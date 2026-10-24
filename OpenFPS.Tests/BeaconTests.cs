@@ -76,14 +76,14 @@ public class BeaconTests
 
         var provider = new VoiceLifecycleTests.RecordingProvider();
         var facade = new AudioEngineFacade(provider);
-        facade.InitializeForTest();
+        facade.InitializeSteppedByHand();
         var ear = door!.Transform.Position + new Vector3(2f, 0.5f, 0f);
         facade.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, -1);
         var aids = new BeaconAids(facade, BeaconPreferences.InMemory());
         for (int i = 0; i < 6; i++)
         {
             aids.Update(client.GetSnapshot(), ear, 10.0 + i);
-            for (int k = 0; k < 3; k++) facade.PumpForTest();
+            for (int k = 0; k < 3; k++) facade.StepByHand();
         }
         _o.WriteLine("played: " + string.Join(", ", provider.PlayedSounds));
         Assert.Contains(provider.PlayedSounds, s => s.Contains("beacon_door"));
@@ -94,7 +94,7 @@ public class BeaconTests
         for (int i = 0; i < 6; i++)
         {
             aids.Update(client.GetSnapshot(), ear, 20.0 + i);
-            for (int k = 0; k < 3; k++) facade.PumpForTest();
+            for (int k = 0; k < 3; k++) facade.StepByHand();
         }
         Assert.DoesNotContain(provider.PlayedSounds, s => s.Contains("beacon_door"));
     }
@@ -164,7 +164,7 @@ public class BeaconTests
 
         var provider = new VoiceLifecycleTests.RecordingProvider();
         var facade = new AudioEngineFacade(provider);
-        facade.InitializeForTest();
+        facade.InitializeSteppedByHand();
         var ear = new Vector3(-340.8f, 1.6f, -13.45f);
         facade.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, -1);
         var acoustics = new OpenFPS.Audio.Acoustics.SpatialAcoustics();
@@ -172,7 +172,7 @@ public class BeaconTests
         for (int i = 0; i < 6; i++)
         {
             aids.Update(client.GetSnapshot(), ear, 10.0 + i);
-            for (int k = 0; k < 3; k++) facade.PumpForTest();
+            for (int k = 0; k < 3; k++) facade.StepByHand();
         }
         _o.WriteLine("played: " + string.Join(", ", provider.PlayedSounds));
         Assert.DoesNotContain(provider.PlayedSounds, s => s.Contains("beacon_door"));
@@ -219,7 +219,7 @@ public class BeaconTests
         {
             var provider = new VoiceLifecycleTests.RecordingProvider();
             var facade = new AudioEngineFacade(provider);
-            facade.InitializeForTest();
+            facade.InitializeSteppedByHand();
             facade.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, -1);
             var acoustics = new OpenFPS.Audio.Acoustics.SpatialAcoustics();
             using var worker = new OpenFPS.Audio.Acoustics.AsyncAcousticWorker(acoustics) { Manual = true };
@@ -230,7 +230,7 @@ public class BeaconTests
             {
                 aids.Update(snap, ear, 10.0 + i / 60.0);
                 worker.StepForTest();
-                for (int k = 0; k < 3; k++) facade.PumpForTest();
+                for (int k = 0; k < 3; k++) facade.StepByHand();
             }
             _o.WriteLine($"ear {ear}: played {string.Join(", ", provider.PlayedSounds)}; {aids.AnsweredByWorker} decided on the worker's answer");
             if (heard)
@@ -312,11 +312,11 @@ public class BeaconTests
                 var ear = p + off + new Vector3(0f, 1.6f, 0f);
                 var mixer = new EmitterRecordingProvider();
                 var audio = new AudioEngineFacade(mixer);
-                audio.InitializeForTest();
+                audio.InitializeSteppedByHand();
                 audio.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, -1);
                 var aids = new BeaconAids(audio, BeaconPreferences.InMemory(), acoustics);
                 aids.Ping(snap, c.EntityId, TrackCategory.Vehicles, ear);
-                for (int k = 0; k < 3; k++) audio.PumpForTest();
+                for (int k = 0; k < 3; k++) audio.StepByHand();
                 int at = mixer.Played.FindIndex(e => e.SoundId == "SYNTH/beacon_vehicle_hum");
                 tried++;
                 if (at < 0) { silent++; _o.WriteLine($"{c.Identity.Name}, {name}: silent"); continue; }
@@ -347,13 +347,13 @@ public class BeaconTests
         {
             var mixer = new EmitterRecordingProvider();
             var audio = new AudioEngineFacade(mixer);
-            audio.InitializeForTest();
+            audio.InitializeSteppedByHand();
             audio.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, -1);
             var aids = new BeaconAids(audio, BeaconPreferences.InMemory(), paths ? acoustics : null);
             for (int i = 0; i < 40; i++)
             {
                 aids.Update(snap, ear, 10.0 + i * 0.1);
-                for (int k = 0; k < 3; k++) audio.PumpForTest();
+                for (int k = 0; k < 3; k++) audio.StepByHand();
             }
             return mixer.Played.Where(e => e.SoundId == "SYNTH/beacon_vehicle_hum").ToList();
         }

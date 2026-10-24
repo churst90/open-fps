@@ -45,7 +45,7 @@ public static class RoomChangeSpike
         var provider = new FmodAudioProvider();
         var facade = new AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();
-        facade.InitializeForTest(sounds);
+        facade.InitializeSteppedByHand(sounds);
         if (!facade.IsInitialized) { Console.WriteLine("FAIL: provider init failed"); return 1; }
         var clock = System.Diagnostics.Stopwatch.StartNew();
         var player = new LocalPlayerState();
@@ -66,7 +66,7 @@ public static class RoomChangeSpike
                 perFrame?.Invoke(clock.Elapsed.TotalSeconds);
                 long f0 = System.Diagnostics.Stopwatch.GetTimestamp();
                 audio.Update(world.GetSnapshot());
-                facade.PumpForTest();
+                facade.StepByHand();
                 worstFrameMs = Math.Max(worstFrameMs, System.Diagnostics.Stopwatch.GetElapsedTime(f0).TotalMilliseconds);
                 Thread.Sleep(4);
             }

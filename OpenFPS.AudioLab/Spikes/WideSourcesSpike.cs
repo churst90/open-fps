@@ -73,7 +73,7 @@ public static class WideSourcesSpike
         var provider = new FmodAudioProvider { Hearing = LabHearing, Options = LabOptions };
         var facade = new AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();
-        facade.InitializeForTest(sounds);
+        facade.InitializeSteppedByHand(sounds);
         if (!facade.IsInitialized) { Console.WriteLine("FAIL: provider init failed"); return 1; }
         provider.EarWindEnabled = false;
         var clock = System.Diagnostics.Stopwatch.StartNew();
@@ -140,7 +140,7 @@ public static class WideSourcesSpike
             {
                 perFrame?.Invoke(clock.Elapsed.TotalSeconds);
                 audio.Update(world.GetSnapshot());
-                facade.PumpForTest();
+                facade.StepByHand();
                 loadSum += facade.MixerLoad; loadCount++;
                 SamplePlaced();
                 Thread.Sleep(4);
@@ -318,7 +318,7 @@ public static class WideSourcesSpike
                 {
                     facade.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, -1);
                     field.Update(w, w.Falling, ear, clock.Elapsed.TotalSeconds, -1, -1, riding);
-                    facade.PumpForTest();
+                    facade.StepByHand();
                     loadSum += facade.MixerLoad; loadCount++;
                     Thread.Sleep(4);
                 }

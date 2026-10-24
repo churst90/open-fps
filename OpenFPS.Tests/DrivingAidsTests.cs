@@ -145,7 +145,7 @@ public class DrivingAidsTests
         var client = City();
         var provider = new VoiceLifecycleTests.RecordingProvider();
         var facade = new AudioEngineFacade(provider);
-        facade.InitializeForTest();
+        facade.InitializeSteppedByHand();
 
         var at = new Vector3(4.5f, 0.15f, 200f);
         var car = new EntityDefinition
@@ -161,7 +161,7 @@ public class DrivingAidsTests
         for (int i = 0; i < 5; i++)
         {
             aids.Update(client.GetSnapshot(), rider, 1.0 + i);
-            for (int k = 0; k < 3; k++) facade.PumpForTest();
+            for (int k = 0; k < 3; k++) facade.StepByHand();
         }
         _o.WriteLine("played: " + string.Join(", ", provider.PlayedSounds));
         Assert.Contains(provider.PlayedSounds, s => s.Contains("drive_guide"));

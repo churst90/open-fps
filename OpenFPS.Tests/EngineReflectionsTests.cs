@@ -45,7 +45,7 @@ public class EngineReflectionsTests
         {
             AcousticRegistry.Initialize();
             Audio = new AudioEngineFacade(Mixer);
-            Audio.InitializeForTest();
+            Audio.InitializeSteppedByHand();
             Echoes.VoiceOf = (engine, n) => (Voices.IdFor(VoiceKind.EngineEcho, engine, n), VoiceRegistry.SeedOf(VoiceKind.EngineEcho, engine, n));
         }
 
@@ -76,7 +76,7 @@ public class EngineReflectionsTests
             Echoes.Update(car, direct, path ?? new AcousticPathData(0f, at, 10f) { RegionId = 4 }, ear ?? Ear, C, dt, Audio, traced);
         }
 
-        public void Pump() => Audio.PumpForTest();
+        public void Pump() => Audio.StepByHand();
 
         public IEnumerable<int> EchoIds => Mixer.Started.Where(e => e.EchoOfEntity != 0).Select(e => e.EntityId).Distinct();
     }

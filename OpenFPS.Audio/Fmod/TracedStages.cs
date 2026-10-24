@@ -87,10 +87,10 @@ internal sealed class TracedStages
                 // A thread of its own, niced: a stage is a few hundred milliseconds of work that must lose to the mixer.
                 var done = new System.Threading.Tasks.TaskCompletionSource();
                 _making = done.Task;
-                OpenFPS.Native.Platform.BackgroundPriority.RunLowered("TracedStages", () =>
+                Shutdown.Started(OpenFPS.Native.Platform.BackgroundPriority.RunLowered("TracedStages", () =>
                 {
                     try { Fill(); } finally { done.SetResult(); }
-                });
+                }));
             }
         }
         if (stale != null) foreach (var s in stale) Free(s);

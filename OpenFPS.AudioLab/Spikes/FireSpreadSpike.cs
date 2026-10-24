@@ -162,7 +162,7 @@ public static class FireSpreadSpike
         var provider = new OpenFPS.Audio.Fmod.FmodAudioProvider();
         var facade = new OpenFPS.Audio.Core.AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();
-        facade.InitializeForTest(sounds);
+        facade.InitializeSteppedByHand(sounds);
         if (!facade.IsInitialized) { Console.WriteLine("FAIL: provider init failed"); return 1; }
         provider.EarWindEnabled = false;
         var clock = Stopwatch.StartNew();
@@ -195,7 +195,7 @@ public static class FireSpreadSpike
             {
                 perFrame?.Invoke(clock.Elapsed.TotalSeconds);
                 audio.Update(world.GetSnapshot());
-                facade.PumpForTest();
+                facade.StepByHand();
                 loadSum += facade.MixerLoad; loadCount++;
                 Thread.Sleep(4);
             }

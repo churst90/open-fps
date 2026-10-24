@@ -73,7 +73,7 @@ public class VoiceLifecycleTests
     {
         var provider = new RecordingProvider();
         var facade = new AudioEngineFacade(provider);
-        facade.InitializeForTest();
+        facade.InitializeSteppedByHand();
 
         const int echoId = -600001;
         facade.PlayPhysicalSoundDirect(Echo(echoId));
@@ -98,7 +98,7 @@ public class VoiceLifecycleTests
     {
         var provider = new RecordingProvider();
         var facade = new AudioEngineFacade(provider);
-        facade.InitializeForTest();
+        facade.InitializeSteppedByHand();
 
         int id = -600000;
         for (int round = 0; round < 40; round++)
@@ -116,6 +116,6 @@ public class VoiceLifecycleTests
     /// <summary>Pushes the facade's queues through, which its audio thread would otherwise do.</summary>
     private static void Pump(AudioEngineFacade facade)
     {
-        for (int i = 0; i < 3; i++) facade.PumpForTest();
+        for (int i = 0; i < 3; i++) facade.StepByHand();
     }
 }

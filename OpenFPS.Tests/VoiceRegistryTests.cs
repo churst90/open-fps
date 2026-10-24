@@ -335,7 +335,7 @@ public class VoiceRegistryTests
     {
         var mixer = new RecordingMixer { FadeCalls = fadeCalls };
         var facade = new AudioEngineFacade(mixer);
-        facade.InitializeForTest();
+        facade.InitializeSteppedByHand();
         return (new VoiceRegistry { Mixer = facade }, facade, mixer);
     }
 
@@ -356,10 +356,10 @@ public class VoiceRegistryTests
         var (reg, facade, mixer) = OnAMixer();
         reg.Declare(-5, 1, VoiceKind.Horn, Vector3.Zero, 110f, frame: 1);
         reg.Sound(Synth(-5));
-        facade.PumpForTest();
+        facade.StepByHand();
         Assert.Single(mixer.Started);
         reg.Sound(Synth(-5));
-        facade.PumpForTest();
+        facade.StepByHand();
         Assert.Single(mixer.Started);
         Assert.Contains(-5, mixer.Live);
 
@@ -368,7 +368,7 @@ public class VoiceRegistryTests
         moved.Position = new Vector3(0f, 0f, 9f);
         reg.Sound(moved);
         reg.Stop(-5);
-        facade.PumpForTest();
+        facade.StepByHand();
         Assert.DoesNotContain(-5, mixer.Live);
         Assert.Equal(5f, mixer.Latest[-5].Position.Z);
         Assert.False(reg.IsRegistered(-5));
@@ -376,17 +376,17 @@ public class VoiceRegistryTests
         // Stopped, then sounded again: started again.
         reg.Declare(-6, 1, VoiceKind.Horn, Vector3.Zero, 110f, frame: 2);
         reg.Sound(Synth(-6));
-        facade.PumpForTest();
+        facade.StepByHand();
         reg.Stop(-6);
         reg.Sound(Synth(-6));
-        facade.PumpForTest();
+        facade.StepByHand();
         Assert.Equal(2, mixer.Started.Count(e => e.EntityId == -6));
         Assert.Contains(-6, mixer.Live);
 
         // Nothing to stop: no stop is sent.
         int stops = mixer.Stopped.Count;
         reg.Stop(-77);
-        facade.PumpForTest();
+        facade.StepByHand();
         Assert.Equal(stops, mixer.Stopped.Count);
     }
 
@@ -400,18 +400,18 @@ public class VoiceRegistryTests
         e.Mode = OpenFPS.Sound.PlaybackMode.LoopOne;
         reg.Declare(-9, 1, VoiceKind.Machine, Vector3.Zero, 60f, frame: 1);
         reg.Submit(e);
-        facade.PumpForTest();
-        facade.PumpForTest();
+        facade.StepByHand();
+        facade.StepByHand();
         Assert.Contains(-9, mixer.Live);
 
         reg.Submit(e);
         reg.Stop(-9);
-        facade.PumpForTest();
-        facade.PumpForTest();
+        facade.StepByHand();
+        facade.StepByHand();
         Assert.DoesNotContain(-9, mixer.Live);
         int started = mixer.Started.Count(x => x.EntityId == -9);
-        facade.PumpForTest();
-        facade.PumpForTest();
+        facade.StepByHand();
+        facade.StepByHand();
         Assert.Equal(started, mixer.Started.Count(x => x.EntityId == -9));
     }
 
@@ -427,7 +427,7 @@ public class VoiceRegistryTests
         reg.Frame = 1;
         reg.Declare(id, 40, VoiceKind.Place, Vector3.Zero, 60f);
         reg.Sound(Synth(id));
-        facade.PumpForTest();
+        facade.StepByHand();
         reg.Sweep(1, mixer.IsPlaying);
 
         reg.Frame = 2;
@@ -436,7 +436,7 @@ public class VoiceRegistryTests
         {
             reg.Frame = f;
             reg.Fades();
-            facade.PumpForTest();
+            facade.StepByHand();
             reg.Sweep(f, mixer.IsPlaying);
             Assert.True(reg.TryGet(id, out var e), $"frame {f}");
             Assert.True(e.Retiring);
@@ -445,7 +445,7 @@ public class VoiceRegistryTests
         }
         reg.Frame = 5;
         reg.Fades();
-        facade.PumpForTest();
+        facade.StepByHand();
         reg.Sweep(5, mixer.IsPlaying);
         Assert.False(reg.IsRegistered(id));
         Assert.DoesNotContain(id, mixer.Live);
@@ -456,12 +456,12 @@ public class VoiceRegistryTests
         int from = mixer.Started.Count;
         reg.Declare(other, 41, VoiceKind.Place, Vector3.Zero, 60f);
         reg.Sound(Synth(other));
-        facade.PumpForTest();
+        facade.StepByHand();
         reg.Retire(other);
         reg.Fades();
         reg.Declare(other, 41, VoiceKind.Place, Vector3.Zero, 60f);
         reg.Sound(Synth(other));
-        facade.PumpForTest();
+        facade.StepByHand();
         Assert.Contains(other, mixer.Revived);
         Assert.False(reg.IsRetiring(other));
         Assert.Single(mixer.Started.Skip(from), x => x.EntityId == other);

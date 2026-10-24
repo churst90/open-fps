@@ -53,6 +53,17 @@ public sealed class AudioWarmUp
     /// at its next step and leaves its own world behind. The load is never held up by it.</summary>
     public void Stop() => _stop.Cancel();
 
+    /// <summary>Waits for the warm-up's thread to end, which includes its own mixer's dispose. False, and logged, when it
+    /// is still running after <paramref name="ms"/>.</summary>
+    public bool Join(int ms)
+    {
+        var thread = _thread;
+        if (thread == null || !thread.IsAlive || thread == Thread.CurrentThread) return true;
+        if (thread.Join(ms)) return true;
+        Log.Warning("Audio shutdown: AudioWarmUp did not stop within {Ms} ms.", ms);
+        return false;
+    }
+
     /// <summary>
     /// Runs the whole warm-up on the calling thread (the lab's warm= option, and a test), so its cost can be
     /// measured. True when it finished its scene; false when <see cref="Stop"/> cut it short.
@@ -80,7 +91,6 @@ public sealed class AudioWarmUp
             // The mixer's HRTF stages and the room's reverb bus are still made and run; the city simulates.
             var provider = new FmodAudioProvider { Clock = clock, Lab = new LabLevers { WithoutSteamAudio = true }, WavPath = wav };
             var facade = new AudioEngineFacade(provider, paths: _paths);
-            AsyncAcousticWorker? worker = null;
             try
             {
                 facade.Initialize();
@@ -94,13 +104,11 @@ public sealed class AudioWarmUp
                 world.Clock = facade.Clock;
                 world.Hearing = facade.Hearing;
                 var audio = new ClientAudioSystem(facade, mapping, player, () => clock.Now, prewarm: false);
-                worker = audio.World.AcousticWorker;
 
                 finished = RunScene(audio, player, world, clock, wall, warmed);
             }
             finally
             {
-                try { worker?.Dispose(); } catch (Exception ex) { Log.Debug(ex, "Warm-up: the acoustic worker did not stop cleanly."); }
                 try { facade.Dispose(); } catch (Exception ex) { Log.Debug(ex, "Warm-up: the mixer did not stop cleanly."); }
             }
         }

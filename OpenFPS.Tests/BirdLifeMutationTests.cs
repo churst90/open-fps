@@ -44,7 +44,7 @@ public class BirdLifeMutationTests
                     File.WriteAllBytes(Path.Combine(Bank, "BIRDS", folder, $"{folder.ToLowerInvariant()}_{i}.wav"), Array.Empty<byte>());
             }
             Audio = new AudioEngineFacade(Mixer);
-            Audio.InitializeForTest(Bank);
+            Audio.InitializeSteppedByHand(Bank);
             Birds = new BirdLife(Audio, acoustics, seed);
             Birds.OnCall = (sp, at) => Calls.Add((sp, at, Now));
         }
@@ -57,7 +57,7 @@ public class BirdLifeMutationTests
                 Now = from + i * dt;
                 Birds.Update(world, ear, Now);
                 if (Worker != null) { Worker.UpdateWorld(world); Worker.StepForTest(); }
-                if (Pump) for (int k = 0; k < 2; k++) Audio.PumpForTest();
+                if (Pump) for (int k = 0; k < 2; k++) Audio.StepByHand();
             }
         }
 
