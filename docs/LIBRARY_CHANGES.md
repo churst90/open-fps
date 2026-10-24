@@ -22,6 +22,13 @@ tag (docs/SOUND_LIBRARY_BOUNDARY.md, stage 8 and decision 8) and references the 
   unless called, and the mix of a host that calls neither is as it was; every world sound now sits under one `World` group
   under the master (a steady placed tone measured the same, to 0.001 dB, with and without the group).
 
+- A host can put a low-pass over the whole world, such as a head under water: `AudioEngineFacade.SetWorldMuffle(cutoffHz)`.
+  It filters the world's mix (voices, reflections, reverb, the wind at the ears) and not the interface or the host's flat
+  sounds. 0, a negative or a non-finite number is off, and off is the default, in which the unit copies its input so the
+  game's mix is as it was. It is one two-pole filter on the world group; the cutoff glides in octaves over about 40 ms, so
+  a change never steps. It is apart from the cabin's enclosure (which is per voice) and the two stack. In the headless
+  test a 1 kHz cutoff took a 6 kHz tone down by more than 25 dB and left a 200 Hz tone within 1.5 dB.
+
 - The loader reads sounds under the facade's `Paths.Sounds`, where it read only under `ASSETS/SOUNDS` beside the
   program, so the bank and the loader agree (`FmodAudioProvider.Sounds.Folder`, set by the facade's constructor and by
   `InitializeSteppedByHand(soundsPath)`). A host whose sounds folder is elsewhere need only give `AudioDataPaths` that

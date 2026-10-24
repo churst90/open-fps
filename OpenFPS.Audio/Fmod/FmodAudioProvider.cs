@@ -834,6 +834,7 @@ public partial class FmodAudioProvider : IAudioProvider
     /// <summary>The parent of every sound heard in the world (voices, reflections, reverb buses, the wind at the ears), under
     /// the master beside the interface and the host's groups.</summary>
     private FMOD.ChannelGroup _worldGroup;
+    private WorldMuffle? _worldMuffle;
     /// <summary>
     /// The player's own voice into their room's reverberation: a group at zero, so the voice itself is
     /// not heard (a late copy of it would be a slap-back) while the channel's sends, which leave from
@@ -1145,6 +1146,7 @@ public partial class FmodAudioProvider : IAudioProvider
             _system.createChannelGroup("Own voice, into the room only", out _ownVoiceRoomGroup);
             _worldGroup.addGroup(_ownVoiceRoomGroup);
             _ownVoiceRoomGroup.setVolume(0f);
+            _worldMuffle = WorldMuffle.Attach(_system, _worldGroup, MixerRate);
             // Interface sounds have their own group so a world fade can leave them alone.
             _system.createChannelGroup("Interface", out _uiGroup);
             master.addGroup(_uiGroup);
@@ -5807,6 +5809,14 @@ public partial class FmodAudioProvider : IAudioProvider
     }
 
     /// <summary>
+    /// A low-pass over the world's whole mix (voices, reflections, reverb, the wind at the ears), cutoff in Hz; 0 or less
+    /// is off, which is the default. It sits on the world group, so the interface and the host's flat sounds are not
+    /// filtered, and it is apart from the cabin's enclosure (per voice, SetListenerEnclosure), the two stacking. The
+    /// cutoff glides in octaves over about 40 ms.
+    /// </summary>
+    public void SetWorldMuffle(float cutoffHz) => _worldMuffle?.Set(cutoffHz);
+
+    /// <summary>
     /// What a host is handed to play its own flat (non-spatial) sounds, such as music and menus: FMOD's system, to create
     /// its sounds, and a channel group under the master, beside the interface's. A sound played into the group passes the
     /// master fader, the limiter and the dither like every other, and the world's fade, world volume and muffle leave it
@@ -6235,6 +6245,7 @@ public partial class FmodAudioProvider : IAudioProvider
             _enginePool?.Dispose(); _enginePool = null;
             _masterTap?.Dispose(); _masterTap = null;
             _preLimiterTap?.Dispose(); _preLimiterTap = null;
+            _worldMuffle?.Dispose();
             _dither?.Dispose();
             if (_loudnessMeter.hasHandle()) _loudnessMeter.release();
             if (_masterLimiter.hasHandle()) _masterLimiter.release();
@@ -6253,6 +6264,7 @@ public partial class FmodAudioProvider : IAudioProvider
         if (_isInitialized) _system.close();   // FMOD requires close() before release()
         if (_earWindHandle.IsAllocated) _earWindHandle.Free();
         _dither?.FreeHandle(); _dither = null;
+        _worldMuffle?.FreeHandle(); _worldMuffle = null;
         _trueLimiter?.FreeHandle(); _trueLimiter = null;
 
         if (_steamAudioEnabled)

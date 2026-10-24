@@ -217,6 +217,43 @@ public class HostVolumeTests : IDisposable
         ClosesClean(rig);
     }
 
+    [FmodFact]
+    public void The_world_muffle_takes_the_high_band_of_the_world_and_leaves_the_low_band_and_the_hosts_sound()
+    {
+        const float low = 200f, high = 6000f;
+        var rig = new Rig(_dir, worldHz: low);
+        Assert.True(rig.Facade.AddSound("high", HostSoundsTests.Wav(high, 1.0f)));
+        rig.Facade.Submit(HostSoundsTests.Emitter(2, "high", loop: true, at: new Vector3(0f, 0f, 2f)));
+        int rate = rig.Facade.MixerRate;
+
+        double[] Read()
+        {
+            HostSoundsTests.Hear(rig.Facade, 0.6);
+            var x = rig.RecordTo(Path.Combine(_dir, Guid.NewGuid().ToString("N") + ".wav"), 0.8);
+            return new[] { ToneDb(x, low, rate), ToneDb(x, high, rate), ToneDb(x, HostHz, rate) };
+        }
+
+        var open = Read();
+        Assert.True(open[1] > -90.0, $"the high tone is not in the mix: {open[1]:F1} dB");
+
+        rig.Facade.SetWorldMuffle(1000f);
+        var muffled = Read();
+        Assert.True(muffled[1] - open[1] < -25.0, $"the high band fell only {open[1] - muffled[1]:F1} dB");
+        Assert.InRange(muffled[0] - open[0], -1.5, 1.0);
+        Assert.InRange(muffled[2] - open[2], -0.5, 0.5);
+
+        // Off again: the open mix back.
+        rig.Facade.SetWorldMuffle(0f);
+        var back = Read();
+        Assert.InRange(back[1] - open[1], -0.7, 0.7);
+        Assert.InRange(back[0] - open[0], -0.7, 0.7);
+
+        // Numbers that are not a cutoff are off.
+        rig.Facade.SetWorldMuffle(float.NaN);
+        rig.Facade.SetWorldMuffle(-5f);
+        ClosesClean(rig);
+    }
+
     private void Facade_Step(Rig rig)
     {
         rig.Facade.FmodSystem.getMasterChannelGroup(out var master);

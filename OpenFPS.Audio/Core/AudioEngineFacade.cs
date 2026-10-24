@@ -755,6 +755,11 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     /// are not touched, and it multiplies <see cref="SetWorldFade"/>. See FmodAudioProvider.SetWorldVolumeDb.</summary>
     public void SetWorldVolumeDb(float db) { if (_isInitialized) _provider.SetWorldVolumeDb(db); }
 
+    /// <summary>A low-pass over the world's mix (a head under water), cutoff in Hz, 0 or less for off (the default). The
+    /// interface and the host's flat sounds are not filtered; it ramps, and stacks with the cabin's enclosure. See
+    /// FmodAudioProvider.SetWorldMuffle.</summary>
+    public void SetWorldMuffle(float cutoffHz) { if (_isInitialized) _provider.SetWorldMuffle(cutoffHz); }
+
     /// <summary>FMOD's system, for a host to create its own flat sounds with, once initialised (no handle without an FMOD
     /// mixer). See FmodAudioProvider.FmodSystem for what the host may do with it.</summary>
     public FMOD.System FmodSystem => _isInitialized && _provider is FmodAudioProvider f ? f.FmodSystem : default;
