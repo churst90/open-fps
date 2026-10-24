@@ -206,4 +206,67 @@ public class HostPlayTests : IDisposable
         ClosesClean(host);
         Assert.False(loop.IsPlaying);
     }
+
+    // ── A horn sounded at a place (item 8) ───────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void A_bad_horn_rhythm_or_place_is_refused_and_a_good_one_has_a_handle_in_the_band()
+    {
+        var facade = new AudioEngineFacade(new RecordingMixer());
+        var player = new LocalPlayerState();
+        var audio = new ClientAudioSystem(facade, new SoundMappingService(player), player, () => 0.0, prewarm: false);
+        var world = audio.World;
+        Assert.Throws<ArgumentException>(() => world.PlayHorn("", new[] { 0.5f }, Vector3.Zero));
+        Assert.Throws<ArgumentException>(() => world.PlayHorn("electric:disc_pair", Array.Empty<float>(), Vector3.Zero));
+        Assert.Throws<ArgumentOutOfRangeException>(() => world.PlayHorn("electric:disc_pair", new[] { float.NaN }, Vector3.Zero));
+        Assert.Throws<ArgumentOutOfRangeException>(() => world.PlayHorn("electric:disc_pair", new[] { 600f }, Vector3.Zero));
+        Assert.Throws<ArgumentException>(() => world.PlayHorn("electric:disc_pair", new[] { 0.5f }, new Vector3(0, float.NaN, 0)));
+        Assert.Throws<ArgumentException>(() => world.PlayHorn("electric:disc_pair", new[] { 0.5f }, Vector3.Zero, new Quaternion(0, 0, 0, 0)));
+        var horn = world.PlayHorn("electric:disc_pair", new[] { 0.5f }, new Vector3(1, 2, 3));
+        Assert.True(horn.Id >= HostedSounds.FirstId && horn.IsPlaying);
+        Assert.Equal(new Vector3(1, 2, 3), horn.Position);
+        horn.Stop();
+        Assert.False(horn.IsPlaying);
+        facade.Dispose();
+    }
+
+    [FmodFact]
+    public void A_horn_sounded_at_a_place_is_heard_through_the_horns_voice_and_ends_with_its_rhythm()
+    {
+        var host = Make();
+        var horn = host.Place.PlayHorn("electric:disc_pair", new[] { 1.0f }, new Vector3(6f, 0f, 0f));
+        int voice = host.Place.Voices.IdFor(VoiceKind.Horn, horn.Id);
+
+        // The voice is built off the frame, so it is asked for until it is heard.
+        var wait = System.Diagnostics.Stopwatch.StartNew();
+        float heard = float.NegativeInfinity;
+        while (!host.Sounds(voice) && wait.Elapsed.TotalSeconds < 6) heard = Math.Max(heard, host.Run(0.25));
+        Assert.True(host.Sounds(voice), "the horn has no voice");
+        heard = Math.Max(heard, host.Run(0.5));
+        Assert.True(heard > -60f, $"the horn was not heard: {heard} dBFS");
+        Assert.True(host.Place.Voices.TryGet(voice, out var entry) && entry.Kind == VoiceKind.Horn && entry.OwnerId == horn.Id);
+        Assert.True(horn.IsPlaying);
+        // One voice: the horn is not also placed as a recording under its own id.
+        Assert.False(host.Sounds(horn.Id));
+
+        // It ends by itself with its rhythm, and nothing of it is left.
+        wait.Restart();
+        while ((horn.IsPlaying || host.Sounds(voice)) && wait.Elapsed.TotalSeconds < 8) host.Run(0.25);
+        Assert.False(horn.IsPlaying, "the horn's handle did not end");
+        Assert.False(host.Sounds(voice), "the horn's voice is still there");
+        host.Run(0.5);
+        Assert.Equal(0, host.Place.PlayedCount);
+
+        // A second one, stopped by the host: gone at once.
+        var again = host.Place.PlayHorn("electric:disc_pair", new[] { 5.0f }, new Vector3(-6f, 0f, 0f));
+        int voice2 = host.Place.Voices.IdFor(VoiceKind.Horn, again.Id);
+        wait.Restart();
+        while (!host.Sounds(voice2) && wait.Elapsed.TotalSeconds < 6) host.Run(0.25);
+        Assert.True(host.Sounds(voice2));
+        again.Stop();
+        host.Run(1.0);
+        Assert.False(again.IsPlaying);
+        Assert.False(host.Sounds(voice2), "the stopped horn still sounds");
+        ClosesClean(host);
+    }
 }

@@ -141,6 +141,7 @@ OpenFPS.Audio/Fmod/TakeLevels.cs	Audio
 OpenFPS.Audio/Fmod/TalkerVoice.cs	Audio	
 OpenFPS.Audio/Fmod/TracedStages.cs	Audio	
 OpenFPS.Audio/Fmod/VoiceBuilds.cs	Audio	
+OpenFPS.Audio/Fmod/WorldMuffle.cs	Audio	
 OpenFPS.Audio/NearDrops.cs	Audio	
 OpenFPS.Audio/RainField.cs	Audio	
 OpenFPS.Audio/SteamAudio/AcousticGeometry.cs	Audio	

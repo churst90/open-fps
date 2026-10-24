@@ -6,6 +6,36 @@ tag (docs/SOUND_LIBRARY_BOUNDARY.md, stage 8 and decision 8) and references the 
 
 ## Unreleased
 
+- A host can play its own flat (non-spatial) sounds, such as music and menus, through one door, and set the master and
+  the world's volume while running. The library adds no player and no music logic. `AudioEngineFacade.FmodSystem` (FMOD's
+  system, to create the host's sounds with) and `HostGroup` (a channel group under the master, beside the interface's) are
+  valid from the mixer's start to its `Dispose`; a sound played into the group passes the master fader, the limiter and the
+  dither like every other, and the world fade, the world volume and the muffle do not touch it. The host must not release
+  the group, remove it from the master, add units to the master, set the master's volume (use `SetMasterVolumeDb`) or the
+  group's own volume (the library holds that against the world fade; set each channel's instead), and it stops its channels
+  before the dispose. `SetMasterVolumeDb(db)` is the level of everything that leaves the mixer, on top of
+  `OPENFPS_MASTER_DB` (which stays the run's starting trim) and of the world fade, ahead of the limiter and the dither, and
+  it scales the interface and the host's sounds too. `SetWorldVolumeDb(db)` is the level of everything heard in the world
+  (voices, reflections, reverb, the wind at the ears) and leaves the interface and the host's sounds alone; it multiplies
+  `SetWorldFade`, which stays the game's own 0 to 1 fade for the load screen. Both go from -80 to +12 dB (0 is as the run
+  began, a number that is not a number is 0) and FMOD ramps the change over one mixer block, about 21 ms. Neither is touched
+  unless called, and the mix of a host that calls neither is as it was; every world sound now sits under one `World` group
+  under the master (a steady placed tone measured the same, to 0.001 dB, with and without the group).
+
+- A host can put a low-pass over the whole world, such as a head under water: `AudioEngineFacade.SetWorldMuffle(cutoffHz)`.
+  It filters the world's mix (voices, reflections, reverb, the wind at the ears) and not the interface or the host's flat
+  sounds. 0, a negative or a non-finite number is off, and off is the default, in which the unit copies its input so the
+  game's mix is as it was. It is one two-pole filter on the world group; the cutoff glides in octaves over about 40 ms, so
+  a change never steps. It is apart from the cabin's enclosure (which is per voice) and the two stack. In the headless
+  test a 1 kHz cutoff took a 6 kHz tone down by more than 25 dB and left a 200 Hz tone within 1.5 dB.
+
+- A host can sound a horn of a given model at a place with no vehicle: `AudioWorld.PlayHorn(horn, rhythm, at, facing = null)`,
+  where `horn` is "electric:disc_pair", "air:truck_dual" and so on, `rhythm` is seconds on, off, on (a tap is one
+  number, each from 0 to 20) and `facing` is a rotation whose forward the horn radiates along (+Z when null). It is the
+  same synthesis, level and placing as a horn a car sounds on the street (`StartHorn`), from `at` as the horn's own point,
+  and it ends when its rhythm has. The handle is a `PlacedSound`: `MoveTo`, `Stop`, `IsPlaying`; its `GainDb` does not
+  apply, a horn's level being its model's. A bad horn, rhythm or place throws `ArgumentException`.
+
 - The loader reads sounds under the facade's `Paths.Sounds`, where it read only under `ASSETS/SOUNDS` beside the
   program, so the bank and the loader agree (`FmodAudioProvider.Sounds.Folder`, set by the facade's constructor and by
   `InitializeSteppedByHand(soundsPath)`). A host whose sounds folder is elsewhere need only give `AudioDataPaths` that

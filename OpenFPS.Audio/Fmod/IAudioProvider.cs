@@ -168,6 +168,12 @@ public interface IAudioProvider : IDisposable
     void StopUiLoop(string slot) { }
     /// <summary>Everything but the interface sounds, 0..1; 1 is as authored.</summary>
     void SetWorldFade(float gain) { }
+    /// <summary>The master level, dB, a host sets while running (0 is as the run began). See FmodAudioProvider.SetMasterVolumeDb.</summary>
+    void SetMasterVolumeDb(float db) { }
+    /// <summary>The level of everything heard in the world, dB, interface and host sounds apart. See FmodAudioProvider.SetWorldVolumeDb.</summary>
+    void SetWorldVolumeDb(float db) { }
+    /// <summary>A low-pass over the world's mix, cutoff Hz; 0 or less is off. See FmodAudioProvider.SetWorldMuffle.</summary>
+    void SetWorldMuffle(float cutoffHz) { }
 
     /// <summary>True when a microphone is connected.</summary>
     bool HasRecordingDevice => false;

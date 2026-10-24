@@ -545,6 +545,7 @@ public partial class AudioWorld : IDisposable, IAudioShutdown
         // The sounds a host played at places join its own sources, placed by the same pass (AudioWorld.Hosted.cs).
         _sources = _hosted.Begin(sources, _sounding ??= _audio.IsPlaying, _now(), _audio.Clock.Now, _hostedGone);
         foreach (int id in _hostedGone) ForgetEntity(id);
+        _hosted.StepHorns(_horns.ContainsKey, h => StartHorn(h.Id, h.Horn!, h.Rhythm!));
         _acousticWorker.UpdateWorld(world);
 
         // A position stamped after now was stamped on another clock: its age, and so where the mixer reckons
@@ -2954,6 +2955,8 @@ public partial class AudioWorld : IDisposable, IAudioShutdown
     /// </summary>
     private Vector3 HornAt(AudioSource src)
     {
+        // A horn sounded at a place by the host (PlayHorn) has no vehicle: its point is the horn.
+        if (_hosted.IsHorn(src.Id)) return src.State.Position;
         string? sid = src.Spec.SoundId;
         if (OpenFPS.Models.ModelKindTable.BodyOf(sid) == OpenFPS.Models.ModelBody.Rails) return TrainHornAt(src);
         var mount = OpenFPS.Models.ModelKindTable.Vehicle(sid)?.HornMount ?? new Vector3(0f, 0.6f, Grille(src));
