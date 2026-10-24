@@ -20,6 +20,18 @@ tag (docs/SOUND_LIBRARY_BOUNDARY.md, stage 8 and decision 8) and references the 
   (a host must not call it from the thread that places sounds), and frees its copy at `Dispose`, after every sound
   made from it is released; the host may free its own at once. Hand a sound in before its first play. A sound of
   bytes is not in the sound bank's index (`AudioBank`), which lists files.
+- A host can play a recording at a place and keep a handle to it: `AudioWorld.Play(sound, at, gainDb, loop, minDistance,
+  range)` returns a `PlacedSound` with `MoveTo(position, velocity)`, `GainDb`, `Stop()` and `IsPlaying`. `sound` is an id
+  under `Paths.Sounds` or one handed in as bytes; the gain is decibels over the recording as authored, heard at
+  `minDistance` (the unit `PlayReferenceVoice` takes). It is a source of the world beside the host's own, so the
+  world's frame places it by the one path every recording takes: occlusion, routes through openings, reflections,
+  reverb sends, HRTF, the voice budget, and the registry's voice (`VoiceKind.Recording`). It is heard only while the
+  host ticks the world (`Tick`), from the first tick after the call; with an empty `IAcousticWorld` it is heard dry at
+  the place, with the distance, air and HRTF every voice has. A change is heard from the next tick. `Stop()` fades the
+  voice over the mixer's usual short fade; a once sound ends by itself and its handle then reads as finished (as it
+  does if it was never heard within `HostedSounds.StartGraceSeconds`, 10 s, or the world is left). A once sound the
+  voice budget cannot hold ends too, and is not started over. The entity ids are given from `HostedSounds.FirstId`
+  (2,000,000,000) up, so a host's own entity ids must stay under it. Safe to call from any thread.
 
 - Five materials a host can name: `Canvas`, `HollowDoor`, `Rock`, `SheetMetal` and `TimberFloor` (resonance indices 59
   to 63), each field with a source or a marked estimate on its line in `AcousticRegistry.AddMatter`. Until now a host
