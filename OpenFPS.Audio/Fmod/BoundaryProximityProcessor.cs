@@ -41,7 +41,7 @@ public sealed class BoundaryVoiceState
     /// a gain is a click; a step in a delay tears the waveform mid-cycle.</summary>
     public float Glide;
 
-    /// <summary>The non-finite guard's flags: the mix arriving at the master, and this stage's output.</summary>
+    /// <summary>The non-finite guard's flags: the world's mix arriving here, and this stage's output.</summary>
     public int NonFiniteInputReported, NonFiniteReported;
 
     /// <summary>Forgets the delay line and the tap filters. Mixer thread; no allocation.</summary>
@@ -61,7 +61,7 @@ public sealed class BoundaryVoiceState
 }
 
 /// <summary>
-/// The near-field boundary reflections on the master bus: a multi-tap feedforward comb, the dry signal
+/// The near-field boundary reflections on the world group (every world sound, not the interface): a multi-tap feedforward comb, the dry signal
 /// plus one delayed, damped, panned copy per nearby surface. Feedforward, because a feedback delay rings
 /// at a fixed pitch (the old FMOD-echo version sounded metallic, not like a wall); one tap per surface,
 /// because a ceiling at a metre and a wall at thirty centimetres make two comb spacings at once, which
@@ -111,7 +111,7 @@ public static class BoundaryProximityProcessor
             }
             catch
             {
-                // Pass the mix through: this unit is on the master bus, and silencing it silences the game.
+                // Pass the mix through: this unit carries the whole world, and silencing it silences the game.
                 unsafe
                 {
                     if (inbuffer != IntPtr.Zero && outbuffer != IntPtr.Zero && inchannels == outchannels)
@@ -141,12 +141,12 @@ public static class BoundaryProximityProcessor
                     if (!NonFinite.AllFinite(input))
                     {
                         output.Clear();
-                        NonFinite.Report(ref s.NonFiniteInputReported, "the mix arriving at the master bus");
+                        NonFinite.Report(ref s.NonFiniteInputReported, "the world's mix arriving at the boundary stage");
                         s.ResetAfterFault();
                         return RESULT.OK;
                     }
                     Process(s, input, output, inCh, outCh);
-                    if (NonFinite.Scrub(output, ref s.NonFiniteReported, "the master bus's boundary stage")) s.ResetAfterFault();
+                    if (NonFinite.Scrub(output, ref s.NonFiniteReported, "the world group's boundary stage")) s.ResetAfterFault();
                 }
             }
             catch (Exception ex)

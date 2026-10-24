@@ -21,6 +21,10 @@ tag (docs/SOUND_LIBRARY_BOUNDARY.md, stage 8 and decision 8) and references the 
   began, a number that is not a number is 0) and FMOD ramps the change over one mixer block, about 21 ms. Neither is touched
   unless called, and the mix of a host that calls neither is as it was; every world sound now sits under one `World` group
   under the master (a steady placed tone measured the same, to 0.001 dB, with and without the group).
+  The near-wall reflections (the boundary stage) moved from the master onto the World group: walls colour the world's
+  sounds and no longer the interface or the host's flat sounds, and the muffle covers them. open-fps's interface sounds
+  lose the wall colour they had near a wall (Cody, 2026-10-24); in the headless test a wall half a metre away moved the
+  host's tone 1.3 dB before and under 0.1 dB after.
 
 - A host can put a low-pass over the whole world, such as a head under water: `AudioEngineFacade.SetWorldMuffle(cutoffHz)`.
   It filters the world's mix (voices, reflections, reverb, the wind at the ears) and not the interface or the host's flat
