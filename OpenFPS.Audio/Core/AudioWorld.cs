@@ -921,11 +921,7 @@ public partial class AudioWorld
         return true;
     }
 
-    /// <summary>
-    /// The key a placed thing's voice is made and ranked with: its emitter's own, but a fire takes the
-    /// shape its collider gives it (FireSpec.KeyForPlaced), so a fire pit scaled up is a bigger fire.
-    /// Memoised: asked several times a frame per source.
-    /// </summary>
+    /// <summary>Sources silenced for a bad value (BadValueIn), so each is logged once.</summary>
     private readonly HashSet<int> _badSources = new();
 
     /// <summary>Which field of an emitter would carry a bad value into a shared stage, or null: a number that is not finite
@@ -943,6 +939,11 @@ public partial class AudioWorld
         return null;
     }
 
+    /// <summary>
+    /// The key a placed thing's voice is made and ranked with: its emitter's own, but a fire takes the
+    /// shape its collider gives it (FireSpec.KeyForPlaced), so a fire pit scaled up is a bigger fire.
+    /// Memoised: asked several times a frame per source.
+    /// </summary>
     private string VoiceKey(in SourceSpec spec)
     {
         // A whole shore's outline (its emitter's line, closed): one source as long as the outline (ShoreSpec.OutlineKey). An
