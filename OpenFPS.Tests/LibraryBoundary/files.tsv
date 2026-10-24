@@ -108,6 +108,7 @@ OpenFPS.Audio/Fmod/EchoWashProcessor.cs	lib	Audio
 OpenFPS.Audio/Fmod/EngineProcessor.cs	lib	Audio	
 OpenFPS.Audio/Fmod/EngineRenderPool.cs	lib	Audio	
 OpenFPS.Audio/Fmod/FmodAudioProvider.Ear.cs	lib	Audio	
+OpenFPS.Audio/Fmod/FmodAudioProvider.Starts.cs	lib	Audio	
 OpenFPS.Audio/Fmod/FmodAudioProvider.cs	lib	Audio	
 OpenFPS.Audio/Fmod/FmodDebugLog.cs	lib	Audio	
 OpenFPS.Audio/Fmod/GranularBank.cs	lib	Audio	

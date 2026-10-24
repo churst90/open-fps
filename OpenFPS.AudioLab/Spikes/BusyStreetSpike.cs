@@ -293,6 +293,8 @@ public static class BusyStreetSpike
         Say($"totals: {censuses} censuses; binaural free at least {worstFree}; mixer {100 * loadSum / Math.Max(1, censuses):F0} % on average, "
           + $"{100 * loadMax:F0} % at most; {shortAll - Math.Max(0, refusedAtWarm)} refused short of a stage after warming, "
           + $"{refusedAudible} of them within 30 dB of the loudest voice playing");
+        var starts = provider.StartCheck;
+        Say($"recordings: {starts.Watched} started, {starts.Checked} judged by their play position, {starts.NeverStarted} never started");
         File.WriteAllText(Path.Combine(outDir, "census.txt"), report.ToString());
         return 0;
     }
