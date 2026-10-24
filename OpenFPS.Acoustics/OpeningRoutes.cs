@@ -1584,9 +1584,94 @@ public sealed class OpeningRoutes
                 if (TryWay(k, buried: true)) tried++;
             }
         }
+
+        // Both ways round the one barrier that governs: its two sides arrive as two paths, each by its own
+        // path difference and band gains. Summed by energy they balance over the middle; the shortest alone
+        // changed sides between two 10 cm steps, and the turn limit made that a slow slide (the footbridge).
+        int governing = scratch.GoverningBox;
+        if (verified && governing >= 0
+            && !(_solids[governing].IsLeaf && governing < _leafInOpening.Length && _leafInOpening[governing]))
+        {
+            float shortest = float.MaxValue;
+            int first = -1;
+            for (int k = 0; k < all.Count; k++)
+                if (all[k].Box == governing && all[k].D < shortest) { shortest = all[k].D; first = k; }
+            if (first >= 0 && MathF.Abs(pathDifference - MathF.Max(shortest, GrazingMetres)) <= 1e-3f)
+            {
+                // Which side of the straight line each edge lies on: the other side's shortest way is the
+                // second. Two crossings of one top face are on the same side (a wall's thickness apart) and
+                // would pay the same route twice; an angle cut-off dropped the second side at a distance.
+                Vector3 offFirst = OffTheLine(all[first].Edge);
+                int second = -1;
+                float secondD = float.MaxValue;
+                for (int k = 0; k < all.Count; k++)
+                {
+                    if (all[k].Box != governing || k == first) continue;
+                    if (Vector3.Dot(offFirst, OffTheLine(all[k].Edge)) >= 0f) continue;
+                    if (all[k].D < secondD) { secondD = all[k].D; second = k; }
+                }
+                if (second >= 0)
+                {
+                    scratch.ChainBudget = ThroughBendsPerSearch;
+                    var g0 = WayGain(all[first].D, all[first].SourceSide, all[first].Edge, governing, out bool ok0);
+                    var g1 = WayGain(all[second].D, all[second].SourceSide, all[second].Edge, governing, out bool ok1);
+                    if (ok0 && ok1)
+                    {
+                        var pair = new Vector3(MathF.Sqrt(g0.X * g0.X + g1.X * g1.X),
+                                               MathF.Sqrt(g0.Y * g0.Y + g1.Y * g1.Y),
+                                               MathF.Sqrt(g0.Z * g0.Z + g1.Z * g1.Z));
+                        if (Vector3.Dot(pair, pair) > bestEnergy)
+                        {
+                            best = Vector3.Max(best, pair);
+                            Vector3 u0 = all[first].Edge - listener, u1 = all[second].Edge - listener;
+                            float l0 = u0.Length(), l1 = u1.Length();
+                            if (l0 > 1e-4f && l1 > 1e-4f)
+                            {
+                                float e0 = Vector3.Dot(g0, g0), e1 = Vector3.Dot(g1, g1);
+                                Vector3 w = u0 / l0 * e0 + u1 / l1 * e1;
+                                // Exactly between two equal sides the intensities point down the middle:
+                                // keep that, rather than either side's edge.
+                                bestEdge = w.LengthSquared() > 1e-12f
+                                    ? listener + Vector3.Normalize(w) * dist
+                                    : listener + Vector3.Normalize(source - listener) * dist;
+                            }
+                            bestEnergy = Vector3.Dot(pair, pair);
+                            any = true;
+                        }
+                    }
+                }
+            }
+        }
         edge = bestEdge;
         found = any;
         return best;
+
+        // A point's offset from the source-to-listener line, across it.
+        Vector3 OffTheLine(Vector3 p)
+        {
+            Vector3 d = p - source;
+            return d - dir * Vector3.Dot(d, dir);
+        }
+
+        /// <summary>What a clear way round box <paramref name="box"/> delivers, per band, its legs and the
+        /// line's other boxes paid as through the rest (<see cref="TryWay"/>), without competing for best.</summary>
+        Vector3 WayGain(float d, Vector3 sourceSide, Vector3 edgeAt, int box, out bool usable)
+        {
+            usable = false;
+            float dd = MathF.Max(d, GrazingMetres);
+            var inBoxes = scratch.EdgeBoxes;
+            var ownLayers = scratch.EdgeLayers;
+            inBoxes.Clear(); ownLayers.Clear();
+            if (EdgeBurial(edgeAt, sourceSide, box, ignoreA, ignoreB, inBoxes, ownLayers) != Burial.Air) return Vector3.Zero;
+            paid.Clear();
+            var legs = LegsThrough(source, sourceSide, edgeAt, listener, box, dd, dist, speedOfSound,
+                                   ignoreA, ignoreB, null, out float extra, out bool blocked);
+            if (blocked) return Vector3.Zero;
+            var detour = Round(dd + extra, dist, speedOfSound);
+            var line_ = LineThrough(line, -1, paid, dir);
+            usable = true;
+            return detour * Vector3.Min(legs, line_);
+        }
 
         // The way tc[k], round its box, its legs paid (LegsThrough), competing per band with what was found.
         // Whether its legs were traced.
@@ -2042,6 +2127,7 @@ public sealed class OpeningRoutes
         edge = listener;
         var routes = scratch.BarrierRoutes;
         routes.Clear();
+        scratch.GoverningBox = -1;
         var boxRoutes = scratch.BoxRoutes;
         foreach (int i in cand)
         {
@@ -2050,7 +2136,7 @@ public sealed class OpeningRoutes
             if (!WaysRound(i, source, listener, boxRoutes, out float dd, out Vector3 p)) continue;
             foreach (var (rd, rs, re) in boxRoutes) routes.Add((rd, rs, re, i));
             if (dd <= worst) continue;
-            worst = dd; edge = p;
+            worst = dd; edge = p; scratch.GoverningBox = i;
         }
 
         // Every way round every box, for BarrierGains' ways round one box and through the rest.
@@ -2637,6 +2723,9 @@ public sealed class OpeningRoutes
         public readonly List<(float D, Vector3 SourceSide, Vector3 Edge)> BoxRoutes = new();
         /// <summary>Boxes the current barrier search may still bend a route round (ClearedLeg).</summary>
         public int ChainBudget;
+        /// <summary>The box whose shortest way round governs BarrierPathDifference: the one BarrierGains
+        /// hears both ways round.</summary>
+        public int GoverningBox = -1;
         public readonly List<(float S, float Y, int Box)> Profile = new(), Hull = new();
         /// <summary>The ground's profile over the line, and the corners of the string over it (OverTheTop).</summary>
         public readonly List<(float S, float H)> GroundProfile = new(), GroundTops = new();
