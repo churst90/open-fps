@@ -656,6 +656,8 @@ public static class CityLoadSpike
         string text = BuildReport(outDir, reports, feet, spotNote, args);
         File.WriteAllText(Path.Combine(outDir, "report.txt"), text);
         Console.Write(text);
+        var starts = provider.StartCheck;
+        Console.WriteLine($"recordings: {starts.Watched} started, {starts.Checked} judged by their play position, {starts.NeverStarted} never started");
         facade.Dispose();
         return 0;
     }
