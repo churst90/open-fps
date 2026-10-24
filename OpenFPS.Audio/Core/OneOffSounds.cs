@@ -224,8 +224,12 @@ public sealed class OneOffSounds
     /// windows as the map arrives (the game). The emitter-stream replay builds six systems a run and wants neither the load
     /// nor renders landing whenever their threads finish.</param>
     public OneOffSounds(AudioEngineFacade audio, SpatialAcoustics acoustics, bool prewarm = true)
+        : this(audio, acoustics, prewarm, null) { }
+
+    internal OneOffSounds(AudioEngineFacade audio, SpatialAcoustics acoustics, bool prewarm, BackgroundWork? work)
     {
         _audio = audio;
+        _work = work;
         Voices = new VoiceRegistry { Mixer = audio };
         _acoustics = acoustics;
         _prewarms = prewarm;
@@ -234,6 +238,13 @@ public sealed class OneOffSounds
     }
 
     private readonly bool _prewarms;
+
+    // What the world's dispose waits for: the door prewarm threads and the thunder renders. All of it is compute.
+    private readonly BackgroundWork? _work;
+    private volatile bool _closing;
+
+    /// <summary>Stops starting renders; those running finish. Called by the world's dispose before it waits on them.</summary>
+    internal void StopPrewarming() => _closing = true;
 
     /// <summary>
     /// A door model takes seconds of a core to render, far past <see cref="MaxRenderLateness"/>, so every render the
@@ -244,7 +255,7 @@ public sealed class OneOffSounds
     /// </summary>
     public void PrewarmDoors(IEnumerable<string> keys)
     {
-        if (!_prewarms) return;
+        if (!_prewarms || _closing) return;
         // The cars' windows after the first map's doors: every car has them, whatever the map.
         foreach (string key in keys.Concat(CarWindowKeys()))
             if (IsDoorModelKey(key) && _rendering.Add($"synth:{key}")) _toPrewarm.Enqueue(key);
@@ -252,7 +263,11 @@ public sealed class OneOffSounds
         // its own queue first, so every other Task.Run (rain survey, route build, a first-heard sound)
         // waited for the doors. 71 s on twelve cores; a CI login past a 30-minute timeout (2026-10-07).
         while (!_toPrewarm.IsEmpty && TryClaimPrewarmer())
-            new System.Threading.Thread(Prewarmer) { IsBackground = true, Name = "Door prewarm" }.Start();
+        {
+            var thread = new System.Threading.Thread(Prewarmer) { IsBackground = true, Name = "Door prewarm" };
+            _work?.Track("Door prewarm", thread);
+            thread.Start(); Shutdown.Started(thread);
+        }
     }
 
     private readonly System.Collections.Concurrent.ConcurrentQueue<string> _toPrewarm = new();
@@ -274,7 +289,7 @@ public sealed class OneOffSounds
         OpenFPS.Native.Platform.FlushToZero.ThisThread("Door prewarm");
         do
         {
-            while (_toPrewarm.TryDequeue(out var key))
+            while (!_closing && _toPrewarm.TryDequeue(out var key))
             {
                 string id = $"synth:{key}";
                 try { _rendered.Enqueue(AtMixerRate(id, RenderDoorKey(key, _fullScaleDb, _audio.DoorRenders))); }
@@ -284,7 +299,7 @@ public sealed class OneOffSounds
             System.Threading.Interlocked.Decrement(ref _prewarmers);
         }
         // A key queued between the last look and leaving would wait for the next map.
-        while (!_toPrewarm.IsEmpty && TryClaimPrewarmer());
+        while (!_closing && !_toPrewarm.IsEmpty && TryClaimPrewarmer());
     }
 
     /// <summary>Door renders made at once while prewarming.</summary>
@@ -439,7 +454,7 @@ public sealed class OneOffSounds
         var air = _air;
         int map = _mapGeneration;
         var options = new Thunder.Options { EarAboveGround = _earAboveGround };
-        System.Threading.Tasks.Task.Run(() =>
+        BackgroundWork.Run(_work, "Thunder render", () =>
         {
             var sw = System.Diagnostics.Stopwatch.StartNew();
             try
@@ -468,8 +483,8 @@ public sealed class OneOffSounds
     /// JIT: its first run took twice as long, and the nearest thunder is due a third of a second after
     /// the flash.
     /// </summary>
-    private static void PrewarmThunder()
-        => System.Threading.Tasks.Task.Run(() =>
+    private void PrewarmThunder()
+        => BackgroundWork.Run(_work, "Thunder prewarm", () =>
         {
             try
             {

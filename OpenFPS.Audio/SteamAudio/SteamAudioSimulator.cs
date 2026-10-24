@@ -193,7 +193,7 @@ public sealed class SteamAudioSimulator : IDisposable
             // Below everything with a deadline: at a map load nobody is waiting for this.
             Priority = ThreadPriority.Lowest,
         };
-        _bakeThread.Start();
+        _bakeThread.Start(); OpenFPS.Audio.Core.Shutdown.Started(_bakeThread);
     }
 
     private Thread? _bakeThread;

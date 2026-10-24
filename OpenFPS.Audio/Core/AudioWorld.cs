@@ -19,7 +19,7 @@ namespace OpenFPS.Audio.Core;
 /// world input and the sources once a frame (<see cref="Tick"/>), the listener and its own parts of the frame
 /// through <see cref="IAudioHost"/>, and the one-off events (a footstep, a horn) as they come.
 /// </summary>
-public partial class AudioWorld
+public partial class AudioWorld : IDisposable, IAudioShutdown
 {
     private readonly AudioEngineFacade _audio;
     private readonly IRecordings _sounds;
@@ -329,14 +329,15 @@ public partial class AudioWorld
         _host = host;
         _acoustics = new SpatialAcoustics { Clock = audio.Clock, Atmosphere = audio.Atmosphere };
         // Shares this world's acoustics, so a rendered latch takes exactly the path a recorded one would.
-        _oneOffs = new OneOffSounds(audio, _acoustics, prewarm: prewarm && !manualAcoustics);
+        _oneOffs = new OneOffSounds(audio, _acoustics, prewarm: prewarm && !manualAcoustics, work: _work);
         _oneOffs.HornReceived = StartHorn;
         _oneOffs.TrainSignalReceived = StartTrainSignal;
         _oneOffs.Ground = ApplyRecordedGround;
         // Every world voice is started, placed and stopped through the registry, on this mixer.
         _voices.Mixer = audio;
         _oneOffs.Voices = _voices;
-        _rain = new RainField(audio, _acoustics, seed) { SurveyInPlace = manualAcoustics };
+        _rain = new RainField(audio, _acoustics, seed) { SurveyInPlace = manualAcoustics, Work = _work };
+        _acoustics.Work = _work;
         // What the library's sources voice, declared as theirs: each carries its own path.
         _rain.Voiced = (id, drop) =>
         {
@@ -346,6 +347,7 @@ public partial class AudioWorld
         _engineEchoes.Voiced = (id, engine) => _voices.Declare(id, engine, VoiceKind.EngineEcho, Vector3.Zero);
         // The image-source search for every engine is built ahead of the frame that uses it (EngineReflections).
         _engineEchoes.PrecomputeInBackground = !manualAcoustics;
+        _engineEchoes.Work = _work;
         // The library's voices are given their ids here, by what they are the sound of.
         _rain.SlotVoice = (slot, part) => (_voices.IdFor(VoiceKind.Rain, slot, part), VoiceRegistry.SeedOf(VoiceKind.Rain, slot, part));
         _rain.DropVoice = n => (_voices.IdFor(VoiceKind.RainDrop, VoiceRegistry.NoEntity, n), VoiceRegistry.SeedOf(VoiceKind.RainDrop, VoiceRegistry.NoEntity, n));
@@ -364,12 +366,61 @@ public partial class AudioWorld
             // The habitat survey is ~300 ms of roof rays on the city: off the placement thread in the
             // game, in place where an answer must come out the same every run (tests, replays).
             SurveyInPlace = manualAcoustics,
+            Work = _work,
         };
         _oneOffs.Received = sounds => _birds.Heard(sounds, _audio.Clock.Now);
         // The loudest surface of each rain patch is heard by the worker's answer, as every sustained voice is (P6).
         _rain.Worker = _acousticWorker;
         _rain.SlotProbe = slot => _voices.IdFor(VoiceKind.Probe, VoiceRegistry.NoEntity, VoiceRegistry.RainProbe(slot));
         _acousticWorker.Start();
+        audio.Own(this);
+    }
+
+    /// <summary>The tasks and threads this world's parts run in the background, waited for by <see cref="Stop"/>.</summary>
+    private readonly BackgroundWork _work = new();
+
+    private int _disposed;
+
+    /// <summary>Background tasks and threads of the world's parts still running (tests).</summary>
+    internal int BackgroundRunning => _work.Running;
+    private bool _stopRan, _stoppedClean;
+
+    string IAudioShutdown.ShutdownName => "AudioWorld";
+
+    /// <summary>Stops the acoustic worker and every background task and thread the world started, and waits up to
+    /// <paramref name="waitMs"/> for them. Frees nothing: the mixer may still be reading the traces
+    /// (<see cref="Free"/>). True when every one stopped.</summary>
+    internal bool Stop(int waitMs)
+    {
+        if (_stopRan) return _stoppedClean;
+        _stopRan = true;
+        _oneOffs.StopPrewarming();
+        bool ok = _acousticWorker.Stop(waitMs);
+        var late = _work.Wait(waitMs);
+        foreach (var name in late) Serilog.Log.Warning("Audio shutdown: {Name} did not finish within {Ms} ms.", name, waitMs);
+        _stoppedClean = ok && late.Count == 0;
+        return _stoppedClean;
+    }
+
+    /// <summary>Frees the Steam Audio objects the world made, after the mixer has stopped. Left to the process
+    /// when a thread using them did not stop.</summary>
+    internal void Free() => _acousticWorker.Free();
+
+    bool IAudioShutdown.Stop(int waitMs) => Stop(waitMs);
+    void IAudioShutdown.Free() => Free();
+
+    /// <summary>Stops the world's threads and tasks, once, and frees what it made when the mixer is not running. With
+    /// the mixer running, the Steam Audio objects it reads stay until the engine facade is disposed, which frees them
+    /// in the order that keeps the mixer clear. Disposing twice does nothing.</summary>
+    public void Dispose()
+    {
+        if (System.Threading.Interlocked.Exchange(ref _disposed, 1) != 0) return;
+        Stop(10000);
+        // The mixer reads the traces and scenes until the facade's device is closed: with it running, the
+        // facade's dispose frees them (it holds this world), and a later call here finds that done.
+        if (_audio.IsInitialized) return;
+        _audio.Disown(this);
+        Free();
     }
 
     /// <summary>The acoustic worker, for the host's features that are heard by its answers (blips, perched birds)
@@ -3684,6 +3735,7 @@ public partial class AudioWorld
         // Their own body is left out; a step with no body leaves out nothing (a voice's id is never a body).
         var path = System.Threading.Tasks.Task.Factory.StartNew(
             () => StepPath(world, bodyId, ear, at), default, System.Threading.Tasks.TaskCreationOptions.None, StepTracer);
+        _work.Track("Footstep path", path);
         _tracingSteps.Add(new TracingStep(at, mat, slopeDb, slopePitch, bodyId, world, ear, path));
     }
 

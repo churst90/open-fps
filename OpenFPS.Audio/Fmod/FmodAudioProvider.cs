@@ -1,6 +1,7 @@
 using System.Numerics;
 using FMOD;
 using Serilog;
+using OpenFPS.Audio.Core;
 using OpenFPS.Sound;
 using OpenFPS.Sound.Core;
 using OpenFPS.Sound.Core.Nature;
@@ -227,7 +228,21 @@ internal class FmodResourceManager : IDisposable
         Log.Warning("Audio asset '{SoundId}' cannot be played: {Reason}. That emitter will be silent.", soundId, reason);
     }
 
-    public void Dispose() { foreach (var s in _cache.Values) s.release(); _cache.Clear(); }
+    public void Dispose()
+    {
+        // A sound still loading on FMOD's own loader thread is released only when it has finished (bounded:
+        // a load that hangs is leaked, not freed under the loader).
+        var wait = System.Diagnostics.Stopwatch.StartNew();
+        foreach (var s in _cache.Values)
+        {
+            while (s.getOpenState(out OPENSTATE state, out _, out _, out _) == RESULT.OK
+                   && (state == OPENSTATE.LOADING || state == OPENSTATE.SETPOSITION)
+                   && wait.ElapsedMilliseconds < 3000)
+                System.Threading.Thread.Sleep(2);
+            s.release();
+        }
+        _cache.Clear();
+    }
 }
 
 public partial class FmodAudioProvider : IAudioProvider
@@ -6058,7 +6073,18 @@ public partial class FmodAudioProvider : IAudioProvider
         _diagPcm = null;
     }
 
+    private int _disposedOnce;
+
+    /// <summary>Stops the mixer and frees everything it owns, once. Before <see cref="Initialize"/> (or after one that
+    /// failed) there is nothing running: only a system handle made, if any, is released.</summary>
     public void Dispose() {
+        if (System.Threading.Interlocked.Exchange(ref _disposedOnce, 1) != 0) return;
+        if (!_isInitialized)
+        {
+            if (_system.hasHandle()) _system.release();
+            return;
+        }
+        Shutdown.Wait(_fieldsMaking, "Source fields", 5000);
         ReportStartCheck();
         StopRecording();
         FadeOutForClose();
@@ -6120,7 +6146,7 @@ public partial class FmodAudioProvider : IAudioProvider
             _saAllVoices.Clear();
             _saPool.Clear();
             _stages?.Release(); _stages = null;
-            _trimsMaking.Wait(5000);
+            Shutdown.Wait(_trimsMaking, "Cabin trims", 5000);
             if (_hrtfMeasureHead != IntPtr.Zero) Phonon.iplHRTFRelease(ref _hrtfMeasureHead);
             Phonon.iplHRTFRelease(ref _saHrtf);
             Phonon.iplContextRelease(ref _saContext);
@@ -6135,6 +6161,7 @@ public partial class FmodAudioProvider : IAudioProvider
         while (_washPool.TryPop(out var wash)) if (wash.Handle.IsAllocated) wash.Handle.Free();
         while (_radiatorPool.TryPop(out var beam)) if (beam.Handle.IsAllocated) beam.Handle.Free();
         if (_isInitialized) _system.release();
+        _isInitialized = false;
     }
 }
 

@@ -110,7 +110,7 @@ internal sealed class LateField : IDisposable
         {
             _running = true;
             _thread = new Thread(Loop) { IsBackground = true, Name = "LateField", Priority = ThreadPriority.BelowNormal };
-            _thread.Start();
+            _thread.Start(); OpenFPS.Audio.Core.Shutdown.Started(_thread);
         }
     }
 
@@ -289,7 +289,7 @@ internal sealed class LateField : IDisposable
     public void Dispose()
     {
         _running = false;
-        _thread?.Join(2000);
+        OpenFPS.Audio.Core.Shutdown.Join(_thread, "LateField thread", 2000);
         lock (_simGate)
         {
             for (int i = 0; i <= MaxSources; i++)

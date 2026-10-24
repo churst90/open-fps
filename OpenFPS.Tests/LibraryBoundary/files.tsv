@@ -88,6 +88,7 @@ OpenFPS.Audio/Core/AudioWorld.Trains.cs	lib	Audio
 OpenFPS.Audio/Core/AudioWorld.Voices.cs	lib	Audio	
 OpenFPS.Audio/Core/AudioWorld.cs	lib	Audio	
 OpenFPS.Audio/Core/AudioWorldOptions.cs	lib	Audio	
+OpenFPS.Audio/Core/BackgroundWork.cs	lib	Audio	
 OpenFPS.Audio/Core/BirdLife.cs	lib	Audio	
 OpenFPS.Audio/Core/DoorRenderCache.cs	lib	Audio	
 OpenFPS.Audio/Core/LoudspeakerVoices.cs	lib	Audio	

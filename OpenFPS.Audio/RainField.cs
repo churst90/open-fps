@@ -757,6 +757,9 @@ public sealed class RainSurvey
 /// </summary>
 public sealed class RainField
 {
+    /// <summary>What the world's dispose waits on for this one's background tasks; null when made alone.</summary>
+    internal OpenFPS.Audio.Core.BackgroundWork? Work { get; set; }
+
     /// <summary>Surveyed again once the ear has moved this far, m, or this long has gone, s.</summary>
     public const float SurveyMetres = 1.5f, SurveySeconds = 2f;
 
@@ -882,7 +885,7 @@ public sealed class RainField
             var (w, at, own, riding) = (world, ear, ownEntityId, ridingEntityId);
             _pending = _running = SurveyInPlace
                 ? System.Threading.Tasks.Task.FromResult(_survey.Run(w, at, own, riding))
-                : System.Threading.Tasks.Task.Run(() => _survey.Run(w, at, own, riding));
+                : BackgroundWork.Run(Work, "RainField survey", () => _survey.Run(w, at, own, riding));
             _surveyedAt = ear;
             _surveyedWhen = now;
         }

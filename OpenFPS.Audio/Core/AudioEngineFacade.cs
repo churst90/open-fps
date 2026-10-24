@@ -16,7 +16,7 @@ namespace OpenFPS.Audio.Core;
 public class AudioEngineFacade : IDisposable, IVoiceSink
 {
     private IAudioProvider _provider;
-    private bool _isInitialized = false;
+    private volatile bool _isInitialized = false;
     private VoiceManager? _voiceManager;
 
     /// <summary>However short the mixer runs, this many voices are still placed.</summary>
@@ -148,6 +148,10 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     /// <summary>Brings up the provider, loads the bank and starts the audio thread.</summary>
     public void Initialize()
     {
+        // With Dispose: one finishes before the other starts, and nothing starts after a dispose.
+        lock (_lifecycle)
+        {
+        if (_closing != 0) return;
         if (_provider.Initialize())
         {
             _bank.Initialize(Paths.Sounds);
@@ -161,7 +165,8 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
                 Priority = ThreadPriority.AboveNormal,
                 Name = "AudioEngineThread"
             };
-            _audioThread.Start();
+            _audioThread.Start(); Shutdown.Started(_audioThread);
+        }
         }
     }
 
@@ -334,10 +339,13 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     /// </summary>
     internal void InitializeForTest(string? soundsPath = null)
     {
-        if (!_provider.Initialize()) return;
-        if (soundsPath != null) _bank.Initialize(soundsPath);
-        _isInitialized = true;
-        _voiceManager = new VoiceManager(this, _bank, 256) { Hearing = Hearing };
+        lock (_lifecycle)
+        {
+            if (_closing != 0 || !_provider.Initialize()) return;
+            if (soundsPath != null) _bank.Initialize(soundsPath);
+            _isInitialized = true;
+            _voiceManager = new VoiceManager(this, _bank, 256) { Hearing = Hearing };
+        }
     }
 
     /// <summary>The lab: the voice budget held at this many voices rather than what the mixer has, so a voice can be
@@ -664,6 +672,12 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     public void PreloadAll(Action<string, int> progressCallback)
     {
         if (!_isInitialized) return;
+        // Dispose waits for this to leave the provider, then frees it.
+        lock (_preloadGate) PreloadAllLocked(progressCallback);
+    }
+
+    private void PreloadAllLocked(Action<string, int> progressCallback)
+    {
         
         // Not the spoken lines (1,400 of them, some 350 MB decoded; WorldAudioPlayer.SpokenLine decodes
         // one when said), nor the footstep bank's per-shoe and per-gait folders (11,000 takes, some
@@ -672,7 +686,7 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
             .Where(id => !id.StartsWith("VOICES/", StringComparison.OrdinalIgnoreCase))
             .Where(id => !IsFootstepVariant(id))
             .ToList();
-        for (int i = 0; i < allIds.Count; i++)
+        for (int i = 0; i < allIds.Count && _closing == 0; i++)
         {
             var id = allIds[i];
             _provider.Preload(id);
@@ -727,10 +741,61 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     public void SetDiagnosticPosition(Vector3 position) { if (_isInitialized) _provider.SetDiagnosticPosition(position); }
     public void StopDiagnosticSound() { if (_isInitialized) _provider.StopDiagnosticSound(); }
 
+    private readonly object _lifecycle = new();
+    private readonly object _preloadGate = new();
+    private int _closing;
+    private readonly List<IAudioShutdown> _parts = new();
+
+    /// <summary>Hands a part with threads or native objects to this facade's dispose (AudioWorld does it itself).</summary>
+    internal void Own(IAudioShutdown part) { lock (_parts) _parts.Add(part); }
+
+    /// <summary>Takes a part back: it was stopped and freed by its owner.</summary>
+    internal void Disown(IAudioShutdown part) { lock (_parts) _parts.Remove(part); }
+
+    /// <summary>Waits this long for each thread and group of tasks to stop at the dispose.</summary>
+    private const int StopWaitMs = 10000;
+
+    /// <summary>
+    /// Stops everything the audio started and frees it, once; a second call, or a call before
+    /// <see cref="Initialize"/>, does nothing more. In order: every public call turns into a no-op, so nothing new is queued;
+    /// the audio thread and every owned world's threads and tasks are told to stop and joined, each
+    /// wait bounded and a thread that did not stop logged by name; the mixer's own objects are freed and
+    /// its system and device closed; then the Steam Audio objects the mixer read (the worlds' traces, scenes
+    /// and context) go, last because the mixer thread uses them until the device closes. If a thread did not stop, what
+    /// it could be using is left to the process rather than freed under it.
+    /// </summary>
     public void Dispose()
     {
+        if (System.Threading.Interlocked.Exchange(ref _closing, 1) != 0) return;
+        lock (_lifecycle) { _isInitialized = false; }
         _isRunning = false;
-        _audioThread?.Join(500);
+
+        IAudioShutdown[] parts;
+        lock (_parts) parts = _parts.ToArray();
+        foreach (var part in parts)
+        {
+            try { part.Stop(StopWaitMs); }
+            catch (Exception ex) { Serilog.Log.Warning(ex, "Audio shutdown: {Name} failed to stop.", part.ShutdownName); }
+        }
+
+        bool audioStopped = Shutdown.Join(_audioThread, "AudioEngineThread", StopWaitMs);
+        bool preloadDone = Monitor.TryEnter(_preloadGate, StopWaitMs);
+        if (preloadDone) Monitor.Exit(_preloadGate);
+        else Serilog.Log.Warning("Audio shutdown: PreloadAll did not return within {Ms} ms.", StopWaitMs);
+
+        if (!audioStopped || !preloadDone)
+        {
+            Serilog.Log.Warning("Audio shutdown: the mixer is left to the process exit, a thread using it did not stop.");
+            return;
+        }
         _provider?.Dispose();
+        foreach (var part in parts)
+        {
+            try { part.Free(); }
+            catch (Exception ex) { Serilog.Log.Warning(ex, "Audio shutdown: {Name} failed to free.", part.ShutdownName); }
+        }
     }
+
+    /// <summary>True once <see cref="Dispose"/> has begun.</summary>
+    internal bool IsClosing => _closing != 0;
 }

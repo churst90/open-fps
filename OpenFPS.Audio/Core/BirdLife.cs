@@ -21,6 +21,9 @@ namespace OpenFPS.Audio.Core;
 /// </summary>
 public sealed class BirdLife
 {
+    /// <summary>What the world's dispose waits on for this one's background tasks; null when made alone.</summary>
+    internal OpenFPS.Audio.Core.BackgroundWork? Work { get; set; }
+
     private sealed class Bird
     {
         public Vector3 At;
@@ -126,7 +129,7 @@ public sealed class BirdLife
         }
         var bodies = new List<AcousticBody>(_bodies);
         _surveyMap = world.Rooms;
-        _survey = System.Threading.Tasks.Task.Run(() => BuildGroups(world, bodies));
+        _survey = BackgroundWork.Run(Work, "BirdLife survey", () => BuildGroups(world, bodies));
     }
 
     /// <summary>The survey runs on the caller's thread, so its answer is taken up on the update that asks

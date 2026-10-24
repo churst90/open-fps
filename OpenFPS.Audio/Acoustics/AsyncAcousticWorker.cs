@@ -145,7 +145,7 @@ public class AsyncAcousticWorker : IDisposable
             // load, and the audio cut out.
             Priority = ThreadPriority.BelowNormal
         };
-        _workerThread.Start();
+        _workerThread.Start(); OpenFPS.Audio.Core.Shutdown.Started(_workerThread);
     }
 
     public void UpdateWorld(IAcousticWorld world)
@@ -1228,11 +1228,11 @@ public class AsyncAcousticWorker : IDisposable
     private static System.Threading.Tasks.Task<T> RunLowered<T>(string name, Func<T> work)
     {
         var done = new System.Threading.Tasks.TaskCompletionSource<T>(System.Threading.Tasks.TaskCreationOptions.RunContinuationsAsynchronously);
-        OpenFPS.Native.Platform.BackgroundPriority.RunLowered(name, () =>
+        OpenFPS.Audio.Core.Shutdown.Started(OpenFPS.Native.Platform.BackgroundPriority.RunLowered(name, () =>
         {
             try { done.SetResult(work()); }
             catch (Exception ex) { done.SetException(ex); }
-        });
+        }));
         return done.Task;
     }
 
@@ -1543,10 +1543,46 @@ public class AsyncAcousticWorker : IDisposable
 
     public void Dispose()
     {
-        _cts.Cancel();
-        _workerThread?.Join(); // after this, nothing else touches the Phonon objects
+        Stop(int.MaxValue);
+        Free();
+    }
 
+    private bool _stopped, _freed, _stoppedClean;
+
+    /// <summary>Stops the worker thread and waits for the scene builds and the hand-over of rebuilds; frees
+    /// nothing, because the mixer may still read the traces. True when all of it stopped in <paramref name="waitMs"/>.</summary>
+    internal bool Stop(int waitMs)
+    {
+        if (_stopped) return _stoppedClean;
+        _stopped = true;
+        _cts.Cancel();
+        bool ok = OpenFPS.Audio.Core.Shutdown.Join(_workerThread, "AcousticWorkerThread", waitMs == int.MaxValue ? Timeout.Infinite : waitMs);
+        // Both touch scenes: the scene build and the rebuild handed to the tracers.
+        ok &= OpenFPS.Audio.Core.Shutdown.Wait(_doorBuild, "Scene build", waitMs == int.MaxValue ? Timeout.Infinite : waitMs);
+        _stoppedClean = ok;
+        return ok;
+    }
+
+    /// <summary>Frees the traces, the Steam Audio simulator, scenes and context. Once only, and only after
+    /// <see cref="Stop"/> found everything stopped: past a thread that did not stop, they are left to the process.</summary>
+    internal void Free()
+    {
+        if (_freed) return;
+        _freed = true;
+        if (!_stopped) Stop(int.MaxValue);
+        if (!_stoppedClean)
+        {
+            Serilog.Log.Warning("Audio shutdown: the acoustic worker's Steam Audio objects are left to the process exit, a thread using them did not stop.");
+            return;
+        }
         Traced.Release();
+        // A build that finished after the last swap: its scenes were never handed to anyone.
+        if (_doorBuild is { IsCompletedSuccessfully: true } built)
+        {
+            var (full, listener, _, _, _, _) = built.Result;
+            full.Dispose(); listener.Dispose();
+        }
+        _doorBuild = null;
         if (_saSim != null) { _saSim.Dispose(); _saSim = null; }
         if (_saScene != null) { _saScene.Dispose(); _saScene = null; }
         foreach (var (retired, _) in _retiredScenes) retired.Dispose();
