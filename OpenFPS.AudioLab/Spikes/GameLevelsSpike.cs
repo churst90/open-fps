@@ -18,10 +18,12 @@ using OpenFPS.Models;
 namespace OpenFPS.AudioLab.Spikes;
 
 /// <summary>
-/// --game-levels [out=DIR] [set=measure|render|compare|all|ear|wind|faults|faults-ac|faults-squeal|faults-landing|engine-cpu]
-/// [cars=a,b,..] [ear=on|off] [listening=DB] [calm=SPEED,TURBULENCE]: what the game's own mixer puts out
+/// --game-levels [out=DIR] [set=measure|render|compare|all|ear|wind|faults|faults-ac|faults-squeal|faults-landing|source-faults|parked-off|engine-cpu]
+/// [cars=a,b,..] [bad=cone|model] [ear=on|off] [listening=DB] [calm=SPEED,TURBULENCE]: what the game's own mixer puts out
 /// for one thing at a time, captured from the real output. set=faults is the Resonance faults of 2026-10-06:
 /// a light single and an airliner landing, a train blowing for a crossing, two window units side by side.
+/// set=source-faults is a bad SourceSpec cone or a synthesised id naming no model, beside a good source;
+/// set=parked-off is a car switched off and left standing, for the mix's mean.
 /// --game-levels spectra [preset ...]: see <see cref="Spectra"/>.
 ///
 /// The whole client path: a ClientAudioSystem over an AudioEngineFacade over the FmodAudioProvider,
@@ -128,7 +130,8 @@ public static class GameLevelsSpike
         // Facing a point: the game's forward is +Z rotated about +Y by the yaw.
         float YawTo(Vector3 from, Vector3 to) => MathF.Atan2(to.X - from.X, to.Z - from.Z);
 
-        int AddCar(string preset, Vector3 at, Vector3 velocity)
+        int AddCar(string preset, Vector3 at, Vector3 velocity) => AddCarWithDefinition(preset, at, velocity, out _);
+        int AddCarWithDefinition(string preset, Vector3 at, Vector3 velocity, out EntityDefinition definition)
         {
             int id = nextId++;
             var profile = MachineRegistry.VehicleFor(preset);
@@ -148,12 +151,13 @@ public static class GameLevelsSpike
             def.SoundEmitter.MinDistance = 3f;
             world.RegisterDefinition(def);
             Move(id, at, rot, velocity);
+            definition = def;
             return id;
         }
         // lever: a train's notch or an aeroplane's power lever, as the server that drives it sends it (MachinePower).
         void Move(int id, Vector3 at, Quaternion rot, Vector3 velocity, float lever = 0f)
             => world.SyncState(new[] { new EntityState { EntityId = id, Transform = QuantizedTransform.FromTransform(new Transform { Position = at, Rotation = rot }), LinearVelocity = velocity, Lever = StatePacking.EncodeLever(lever) } });
-        int AddEmitter(string soundId, Vector3 at, float range, float minDistance)
+        int AddEmitter(string soundId, Vector3 at, float range, float minDistance, Func<SoundEmitterComponent, SoundEmitterComponent>? edit = null)
         {
             int id = nextId++;
             var def = new EntityDefinition
@@ -162,13 +166,15 @@ public static class GameLevelsSpike
                 Transform = new Transform { Position = at, Rotation = Quaternion.Identity, Scale = Vector3.One },
             };
             // A real component, not default(struct): its initialisers (SynthRunning = true) only run in the constructor.
-            def.SoundEmitter = new SoundEmitterComponent();
-            def.SoundEmitter.IsSynth = true;
-            def.SoundEmitter.SoundId = soundId;
-            def.SoundEmitter.Mode = PlaybackMode.LoopOne;
-            def.SoundEmitter.Volume = 1f;
-            def.SoundEmitter.Range = range;
-            def.SoundEmitter.MinDistance = minDistance;
+            var em = new SoundEmitterComponent();
+            em.IsSynth = true;
+            em.SoundId = soundId;
+            em.Mode = PlaybackMode.LoopOne;
+            em.Volume = 1f;
+            em.Range = range;
+            em.MinDistance = minDistance;
+            if (edit != null) em = edit(em);
+            def.SoundEmitter = em;
             world.RegisterDefinition(def);
             return id;
         }
@@ -604,6 +610,72 @@ public static class GameLevelsSpike
             {
                 Landing("piston_single", 40f, 7.0, 9.0);
                 Landing("airliner", 60f, 7.0, 9.0);
+            }
+            if (set is "source-faults")
+            {
+                // One source with a value a host can leave behind, beside one that plays normally:
+                // whether either takes the whole mix down, and whether the good source survives it.
+                string bad = Arg(args, "bad=") ?? "cone";
+                string badSound = Arg(args, "id=") ?? (bad == "model" ? "engine:no_such_vehicle" : "water:park_fountain");
+                float badDist = float.TryParse(Arg(args, "dist="), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float bd) ? bd : 4f;
+                Stand(new Vector3(-30f, 0f, -30f), 0f);
+                int good = AddEmitter("water:park_fountain", player.Position + new Vector3(0f, 0.6f, 5f),
+                                      LabHearing.AudibleRange(ModelLibrary.Presets.Water("park_fountain").SourceLevelDb), 1.2f);
+                Pump(4.0);
+                Record("good source alone", 3.0);
+                // range=, min=, vol=, aim=x,y,z: the other fields a bare SourceSpec leaves at 0.
+                float? Num(string key) => float.TryParse(Arg(args, key), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float v) ? v : null;
+                SoundEmitterComponent Bare(SoundEmitterComponent em)
+                {
+                    if (Num("range=") is { } r) em.Range = r;
+                    if (Num("min=") is { } m) em.MinDistance = m;
+                    if (Num("vol=") is { } vol) em.Volume = vol;
+                    if (Arg(args, "aim=") is { } aim) { var f = aim.Split(',').Select(s => float.Parse(s, System.Globalization.CultureInfo.InvariantCulture)).ToArray(); em.Direction = new Vector3(f[0], f[1], f[2]); }
+                    return em;
+                }
+                int badId = bad == "model"
+                    ? AddEmitter(badSound, player.Position + new Vector3(1.5f, 1.7f, badDist), 200f, 1.2f,
+                                 em =>
+                                 {
+                                     Bare(em);
+                                     // zero=1: every synth field left at a SourceSpec's default, as a host that fills only what it knows.
+                                     bool zero = Arg(args, "zero=") == "1";
+                                     em.SynthWave = 0; em.SynthFrequency = zero ? 0f : 220f; em.SynthFilterCutoff = zero ? 0f : 1f; em.SynthPulseWidth = zero ? 0f : 0.5f;
+                                     if (zero) em.SynthRunning = Arg(args, "running=") == "1";
+                                     return em;
+                                 })
+                    : AddEmitter(badSound, player.Position + new Vector3(1.5f, 0.6f, badDist),
+                                 LabHearing.AudibleRange(ModelLibrary.Presets.Water("park_fountain").SourceLevelDb), 1.2f,
+                                 em => { if (Arg(args, "cone=") != "ok") { em.ConeInsideAngle = 0f; em.ConeOutsideAngle = 0f; em.ConeOutsideVolume = 0f; } em.SynthRunning = Arg(args, "running=") != "0"; return Bare(em); });
+                Pump(1.0);
+                Record($"good + {bad} fault", 3.0);
+                Remove(badId);
+                Pump(2.0);
+                Record("good after the fault", 2.0);
+                Remove(good);
+                Pump(1.5);
+            }
+            if (set is "parked-off")
+            {
+                // A car idling beside you, then switched off and left standing: the mix's mean (DC)
+                // while it dies and after, against its own idle and against the street with no car.
+                string preset = Arg(args, "cars=") ?? "i4_midsize";
+                var v = MachineRegistry.VehicleFor(preset);
+                Stand(new Vector3(0f, 0f, v.LengthMetres * 0.5f + 2f), MathF.PI);
+                Record("street with no car", 2.0);
+                int id = AddCarWithDefinition(preset, Vector3.Zero, Vector3.Zero, out var def);
+                perFrame = _ => Move(id, Vector3.Zero, Quaternion.Identity, Vector3.Zero);
+                Pump(5.0);
+                Record($"parked {preset} idling", 3.0);
+                def.SoundEmitter.SynthRunning = false;
+                world.RegisterDefinition(def);
+                Pump(0.25);
+                Record($"parked {preset} switched off, dying", 3.0);
+                Record($"parked {preset} switched off, standing", 8.0);
+                perFrame = null;
+                Remove(id);
+                Pump(1.5);
+                Record("street after the car", 2.0);
             }
             var measureSpots = new List<(string, float)>();
             foreach (var side in new[] { "front", "side", "rear" })
