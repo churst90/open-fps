@@ -11,7 +11,8 @@ namespace OpenFPS.Audio.Core;
 /// whether it still sounds. It is a source of the world like any the host holds, so it is placed by the same path
 /// as a loudspeaker's recording: occluded, routed through openings, reflected, sent to the reverb, panned by HRTF,
 /// ranked by the voice budget and given its voice by the registry. Safe to call from any thread; a change is heard
-/// from the world's next frame.
+/// from the world's next frame. A horn (<see cref="AudioWorld.PlayHorn"/>) is the same handle: <see cref="Sound"/> is the
+/// horn's key, it ends when its rhythm has, and <see cref="GainDb"/> does not apply to it (a horn's level is its model's).
 /// </summary>
 public sealed class PlacedSound
 {
@@ -19,13 +20,21 @@ public sealed class PlacedSound
     private Vector3 _at, _velocity;
     private float _gainDb;
     private bool _stopped, _finished, _started;
+    private Quaternion _facing = Quaternion.Identity;
 
-    internal PlacedSound(object gate, int id, string sound, bool loops, Vector3 at, float gainDb, float minDistance, float range, double now)
+    internal PlacedSound(object gate, int id, string sound, bool loops, Vector3 at, float gainDb, float minDistance, float range, double now,
+                         string? horn = null, float[]? rhythm = null, Quaternion? facing = null)
     {
         _gate = gate; Id = id; Sound = sound; Loops = loops; _at = at; _gainDb = gainDb;
         MinDistance = minDistance; Range = range; AddedAt = now;
+        Horn = horn; Rhythm = rhythm; _facing = facing ?? Quaternion.Identity;
         Source = new AudioSource(id);
     }
+
+    /// <summary>The horn's model ("electric:disc_pair", "air:truck_dual") of a horn sounded at a place; null for a recording.</summary>
+    internal string? Horn { get; }
+    internal float[]? Rhythm { get; }
+    internal bool IsHorn => Horn != null;
 
     /// <summary>The entity id the voice sounds under, in the band the library keeps for these
     /// (<see cref="HostedSounds.FirstId"/> up).</summary>
@@ -79,16 +88,16 @@ public sealed class PlacedSound
     /// <summary>Its source for this frame.</summary>
     internal void Fill()
     {
-        Vector3 at, velocity; float db;
-        lock (_gate) { at = _at; velocity = _velocity; db = _gainDb; }
+        Vector3 at, velocity; float db; Quaternion facing;
+        lock (_gate) { at = _at; velocity = _velocity; db = _gainDb; facing = _facing; }
         Source.Set(new SourceSpec
         {
-            SoundId = Sound,
+            SoundId = IsHorn ? "" : Sound,
             Mode = Loops ? PlaybackMode.LoopOne : PlaybackMode.Single,
             Volume = MathF.Pow(10f, db / 20f),
             MinDistance = MinDistance,
             Range = Range,
-        }, new SourceState { Position = at, Rotation = Quaternion.Identity, Velocity = velocity });
+        }, new SourceState { Position = at, Rotation = facing, Velocity = velocity });
     }
 }
 
@@ -118,15 +127,39 @@ public sealed class HostedSounds
 
     public int Count { get { lock (_gate) return _live.Count; } }
 
-    internal PlacedSound Add(string sound, bool loops, Vector3 at, float gainDb, float minDistance, float range, double now)
+    internal PlacedSound Add(string sound, bool loops, Vector3 at, float gainDb, float minDistance, float range, double now,
+                             string? horn = null, float[]? rhythm = null, Quaternion? facing = null)
     {
         lock (_gate)
         {
             if (_next == int.MaxValue) throw new InvalidOperationException("no more ids for played sounds");
-            var placed = new PlacedSound(_gate, _next++, sound, loops, at, gainDb, minDistance, range, now);
+            var placed = new PlacedSound(_gate, _next++, sound, loops, at, gainDb, minDistance, range, now, horn, rhythm, facing);
             _live.Add(placed);
             _byId[placed.Id] = placed;
             return placed;
+        }
+    }
+
+    /// <summary>Whether this id is a horn sounded at a place: its point is the horn's own, not a vehicle model's mount.</summary>
+    internal bool IsHorn(int id)
+    {
+        lock (_gate) return _byId.TryGetValue(id, out var p) && p.IsHorn;
+    }
+
+    /// <summary>
+    /// The frame's horns: one just asked for is started (<paramref name="start"/> hands the world its key, as a horn
+    /// reported from the street is), one the world has let go of (<paramref name="sounding"/> says no) has ended.
+    /// </summary>
+    internal void StepHorns(Func<int, bool> sounding, Action<PlacedSound> start)
+    {
+        lock (_gate)
+        {
+            foreach (var p in _live)
+            {
+                if (!p.IsHorn || !p.Wanted) continue;
+                if (!p.Started) { p.Started = true; start(p); }
+                else if (!sounding(p.Id)) p.End();
+            }
         }
     }
 
@@ -151,7 +184,7 @@ public sealed class HostedSounds
             for (int i = _live.Count - 1; i >= 0; i--)
             {
                 var p = _live[i];
-                if (p.Wanted && !p.Loops)
+                if (p.Wanted && !p.Loops && !p.IsHorn)
                 {
                     // Heard once, and then not: it has played to its end. Never heard: it could not be.
                     if (!p.Started) { if (sounding(p.Id)) p.Started = true; else if (now - p.AddedAt > StartGraceSeconds) p.End(); }
@@ -168,6 +201,8 @@ public sealed class HostedSounds
             foreach (var p in _live)
             {
                 p.Fill();
+                // A horn is found by its id (the world places it as a horn) and is not a recording to place again.
+                if (p.IsHorn) continue;
                 _ids.Add(p.Id);
                 if (p.Source.State.Velocity != Vector3.Zero) _moving.Add(p.Id);
             }
@@ -257,6 +292,28 @@ public partial class AudioWorld
         if (!(minDistance > 0f) || !float.IsFinite(minDistance)) throw new ArgumentOutOfRangeException(nameof(minDistance));
         if (!(range > 0f) || !float.IsFinite(range)) throw new ArgumentOutOfRangeException(nameof(range));
         return _hosted.Add(sound, loop, at, gainDb, minDistance, range, _now());
+    }
+
+    /// <summary>
+    /// Sounds a horn at a place with no vehicle (library 0.2, item 8): <paramref name="horn"/> is a horn's model,
+    /// "electric:disc_pair" or "air:truck_dual", and <paramref name="rhythm"/> the hand on it as <see cref="StartHorn"/>
+    /// takes it (seconds on, off, on, and so on; a tap is one number). It is the same synthesis, level and placing as a
+    /// horn a car sounds on the street (<see cref="StartHorn"/>), from <paramref name="at"/> as the horn's own point,
+    /// facing along <paramref name="facing"/>'s forward (+Z by default), and it ends when the rhythm has. The handle is a
+    /// <see cref="PlacedSound"/>: moved, stopped, asked whether it still sounds. Like <see cref="Play"/> it is heard only
+    /// while frames are ticked.
+    /// </summary>
+    public PlacedSound PlayHorn(string horn, float[] rhythm, Vector3 at, Quaternion? facing = null)
+    {
+        if (string.IsNullOrEmpty(horn)) throw new ArgumentException("a horn has a model", nameof(horn));
+        if (rhythm == null || rhythm.Length == 0) throw new ArgumentException("a rhythm has at least one number", nameof(rhythm));
+        foreach (float r in rhythm)
+            if (!float.IsFinite(r) || r < 0f || r > 20f) throw new ArgumentOutOfRangeException(nameof(rhythm), "a rhythm is seconds from 0 to 20");
+        if (!float.IsFinite(at.X) || !float.IsFinite(at.Y) || !float.IsFinite(at.Z)) throw new ArgumentException("a place is finite numbers", nameof(at));
+        if (facing is { } q && !(float.IsFinite(q.X) && float.IsFinite(q.Y) && float.IsFinite(q.Z) && float.IsFinite(q.W) && q.LengthSquared() > 0f))
+            throw new ArgumentException("a facing is a rotation", nameof(facing));
+        var turn = facing is { } f ? Quaternion.Normalize(f) : (Quaternion?)null;
+        return _hosted.Add(OpenFPS.Sound.Honk.Key(horn, rhythm), false, at, 0f, 1f, 200f, _now(), horn, (float[])rhythm.Clone(), turn);
     }
 
     /// <summary>The played sounds that have not ended.</summary>

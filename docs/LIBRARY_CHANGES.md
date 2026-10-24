@@ -29,6 +29,13 @@ tag (docs/SOUND_LIBRARY_BOUNDARY.md, stage 8 and decision 8) and references the 
   a change never steps. It is apart from the cabin's enclosure (which is per voice) and the two stack. In the headless
   test a 1 kHz cutoff took a 6 kHz tone down by more than 25 dB and left a 200 Hz tone within 1.5 dB.
 
+- A host can sound a horn of a given model at a place with no vehicle: `AudioWorld.PlayHorn(horn, rhythm, at, facing = null)`,
+  where `horn` is "electric:disc_pair", "air:truck_dual" and so on, `rhythm` is seconds on, off, on (a tap is one
+  number, each from 0 to 20) and `facing` is a rotation whose forward the horn radiates along (+Z when null). It is the
+  same synthesis, level and placing as a horn a car sounds on the street (`StartHorn`), from `at` as the horn's own point,
+  and it ends when its rhythm has. The handle is a `PlacedSound`: `MoveTo`, `Stop`, `IsPlaying`; its `GainDb` does not
+  apply, a horn's level being its model's. A bad horn, rhythm or place throws `ArgumentException`.
+
 - The loader reads sounds under the facade's `Paths.Sounds`, where it read only under `ASSETS/SOUNDS` beside the
   program, so the bank and the loader agree (`FmodAudioProvider.Sounds.Folder`, set by the facade's constructor and by
   `InitializeSteppedByHand(soundsPath)`). A host whose sounds folder is elsewhere need only give `AudioDataPaths` that
