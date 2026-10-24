@@ -116,6 +116,11 @@ fingerprint changed too, so the door renders are made again once.
      map yet; wire hash 053dd7700918 and a new door fingerprint).
      Done 2026-10-24: the loader under `Paths.Sounds` and from a host's bytes (c80fc14d), and `AudioWorld.Play`
      with a `PlacedSound` handle (8cc41caf).
+     Done 2026-10-24: the host's group (`HostGroup`, `FmodSystem`) with `SetMasterVolumeDb` and
+     `SetWorldVolumeDb` (e3988d42; every world sound now under one World group), `SetWorldMuffle` (cd96b380) and
+     `AudioWorld.PlayHorn` (32291b55). Open: the near-wall reflections sit on the master's tail, so they colour the
+     interface and the host's flat sounds and the muffle does not reach them; moving them onto the World group
+     waits on Cody, since it changes how interface sounds sound near a wall.
    - Sean's update of 2026-10-20 and 21 (the same inbox file), taken one item at a time as Cody agrees each:
      - Recordings that never start (agreed 2026-10-21; next after the faults above). In Resonance's copy 58 of
        about 58,000 recordings in 36 minutes never left their first sample, past their delayed start, not
