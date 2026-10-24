@@ -106,6 +106,12 @@ conductivity, melting point, water uptake and vapour resistance. The fuel fields
 - A new material's face (absorption, scattering, transmission, porosity) is the existing material whose
   surface it shares (aluminium's is Metal's, oak's Wood's), except Foam, Snow and Fabric, which absorb in
   their own way and carry their own published curves.
+- Five built things (2026-10-24, indices 59 to 63): Canvas, HollowDoor, Rock, SheetMetal and TimberFloor. A thing that is
+  not one stuff is the single stuff that weighs and bends like it at its usual thickness, `BuiltThicknessMetres`, and
+  `SurfaceMassKgM2` is density times that (Canvas 0.41, HollowDoor 10, SheetMetal 7.85, TimberFloor 35; Rock is a stuff,
+  zero). Each figure's source or estimate is on its line in `AcousticRegistry.AddMatter`. The floor's double leaf is the
+  box's WallBuild or an assembly, not the row. Rock, SheetMetal and the door keep the strike and ricochet face of the
+  material they were made like (Granite, Metal, Wood's figures as a Panel), so the ricochet table gains no row.
 - Aliases: Steel and MildSteel are Metal, Aluminum is Aluminium, SodaLimeGlass is Glass, Soil is Dirt,
   Porcelain and CeramicTile are Tile, Plasterboard and Gypsum are Plaster, Stainless is StainlessSteel.
   An alias reads its material; lists show only the table's own names.

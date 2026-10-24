@@ -162,4 +162,52 @@ public class AcousticRegistryTests
         Assert.Contains("Unobtainium", AcousticRegistry.UnknownNamesAsked);
         Assert.False(AcousticRegistry.IsKnown("Unobtainium"));
     }
+
+    /// <summary>The five built materials (docs/LIBRARY_CHANGES.md, Unreleased): each is its own row, not the Generic one
+    /// an unknown name falls back to, each weighs what the real thing does per square metre, and each figure sits in the
+    /// range its source gives (the comments at AcousticRegistry.AddMatter).</summary>
+    [Theory]
+    [InlineData("Canvas", 0.41f, 0.3f, 400f, 800f, 0.01f, 0.05f, 0.05f, 0.2f)]
+    [InlineData("HollowDoor", 10f, 1f, 250f, 330f, 1f, 3f, 0.02f, 0.05f)]
+    [InlineData("Rock", 0f, 0f, 2500f, 2700f, 30f, 60f, 0.005f, 0.02f)]
+    [InlineData("SheetMetal", 7.85f, 0.05f, 7800f, 7900f, 190f, 210f, 0.0001f, 0.002f)]
+    [InlineData("TimberFloor", 35f, 1f, 120f, 180f, 0.5f, 1.5f, 0.02f, 0.05f)]
+    public void ABuiltMaterialIsItselfAndSitsInItsSourcedRange(string name, float kgM2, float kgM2Tolerance, float rhoMin, float rhoMax,
+                                                               float eMin, float eMax, float lossMin, float lossMax)
+    {
+        AcousticRegistry.Initialize();
+        Assert.True(AcousticRegistry.IsKnown(name));
+        Assert.Contains(name, AcousticRegistry.KnownMaterials());
+        var p = AcousticRegistry.GetProperties(name);
+        var generic = AcousticRegistry.GetProperties("Generic");
+        Assert.NotEqual(generic.ResonanceIndex, p.ResonanceIndex);
+        Assert.Equal(AcousticRegistry.GetPropertiesByResonanceIndex(p.ResonanceIndex), p);
+        Assert.Equal(name, AcousticRegistry.Canonical(name));
+        Assert.InRange(p.DensityKgM3, rhoMin, rhoMax);
+        Assert.InRange(p.YoungsModulusGPa, eMin, eMax);
+        Assert.InRange(p.LossFactor, lossMin, lossMax);
+        Assert.NotNull(p.Strike);
+        if (kgM2 > 0f)
+        {
+            Assert.InRange(p.SurfaceMassKgM2, kgM2 - kgM2Tolerance, kgM2 + kgM2Tolerance);
+            Assert.True(p.BuiltThicknessMetres > 0f);
+        }
+        else Assert.Equal(0f, p.SurfaceMassKgM2);   // a stuff: a box is as thick as it is made
+        // Absorption and transmission are fractions, and a wall passes less of the highs than of the lows.
+        Assert.InRange(p.AbsorptionLow, 0f, 1f); Assert.InRange(p.AbsorptionMid, 0f, 1f); Assert.InRange(p.AbsorptionHigh, 0f, 1f);
+        Assert.True(p.TransmissionLow >= p.TransmissionMid && p.TransmissionMid >= p.TransmissionHigh);
+    }
+
+    /// <summary>Each of the five is a different thing from the one it was played as until now, on the figures that
+    /// tell them apart.</summary>
+    [Fact]
+    public void TheBuiltMaterialsDifferFromTheirNearestMeanwhile()
+    {
+        AcousticRegistry.Initialize();
+        Assert.True(AcousticRegistry.GetProperties("HollowDoor").DensityKgM3 < AcousticRegistry.GetProperties("Wood").DensityKgM3 / 2f);
+        Assert.True(AcousticRegistry.GetProperties("TimberFloor").DensityKgM3 < AcousticRegistry.GetProperties("Wood").DensityKgM3 / 3f);
+        Assert.True(AcousticRegistry.GetProperties("Rock").Scattering > AcousticRegistry.GetProperties("Granite").Scattering);
+        Assert.True(AcousticRegistry.GetProperties("Canvas").DensityKgM3 * AcousticRegistry.GetProperties("Canvas").BuiltThicknessMetres < 1f);
+        Assert.True(AcousticRegistry.GetProperties("SheetMetal").SurfaceMassKgM2 > 0f && AcousticRegistry.GetProperties("Metal").SurfaceMassKgM2 == 0f);
+    }
 }

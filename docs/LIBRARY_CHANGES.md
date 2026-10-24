@@ -6,6 +6,17 @@ tag (docs/SOUND_LIBRARY_BOUNDARY.md, stage 8 and decision 8) and references the 
 
 ## Unreleased
 
+- Five materials a host can name: `Canvas`, `HollowDoor`, `Rock`, `SheetMetal` and `TimberFloor` (resonance indices 59
+  to 63), each field with a source or a marked estimate on its line in `AcousticRegistry.AddMatter`. Until now a host
+  had to play them as the nearest material (Fabric, Wood, Granite, Metal, Wood). A built thing is the single stuff that
+  weighs and bends like it at its usual thickness, so `MaterialProperties` gains `BuiltThicknessMetres` and
+  `SurfaceMassKgM2` (density times thickness: Canvas 0.41, HollowDoor 10, SheetMetal 7.85, TimberFloor 35 kg/m2; zero
+  for a stuff). A host must do nothing: no map uses them yet and no existing row changes. To use one, make the box that
+  thick (`BuiltThicknessMetres`), and give a floor its ceiling as the second leaf through `WallBuild` or an assembly,
+  which the material cannot carry. The material table is part of the wire contract and of the door model's source, so
+  the wire hash and the door fingerprint change: the server and the clients deploy together, and the door renders are
+  made again before they are used.
+
 - The mixer checks that every recording leaves its first sample, as Resonance found 58 in about 58,000 that did not:
   a recording a tenth of a second past its start on the parent's clock, not paused or virtual and still where it
   began, is counted and logged once (`[NEVER-STARTED]`, with its sound, delay, pitch and fade points), the counts are
