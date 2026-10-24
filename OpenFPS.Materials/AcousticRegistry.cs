@@ -42,6 +42,17 @@ public struct MaterialProperties
     /// liquid, building, none): for lists and for a builder choosing one.</summary>
     public string Family { get; set; }
 
+    /// <summary>
+    /// For a built element rather than a stuff (a hollow door, a joisted floor, a sheet, a tent wall): the thickness at
+    /// which <see cref="DensityKgM3"/> is the element's average, so density times this is its weight per square metre
+    /// and a box of that thickness weighs what the real thing does. Zero for a stuff, whose box is as thick as it is.
+    /// </summary>
+    public float BuiltThicknessMetres { get; set; }
+
+    /// <summary>The element's weight per square metre, kg/m2: density times <see cref="BuiltThicknessMetres"/>; zero
+    /// for a stuff.</summary>
+    public readonly float SurfaceMassKgM2 => DensityKgM3 * BuiltThicknessMetres;
+
     /// <summary>Poisson's ratio: how much it narrows as it is stretched. With the modulus, the plate's bending
     /// stiffness and the Hertz contact.</summary>
     public float PoissonRatio { get; set; }
@@ -549,6 +560,82 @@ public static class AcousticRegistry
         };
         Matter(reg, "GlassWool", "building", 0.2f, 0f, 0.01f, 1f, 0.01f, 1030f, 0.04f, 650f, 1f, 1f);
 
+        // ── Built things a host can name: five materials Resonance played as the nearest meanwhile ──────
+        //
+        // A box in this table is as thick as the host makes it, so a thing that is not one stuff (a hollow door, a floor on
+        // joists) is given as the single stuff that weighs and bends like it at its usual thickness
+        // (BuiltThicknessMetres); the double leaf of a floor is the box's WallBuild or an assembly, not the material.
+        // Transmission figures are the mass law at that thickness (WallTransmission.MassLawDb at the bands' centres 200,
+        // 1250 and 8000 Hz, as an amplitude gain); for an airtight panel the panel model decides, and they stand only
+        // where it does not. "Tabulated" means the usual reproduced table (Egan, Architectural Acoustics, 1988; Cox and
+        // D'Antonio, Acoustic Absorbers and Diffusers), which was not re-read here.
+
+        // Canvas: tent walls of cotton duck. Graded by weight, 12 oz/yd2 is 407 g/m2 (a unit conversion); about 0.7 mm
+        // thick (EST), so 580 kg/m3 as a bulk and 0.41 kg/m2 in the wall. Bending rigidity of a heavy canvas about 0.5 mN m
+        // (EST from the order of fabric bending rigidity), E = 12 B / t3 = 0.02 GPa: no coincidence below 100 kHz, so the
+        // mass law alone, 0 dB at 200 Hz, 7 at 1.25 kHz, 23 at 8 kHz. Airtight (proofed duck), unlike the draped Fabric.
+        // Taut with air behind it, a limp membrane that absorbs little (EST, the thin-membrane absorbers in Cox and
+        // D'Antonio), its small permeability adding at the top. Loss 0.1 (EST, a textile); a taut sheet scatters little.
+        Solid(reg, "Canvas", 59, like: "Fabric", 580f, 0.02f, 0.1f, porous: false);
+        Face(reg, "Canvas", 0.07f, 0.05f, 0.08f, 0.15f, 0.1f, 1.0f, 0.44f, 0.07f);
+        Built(reg, "Canvas", 0.0007f);
+        Matter(reg, "Canvas", "soft", 0.3f, 0f, 0.05f, 0.5f, 30f, 1300f, 0.06f, null, 25f, 5f);
+
+        // HollowDoor: a hollow-core interior leaf, 35 mm (1 3/8 in.), HDF skins 3.2 mm (E 4 GPa, 850 kg/m3, the door
+        // model's own KnobDoor constants) 28 mm apart over a paper-honeycomb core and a frame, 10 kg/m2 in all (the task's
+        // figure; KnobDoor's render weighs 7.1 with a 3.1 kg core and frame): 286 kg/m3 over 35 mm. The sandwich's stiffness
+        // D = 2 E t a2 = 6.2 kN m (a = 15.6 mm) is a plain 35 mm plate's E = 12 D / h3 = 1.7 GPa. Loss 0.03 and the
+        // viscoelastic exponent 0.8 as the door model's HollowLoss and MDF; Poisson, roughness, water and cp as MDF (HDF is the
+        // same fibre, EST); strength 32 MPa (EN 622-2 hardboard bending classes, 30 to 38 MPa); conductivity 0.07 (EST, an
+        // air-filled core); vapour resistance 30 (EST within ISO 10456's fibreboard range). Absorption: a painted leaf is a
+        // panel absorber; the tabulated solid wood door is 0.14 0.10 0.06 0.08 0.10 0.10 at 125 Hz to 4 kHz, and the thinner
+        // hollow leaf sits above it in the low band (EST). A round pierces it: Wood's strike figures, as a Panel.
+        Solid(reg, "HollowDoor", 60, like: "Wood", 286f, 1.7f, 0.03f);
+        Face(reg, "HollowDoor", 0.10f, 0.20f, 0.08f, 0.10f, 0.1f, 0.11f, 0.018f, 0.0028f);
+        Built(reg, "HollowDoor", 0.035f);
+        Matter(reg, "HollowDoor", "wood", 0.25f, 0.8f, 40f, 0.005f, 32f, 1700f, 0.07f, null, 12f, 30f);
+        SetStrike(reg, "HollowDoor", new(StrikeKind.Panel, 30e6f, 0.3f, 150e-6f));
+        SetUnderfoot(reg, "HollowDoor", null);
+
+        // Rock: natural limestone, a cave's wall. 2600 kg/m3 (ASTM C568 class III, high-density limestone, 2560 and up);
+        // E 40 GPa (EST, mid of the 30 to 60 laboratory values; a rock mass in place is looser); loss 0.01, Q about 100
+        // where ROCK gives 30 to 400 (sound granite is Q 250); Poisson 0.25 (BH 0.2 to 0.3); strength 6.9 MPa (C568 class
+        // III modulus of rupture); hardness 1500 MPa (calcite, Knoop 135 kgf/mm2); water 3 % (C568 class III's limit); ISO
+        // 10456 dense limestone 2.3 W/mK, 1000 J/kgK, vapour resistance 250 (EST within its limestone figures); calcite
+        // calcines near 825 C, so it does not melt. Rougher than cut stone: Ra 5 mm (EST, a weathered face), scattering 0.6
+        // (EST: brick's 0.45 is a centimetre relief, a cave wall's is decimetres), absorption a little above Concrete's from
+        // the roughness and the stone's pores (EST). Transmission is the mass law of half a metre. A round skips off it
+        // as off granite (Granite's face is kept, so the stored ricochet table grows no row) and strikes as Marble does;
+        // underfoot it is a gritty floor, Concrete's (no cave footstep measurement exists).
+        Solid(reg, "Rock", 61, like: "Granite", 2600f, 40f, 0.01f);
+        Face(reg, "Rock", 0.03f, 0.02f, 0.03f, 0.06f, 0.6f, 0.0009f, 0.00014f, 0.00002f);
+        Matter(reg, "Rock", "stone", 0.25f, 0f, 1500f, 5f, 6.9f, 1000f, 2.3f, null, 3f, 250f);
+        SetUnderfoot(reg, "Rock", new Underfoot(0f, 0f, 0.45f, 0.80f));
+
+        // SheetMetal: 1 mm cold-rolled low-carbon steel sheet. The table has no thickness (a box brings it), so what it is
+        // beside Metal is the steel of a sheet and its weight: density and modulus of steel (7850, 200 GPa), loss as Metal's
+        // (the panel model adds the edges' and the air's), cold-rolled AISI 1008 at 340 MPa and about 950 MPa hard (ASM),
+        // Ra 1 um (FIN), 7.85 kg/m2 at 1 mm and its mass-law transmission, and a ringing panel with air behind it takes
+        // some of the low band (0.10, EST), else Metal's. Underfoot it is a deck 0.6 m between supports (EST) and 1 mm
+        // thick, which booms. A round: Metal's strike and face.
+        Solid(reg, "SheetMetal", 62, like: "Metal", 7850f, 200f, 0.0002f);
+        Face(reg, "SheetMetal", 0.06f, 0.10f, 0.05f, 0.10f, 0.1f, 0.14f, 0.023f, 0.0036f);
+        Built(reg, "SheetMetal", 0.001f);
+        Matter(reg, "SheetMetal", "metal", 0.29f, 0f, 950f, 0.001f, 340f, 486f, 51.9f, 1450f, 0f, Tight);
+        SetUnderfoot(reg, "SheetMetal", new Underfoot(0.60f, 0.001f, 0.08f, 0.35f));
+
+        // TimberFloor: boards on joists with a plasterboard ceiling below. 21 mm pine boards (570 kg/m3, 12 kg/m2), 50 x 200 mm
+        // joists at 406 mm (12.3 kg/m2 at 500 kg/m3) and 12.7 mm plasterboard (10 kg/m2 at 800) come to 35 kg/m2 in 0.234 m:
+        // 150 kg/m3. Along the joists D = E I / s = 1.0 MN m (E 12.3 GPa, WH), a plain 0.234 m plate's E = 12 D / h3 = 0.95
+        // GPa, so its coincidence is near 110 Hz; across them only the boards, 0.009 GPa. Loss 0.03 and exponent 0.8 as Wood
+        // "as built, joints and all". The rest as Pine (WH) with ISO softwood k 0.13. Absorption: the tabulated wood floor on
+        // joists, 125 Hz to 4 kHz 0.15 0.11 0.10 0.07 0.06 0.07, so 0.13 low, 0.08 mid, the top held at 0.07. Underfoot it is
+        // Wood's boards on joists at 16 in. The ceiling beneath is the double leaf: the box's WallBuild, not this row.
+        Solid(reg, "TimberFloor", 63, like: "Wood", 150f, 0.95f, 0.03f);
+        Face(reg, "TimberFloor", 0.09f, 0.13f, 0.08f, 0.07f, 0.1f, 0.032f, 0.0051f, 0.0008f);
+        Built(reg, "TimberFloor", 0.234f);
+        Matter(reg, "TimberFloor", "wood", 0.37f, 0.8f, 16f, 0.01f, 88f, 1600f, 0.13f, null, 30f, 50f, acrossGrainGPa: 0.009f);
+
         // ── Liquids, and the rest ───────────────────────────────────────────────────────────────────────
         // Water at 20 C: a liquid, Poisson 0.5; cp 4182, k 0.6; freezes (and ice melts) at 0 C.
         Matter(reg, "Water", "liquid", 0.5f, 0f, 0f, 0f, 0f, 4182f, 0.6f, 0f, 0f, 0f);
@@ -570,6 +657,26 @@ public static class AcousticRegistry
         if (porous is { } isPorous) p.Porous = isPorous;
         reg[name] = p;
     }
+
+    /// <summary>Sets a material's surface: absorption (whole, low, mid, high), scattering and transmission (low, mid, high).</summary>
+    private static void Face(Dictionary<string, MaterialProperties> reg, string name, float absorption, float low, float mid,
+                             float high, float scattering, float transLow, float transMid, float transHigh)
+    {
+        var p = reg[name];
+        p.Absorption = absorption; p.AbsorptionLow = low; p.AbsorptionMid = mid; p.AbsorptionHigh = high;
+        p.Scattering = scattering;
+        p.TransmissionLow = transLow; p.TransmissionMid = transMid; p.TransmissionHigh = transHigh;
+        reg[name] = p;
+    }
+
+    private static void Built(Dictionary<string, MaterialProperties> reg, string name, float metres)
+    { var p = reg[name]; p.BuiltThicknessMetres = metres; reg[name] = p; }
+
+    private static void SetStrike(Dictionary<string, MaterialProperties> reg, string name, StrikeBehaviour strike)
+    { var p = reg[name]; p.Strike = strike; p.Ricochet = null; reg[name] = p; }
+
+    private static void SetUnderfoot(Dictionary<string, MaterialProperties> reg, string name, Underfoot? u)
+    { var p = reg[name]; p.Underfoot = u; reg[name] = p; }
 
     /// <summary>
     /// How hard air finds it to flow into each ground (<see cref="MaterialProperties.FlowResistivityKPa"/>), kPa s/m2.
@@ -818,6 +925,7 @@ public static class AcousticRegistry
         // Settled snow is a soil a tenth as dear to crater as dirt, and its spray is fine (EST).
         Set("Snow", new(StrikeKind.Soil, 0.5e6f, 0.3f, 1e-3f, SprayLowHz: 1500f));
         Set("Fabric", new(StrikeKind.Soft, 0f, 0f, 1e-3f));
+        Set("Canvas", new(StrikeKind.Soft, 0f, 0f, 1e-3f));   // a round goes through cloth as through Fabric
         Set("Foam", new(StrikeKind.Soft, 0f, 0f, 1e-3f));
         Set("GlassWool", new(StrikeKind.Soft, 0f, 0f, 1e-3f));
     }
