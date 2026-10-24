@@ -111,6 +111,9 @@ fingerprint changed too, so the door renders are made again once.
      set while running (2 and 3 as Cody cut them: no music in the library); a muffle over the whole mix, for a
      head under water (4); Rock, SheetMetal, TimberFloor, HollowDoor and Canvas in the material table (10,
      realism for open-fps's own houses too); a horn with no vehicle source (8), last.
+     Done 2026-10-24: the dispose (71946d55) and headless mode (babc5f25; `FmodAudioProvider.NoSound`,
+     `InitializeSteppedByHand`/`StepByHand`, `MixPeakDb`); the five materials (e3b44c94, indices 59 to 63, on no
+     map yet; wire hash 053dd7700918 and a new door fingerprint).
    - Sean's update of 2026-10-20 and 21 (the same inbox file), taken one item at a time as Cody agrees each:
      - Recordings that never start (agreed 2026-10-21; next after the faults above). In Resonance's copy 58 of
        about 58,000 recordings in 36 minutes never left their first sample, past their delayed start, not
