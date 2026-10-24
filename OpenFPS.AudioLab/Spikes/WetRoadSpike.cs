@@ -212,7 +212,7 @@ public static class WetRoadSpike
         var provider = new FmodAudioProvider { Hearing = LabHearing };
         var facade = new AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();
-        facade.InitializeForTest(sounds);
+        facade.InitializeSteppedByHand(sounds);
         if (!facade.IsInitialized) { Console.WriteLine("FAIL: provider init failed"); return 1; }
         provider.EarWindEnabled = false;
         var clock = System.Diagnostics.Stopwatch.StartNew();
@@ -247,7 +247,7 @@ public static class WetRoadSpike
             {
                 perFrame?.Invoke(clock.Elapsed.TotalSeconds);
                 audio.Update(world.GetSnapshot());
-                facade.PumpForTest();
+                facade.StepByHand();
                 Thread.Sleep(4);
             }
         }

@@ -336,7 +336,7 @@ public static class StoveSpike
 
         var facade = new AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();
-        facade.InitializeForTest(sounds);
+        facade.InitializeSteppedByHand(sounds);
         if (!facade.IsInitialized) { Console.WriteLine("FAIL: provider init failed"); return 1; }
         provider.EarWindEnabled = false;
         var clock = Stopwatch.StartNew();
@@ -408,7 +408,7 @@ public static class StoveSpike
             while (clock.Elapsed.TotalSeconds < until)
             {
                 audio.Update(world.GetSnapshot());
-                facade.PumpForTest();
+                facade.StepByHand();
                 Thread.Sleep(4);
             }
         }
@@ -420,7 +420,7 @@ public static class StoveSpike
             {
                 while (ev < events.Length && clock.Elapsed.TotalSeconds - start >= events[ev].At) events[ev++].Do();
                 audio.Update(world.GetSnapshot());
-                facade.PumpForTest();
+                facade.StepByHand();
                 Thread.Sleep(4);
             }
             segments.Add(new Segment(name, start, seconds));

@@ -136,7 +136,7 @@ public static class BusyStreetSpike
         var provider = new FmodAudioProvider { Hearing = LabHearing, Lab = new LabLevers { FirstComeStages = Arg(args, "rule") == "old" } };
         string sounds = LabPaths.Sounds();
         var facade = new AudioEngineFacade(provider, paths: new AudioDataPaths(sounds, null, null));
-        facade.InitializeForTest(sounds);
+        facade.InitializeSteppedByHand(sounds);
         if (!facade.IsInitialized) { Console.WriteLine("FAIL: provider init failed"); return 1; }
         var player = new LocalPlayerState { Position = feet, Yaw = yawDeg * MathF.PI / 180f };
         player.Rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitY, player.Yaw);
@@ -222,7 +222,7 @@ public static class BusyStreetSpike
         for (int i = 0; i < prerun / dt; i++) ServerTick();
         while (inbox.TryDequeue(out var early)) Receive(early);
         // The first updates build the scenes and the worker's world (seconds): the street starts after them.
-        for (int i = 0; i < 3; i++) { audio.Update(world.GetSnapshot()); facade.PumpForTest(); }
+        for (int i = 0; i < 3; i++) { audio.Update(world.GetSnapshot()); facade.StepByHand(); }
         double start = clock.Elapsed.TotalSeconds;
         double nextCensus = start + warm, end = start + warm + seconds;
         warm += start;
@@ -255,7 +255,7 @@ public static class BusyStreetSpike
                 var snapshot = world.GetSnapshot();
                 others.Update(snapshot, self);
                 audio.Update(snapshot);
-                facade.PumpForTest();
+                facade.StepByHand();
 
                 if (now >= nextCensus)
                 {
@@ -376,7 +376,7 @@ public static class BusyStreetSpike
         string sounds = LabPaths.Sounds();
         var facade = new AudioEngineFacade(provider, paths: new AudioDataPaths(sounds, null, null));
         var clock = System.Diagnostics.Stopwatch.StartNew();
-        facade.InitializeForTest(sounds);
+        facade.InitializeSteppedByHand(sounds);
         if (!facade.IsInitialized) { Console.WriteLine("FAIL: provider init failed"); return 1; }
         double tapStart = clock.Elapsed.TotalSeconds;
         const int Rate = 48000;
@@ -394,7 +394,7 @@ public static class BusyStreetSpike
         void Pump(double seconds)
         {
             double until = clock.Elapsed.TotalSeconds + seconds;
-            while (clock.Elapsed.TotalSeconds < until) { facade.PumpForTest(); Thread.Sleep(2); }
+            while (clock.Elapsed.TotalSeconds < until) { facade.StepByHand(); Thread.Sleep(2); }
         }
         double letGoAt, stoppedAt;
         try

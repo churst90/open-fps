@@ -345,7 +345,7 @@ internal sealed class Replay
         // A still day: the weather's wind is read on the wall clock (WindField.Now). The run-off is this
         // world's own, so it starts empty.
         Facade.Weather.Wind = WindWeather.Steady(0f, 0f, 0f);
-        Facade.InitializeForTest();
+        Facade.InitializeSteppedByHand();
         Audio = new ClientAudioSystem(Facade, new SoundMappingService(Player), Player, () => Now, manualAcoustics: true, seed: Seed);
     }
 
@@ -471,8 +471,8 @@ internal sealed class Replay
         Mixer.Frame = Frame;
         Audio.Update(World.GetSnapshot());
         Audio.World.AcousticWorker.StepForTest();
-        Facade.PumpForTest();
-        Facade.PumpForTest();
+        Facade.StepByHand();
+        Facade.StepByHand();
         AfterTick?.Invoke(this);
     }
 

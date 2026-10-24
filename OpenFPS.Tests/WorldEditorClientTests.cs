@@ -206,7 +206,7 @@ public class WorldEditorClientTests
 
         var restarted = h.Audio.ModelChanged(ModelLibrary.Kinds.SmallMachine, id, h.World.GetSnapshot());
         Assert.Equal(new[] { unit }, restarted);
-        h.Facade.PumpForTest();
+        h.Facade.StepByHand();
         Assert.Contains(unit, h.Mixer.Stopped);
         Assert.True(h.TickUntil(() => h.Mixer.Started.Count(e => e.EntityId == unit) > starts), "the machine was not voiced again");
         // Another model's change leaves it alone.

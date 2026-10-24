@@ -334,10 +334,12 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     }
 
     /// <summary>
-    /// Brings the facade up without its audio thread, to be pumped by hand. Tests only: with the real
-    /// thread running too, the test and the engine race through the same queues.
+    /// Brings the facade up without its audio thread; the host runs each audio frame itself with
+    /// <see cref="StepByHand"/> (a test, a tool, a server with no ear). With the thread running too, the host and the
+    /// engine would race through the same queues, so this and <see cref="Initialize"/> are not mixed. Dispose works as
+    /// after Initialize.
     /// </summary>
-    internal void InitializeForTest(string? soundsPath = null)
+    public void InitializeSteppedByHand(string? soundsPath = null)
     {
         lock (_lifecycle)
         {
@@ -352,8 +354,13 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     /// made to lose its slot (AudioLab --stop-clicks). Null in the game.</summary>
     internal int? BudgetForLab { get; set; }
 
-    /// <summary>Runs one audio frame synchronously. Pair with <see cref="InitializeForTest"/>.</summary>
-    internal void PumpForTest() => Tick();
+    /// <summary>Runs one audio frame on the calling thread. Pair with <see cref="InitializeSteppedByHand"/>.</summary>
+    public void StepByHand() => Tick();
+
+    /// <summary>The highest true peak, dBFS, of the mix leaving the mixer since the mixer's last five-second report
+    /// reset it; NaN when the mixer cannot say. Below about -100 the mix is silent. Read it within a few seconds of the
+    /// sound under test.</summary>
+    public float MixPeakDb => _isInitialized ? _provider.MixPeakDb : float.NaN;
 
     public void UpdateListener(Vector3 pos, Quaternion rot, Vector3 vel, int regionId)
     {

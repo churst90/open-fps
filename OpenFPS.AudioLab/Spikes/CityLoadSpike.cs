@@ -223,7 +223,7 @@ public static class CityLoadSpike
         var provider = new FmodAudioProvider { Hearing = LabHearing, Lab = new LabLevers() };
         string sounds = LabPaths.Sounds();
         var facade = new AudioEngineFacade(provider, paths: new AudioDataPaths(sounds, null, null));
-        facade.InitializeForTest(sounds);
+        facade.InitializeSteppedByHand(sounds);
         if (!facade.IsInitialized) { Console.WriteLine("FAIL: provider init failed"); return 1; }
 
         var player = new LocalPlayerState { Position = feet };
@@ -563,7 +563,7 @@ public static class CityLoadSpike
                     iterationParts[LoopAudio] = Ms(partAt2);
 
                     partAt2 = Stopwatch.GetTimestamp();
-                    facade.PumpForTest();
+                    facade.StepByHand();
                     iterationParts[LoopPump] = Ms(partAt2);
 
                     double loopMs = Ms(loopAt);

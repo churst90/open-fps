@@ -63,7 +63,7 @@ public class OneOffCopiesTests
         {
             World = world;
             Facade = new AudioEngineFacade(Mixer);
-            Facade.InitializeForTest();
+            Facade.InitializeSteppedByHand();
             Player = new OneOffSounds(Facade, new SpatialAcoustics(), prewarm: false);
         }
 
@@ -74,8 +74,8 @@ public class OneOffCopiesTests
             var snap = World.GetSnapshot();
             Player.Update(snap, ears, now, air: snap.Outdoors);
             // Twice: a submission is queued as a direct play, which the next pump hands to the mixer.
-            Facade.PumpForTest();
-            Facade.PumpForTest();
+            Facade.StepByHand();
+            Facade.StepByHand();
         }
 
         /// <summary>

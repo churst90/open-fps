@@ -1025,7 +1025,7 @@ public partial class FmodAudioProvider : IAudioProvider
             string? wavPath = WavPath ?? System.Environment.GetEnvironmentVariable("OPENFPS_FMOD_WAV");
             _writesFile = !string.IsNullOrEmpty(wavPath);
             IntPtr extra = IntPtr.Zero;
-            if (string.IsNullOrEmpty(wavPath)) MixerQuality.ApplyOutput(_system);
+            if (string.IsNullOrEmpty(wavPath)) MixerQuality.ApplyOutput(_system, NoSound);
             if (!string.IsNullOrEmpty(wavPath))
             {
                 FmodCheck(_system.setOutput(OUTPUTTYPE.WAVWRITER), "setOutput(WAVWRITER)");
@@ -1792,6 +1792,24 @@ public partial class FmodAudioProvider : IAudioProvider
     /// OPENFPS_FMOD_WAV. The login warm-up's mixer sets it, because a variable would reach the game's mixer
     /// too.</summary>
     public string? WavPath { get; init; }
+
+    /// <summary>Headless: FMOD's NOSOUND output, no sound card needed. The mixer thread still runs in real time and
+    /// mixes everything, so <see cref="MixPeakDb"/> can be read; only the device is missing. Chosen over NOSOUND_NRT,
+    /// which mixes inside System.update as fast as it is called, so a sound's start would no longer fall where it does
+    /// on a device. OPENFPS_FMOD_OUTPUT=nosound asks for the same. A WavPath wins over both.</summary>
+    public bool NoSound { get; init; }
+
+    /// <summary>The mix's highest true peak, dBFS (the meter after the limiter, before the dither), since the
+    /// periodic report last reset it; NaN without the meter.</summary>
+    public float MixPeakDb
+    {
+        get
+        {
+            if (!_isInitialized || !_loudnessMeter.hasHandle()) return float.NaN;
+            if (_loudnessMeter.getParameterData(2, out IntPtr data, out uint _) != RESULT.OK) return float.NaN;
+            return System.Runtime.InteropServices.Marshal.PtrToStructure<DSP_LOUDNESS_METER_INFO_TYPE>(data).maxtruepeak;
+        }
+    }
 
     /// <summary>This mixer's live levers (the console's): the reflections' trims, the traced echoes, the cabin's
     /// response, far engines' detail and the valves' rush. The host turns the same one (AudioEngineFacade.Mix).

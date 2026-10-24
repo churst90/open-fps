@@ -56,13 +56,15 @@ public static class MixerQuality
     public static float[] Resample(float[] x, int from, int to) => Sound.Core.SincResampler.Resample(x, from, to);
 
     /// <summary>
-    /// OPENFPS_FMOD_OUTPUT=pulse|alsa|wasapi: which output FMOD drives, for measuring what reaches the
-    /// sound server (the lab's --quality output). Unset, FMOD chooses.
+    /// OPENFPS_FMOD_OUTPUT=pulse|alsa|wasapi|nosound: which output FMOD drives, for measuring what reaches the
+    /// sound server (the lab's --quality output); nosound is the headless mode (no sound card, the mix still runs).
+    /// Unset, FMOD chooses. <paramref name="noSound"/> (FmodAudioProvider.NoSound) asks for nosound without the variable.
     /// </summary>
-    public static void ApplyOutput(FMOD.System system)
+    public static void ApplyOutput(FMOD.System system, bool noSound = false)
     {
-        OUTPUTTYPE? type = System.Environment.GetEnvironmentVariable("OPENFPS_FMOD_OUTPUT")?.Trim().ToLowerInvariant() switch
+        OUTPUTTYPE? type = noSound ? OUTPUTTYPE.NOSOUND : System.Environment.GetEnvironmentVariable("OPENFPS_FMOD_OUTPUT")?.Trim().ToLowerInvariant() switch
         {
+            "nosound" => OUTPUTTYPE.NOSOUND,
             "pulse" or "pulseaudio" => OUTPUTTYPE.PULSEAUDIO,
             "alsa" => OUTPUTTYPE.ALSA,
             "wasapi" => OUTPUTTYPE.WASAPI,
@@ -70,7 +72,7 @@ public static class MixerQuality
         };
         if (type == null) return;
         RESULT r = system.setOutput(type.Value);
-        if (r == RESULT.OK) Log.Information("FMOD output: {Type} (OPENFPS_FMOD_OUTPUT).", type);
+        if (r == RESULT.OK) Log.Information("FMOD output: {Type} ({Why}).", type, noSound ? "headless" : "OPENFPS_FMOD_OUTPUT");
         else Log.Warning("FMOD output {Type} refused: {Result}.", type, r);
     }
 

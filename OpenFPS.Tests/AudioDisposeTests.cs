@@ -68,7 +68,7 @@ public class AudioDisposeTests
         facade.Dispose();
         facade.Dispose();
         facade.Initialize();
-        facade.InitializeForTest();
+        facade.InitializeSteppedByHand();
         Assert.False(facade.IsInitialized);
         Assert.Empty(Left(before));
     }

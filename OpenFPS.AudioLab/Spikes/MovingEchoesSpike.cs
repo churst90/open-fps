@@ -87,7 +87,7 @@ public static class MovingEchoesSpike
         var facade = new AudioEngineFacade(provider);
         string sounds = LabPaths.Sounds();
         var clock = System.Diagnostics.Stopwatch.StartNew();
-        facade.InitializeForTest(sounds);
+        facade.InitializeSteppedByHand(sounds);
         if (!facade.IsInitialized) { Console.WriteLine("FAIL: provider init failed"); return 1; }
         double tapStart = clock.Elapsed.TotalSeconds;
         var player = new LocalPlayerState();
@@ -129,7 +129,7 @@ public static class MovingEchoesSpike
                 while (clock.Elapsed.TotalSeconds < until)
                 {
                     audio.Update(world.GetSnapshot());
-                    facade.PumpForTest();
+                    facade.StepByHand();
                     each?.Invoke(clock.Elapsed.TotalSeconds);
                     Thread.Sleep(4);
                 }

@@ -239,7 +239,7 @@ internal sealed class SpokenReplay
         _facade = new AudioEngineFacade(_mixer, new SteppedAudioClock(() => Now));
         // A still day: the weather's wind is read on the wall clock.
         _facade.Weather.Wind = WindWeather.Steady(0f, 0f, 0f);
-        _facade.InitializeForTest();
+        _facade.InitializeSteppedByHand();
         var network = new ClientNetworkService { Sending = Sent.Add };
         Session = new ClientGameSession(network, new Speech(this), new Shell(), _facade,
             new NullMicrophoneCapture("no microphone in a replay"), enableAudio: false, replayClock: () => Now);
@@ -408,8 +408,8 @@ internal sealed class SpokenReplay
             Now += Dt / FramesPerTick;
             Session.ContinuousUpdate();
             Session.AudioSystemForTest.World.AcousticWorker.StepForTest();
-            _facade.PumpForTest();
-            _facade.PumpForTest();
+            _facade.StepByHand();
+            _facade.StepByHand();
         }
         Drain();
         if (AwaitRenders) WaitForRenders();

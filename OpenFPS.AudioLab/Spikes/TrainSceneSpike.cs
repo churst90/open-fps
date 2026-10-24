@@ -108,7 +108,7 @@ public static class TrainSceneSpike
 
         var facade = new AudioEngineFacade(provider);
         string sounds = OpenFPS.AudioLab.LabPaths.Sounds();
-        facade.InitializeForTest(sounds);
+        facade.InitializeSteppedByHand(sounds);
         if (!facade.IsInitialized) { Console.WriteLine("FAIL: provider init failed"); return 1; }
         provider.EarWindEnabled = false;
 
@@ -230,7 +230,7 @@ public static class TrainSceneSpike
                 player.Yaw = 0f;
                 player.Rotation = Quaternion.Identity;
                 audio.Update(world.GetSnapshot());
-                facade.PumpForTest();
+                facade.StepByHand();
 
                 if (now >= nextCensus)
                 {

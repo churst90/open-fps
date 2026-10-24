@@ -244,8 +244,8 @@ public class ClientAudioSystemTests
         foreach (int id in h.World.RemoveEntities(new[] { NearCar, DistantNear })) h.Audio.ForgetEntity(id);
         int startedBefore = h.Mixer.Started.Count;
         // The mixer's own thread runs before the next audio update does.
-        h.Facade.PumpForTest();
-        h.Facade.PumpForTest();
+        h.Facade.StepByHand();
+        h.Facade.StepByHand();
         Assert.DoesNotContain(NearCar, h.Mixer.Live);
         Assert.DoesNotContain(borrowed, h.Mixer.Live);
 

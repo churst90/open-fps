@@ -20,7 +20,7 @@ public class OwnClapTests
     {
         var provider = new SteelDoorSoundTests.CapturingProvider();
         var facade = new AudioEngineFacade(provider);
-        facade.InitializeForTest();
+        facade.InitializeSteppedByHand();
         var player = new OneOffSounds(facade, new OpenFPS.Audio.Acoustics.SpatialAcoustics(), prewarm: false);
         // The client has you 1.4 m further along than the server did, facing east (+x).
         var feet = new Vector3(11.4f, 0f, 5f);
@@ -47,7 +47,7 @@ public class OwnClapTests
         {
             var snap = client.GetSnapshot();
             player.Update(snap, ear, clock.Elapsed.TotalSeconds, air: snap.Outdoors);
-            facade.PumpForTest();
+            facade.StepByHand();
             System.Threading.Thread.Sleep(5);
         }
         var played = provider.Emitters.Find(e => e.SoundId.Contains("clap") && !e.IsReflection);

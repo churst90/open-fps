@@ -732,14 +732,14 @@ public class StairsTests : IClassFixture<StairsTests.City>
         {
             var mixer = new EmitterRecordingProvider();
             var audio = new AudioEngineFacade(mixer);
-            audio.InitializeForTest();
+            audio.InitializeSteppedByHand();
             var aids = new BeaconAids(audio, prefs);
             aids.SetMapPolicy(policy);
             for (int i = 0; i < 40; i++)
             {
                 audio.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, -1);
                 aids.Update(world, ear, 10.0 + i * 0.1);
-                for (int k = 0; k < 3; k++) audio.PumpForTest();
+                for (int k = 0; k < 3; k++) audio.StepByHand();
             }
             return mixer.Played.Where(e => e.SoundId == "SYNTH/beacon_stairs_steps").ToList();
         }
@@ -834,13 +834,13 @@ public class StairsTests : IClassFixture<StairsTests.City>
 
                 var mixer = new EmitterRecordingProvider();
                 var audio = new AudioEngineFacade(mixer);
-                audio.InitializeForTest();
+                audio.InitializeSteppedByHand();
                 var aids = new BeaconAids(audio, BeaconPreferences.InMemory());
                 for (int i = 0; i < 40; i++)
                 {
                     audio.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, -1);
                     aids.Update(world, ear, 10.0 + i * 0.1);
-                    for (int k = 0; k < 3; k++) audio.PumpForTest();
+                    for (int k = 0; k < 3; k++) audio.StepByHand();
                 }
                 var blips = mixer.Played.Where(e => e.SoundId == "SYNTH/beacon_stairs_steps").ToList();
                 Assert.True(blips.Count > 0, $"{tower} floor {s}: no stairs beacon from the door, {Vector3.Distance(ear, wayUp):F1} m from the way up");

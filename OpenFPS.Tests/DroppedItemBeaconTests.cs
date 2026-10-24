@@ -101,7 +101,7 @@ public class DroppedItemBeaconTests
         // And it rings, through the real acoustics of that room, at the ear of the man who put it down.
         var provider = new VoiceLifecycleTests.RecordingProvider();
         var facade = new AudioEngineFacade(provider);
-        facade.InitializeForTest();
+        facade.InitializeSteppedByHand();
         var ear = Feet + new Vector3(0f, 1.6f, 0f);
         facade.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, -1);
         // His own body left out of the rays, as the client says whose it is (ClientAudioSystem.OwnEntityId).
@@ -113,7 +113,7 @@ public class DroppedItemBeaconTests
         for (int i = 0; i < 6; i++)
         {
             aids.Update(client.GetSnapshot(), ear, 10.0 + i, selfId: body.Id);
-            for (int k = 0; k < 3; k++) facade.PumpForTest();
+            for (int k = 0; k < 3; k++) facade.StepByHand();
         }
         _o.WriteLine("played: " + string.Join(", ", provider.PlayedSounds));
         Assert.Contains(provider.PlayedSounds, s => s.Contains("beacon_item"));
