@@ -638,6 +638,7 @@ public partial class FmodAudioProvider : IAudioProvider
         public float CurrentOcclusion;
         /// <summary>The volume last handed to the channel, before the band EQ. For the census.</summary>
         public float LastVolume;
+        public bool BadValueLogged;
         /// <summary>The low/mid/high EQ last applied, dB: occlusion, air, shelter, cone. For the census.</summary>
         public (float Low, float Mid, float High) LastEqDb;
         /// <summary>The pop detector's memory (WatchForPops): the level a while ago, when it rose, from where.</summary>
@@ -4706,6 +4707,12 @@ public partial class FmodAudioProvider : IAudioProvider
         float volume = active.BaseVolume * finalVolFactor * roomGainBonus * distAtten * coneAtten
                        * (active.OverloadExempt || active.IsReflection ? 1f : _overloadGain)
                        * EarGain(active, lPosVec, dt);   // the law in loudness units (FmodAudioProvider.Ear.cs)
+        // The last stop before a shared stage: a value that is not finite would be sent to the reverb buses and the master.
+        if (!float.IsFinite(volume) || !float.IsFinite(coneAtten))
+        {
+            if (!active.BadValueLogged) { active.BadValueLogged = true; Log.Warning("Audio: voice {Id} ({Sound}) has a level that is not finite (volume {Volume}, cone {Cone}): silent.", active.EntityId, active.SoundId, volume, coneAtten); }
+            volume = 0f; coneAtten = 1f;
+        }
         active.LastVolume = volume * active.FadeGain;
         active.Channel.setVolume(volume);
 
@@ -4779,6 +4786,13 @@ public partial class FmodAudioProvider : IAudioProvider
         // loudspeaker radiates a share of its on-axis level all round (Radiator.RadiatedGain): the own-room
         // send is taken ahead of its beam, the listener's room's after it.
         float radiated = 1f / MathF.Max(coneAtten, 0.05f);
+        // A cone with no outside angle and no outside volume lets nothing out (a host that filled the emitter field by field on
+        // a default struct sends zeros): the source is silent, and its room is not fed twenty times over what it does not say.
+        if (active.ConeOutside <= 0f && active.ConeOutsideVolume <= 0f)
+        {
+            if (!active.BadValueLogged) { active.BadValueLogged = true; Log.Warning("Audio: voice {Id} ({Sound}) has a cone of {In}, {Out}, {Vol}, which lets no sound out: silent.", active.EntityId, active.SoundId, active.ConeInside, active.ConeOutside, active.ConeOutsideVolume); }
+            radiated = 0f;
+        }
         float ownRadiated = radiated;
         if (active.Radiator != null)
         {

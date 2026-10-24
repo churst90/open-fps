@@ -926,6 +926,23 @@ public partial class AudioWorld
     /// shape its collider gives it (FireSpec.KeyForPlaced), so a fire pit scaled up is a bigger fire.
     /// Memoised: asked several times a frame per source.
     /// </summary>
+    private readonly HashSet<int> _badSources = new();
+
+    /// <summary>Which field of an emitter would carry a bad value into a shared stage, or null: a number that is not finite
+    /// reaches the master as NaN. (A cone of zeros is silent by itself and is the provider's to log: hosts that fill an
+    /// emitter field by field on a default struct send one, and the stored streams carry it.)</summary>
+    internal static string? BadValueIn(in SpatialEmitter e)
+    {
+        static bool Bad(float v) => !float.IsFinite(v);
+        if (Bad(e.Volume) || Bad(e.Range) || Bad(e.MinDistance) || Bad(e.ExtentMetres) || Bad(e.EarLevelDb) || Bad(e.HeadroomGain))
+            return "a level, range or size is not a finite number";
+        if (Bad(e.ConeInside) || Bad(e.ConeOutside) || Bad(e.ConeOutsideVolume))
+            return "its cone is not a finite number";
+        if (Bad(e.Direction.X) || Bad(e.Direction.Y) || Bad(e.Direction.Z) || Bad(e.Position.X) || Bad(e.Position.Y) || Bad(e.Position.Z))
+            return "its aim or place is not a finite number";
+        return null;
+    }
+
     private string VoiceKey(in SourceSpec spec)
     {
         // A whole shore's outline (its emitter's line, closed): one source as long as the outline (ShoreSpec.OutlineKey). An
@@ -3191,7 +3208,18 @@ public partial class AudioWorld
                 }
             }
             else if (OpenFPS.Models.ModelKindTable.KindOf(resolvedSoundId) == null)
+            {
                 OpenFPS.Models.ModelKindTable.Fail(resolvedSoundId, "is synthesised but names no kind of model");
+                // Only the plain oscillator an emitter with no sound id describes is played from its own fields.
+                if (resolvedSoundId != "SYNTH") return;
+            }
+            else if (OpenFPS.Models.ModelKindTable.KindOf(resolvedSoundId) is { } kind && (kind.DeclaresLevel || kind.Body == OpenFPS.Models.ModelBody.Rolls))
+            {
+                // A model that did not resolve (logged once where it failed): nothing renders it, so the source is silent.
+                // Played as a plain oscillator it came out loud, from fields never meant for one. The kinds with no level of
+                // their own (sirens, horns, rain) are placed by their own paths and are left alone.
+                return;
+            }
         }
         else
         {
@@ -3320,6 +3348,13 @@ public partial class AudioWorld
             SynthFilterResonance = spec.SynthFilterResonance,
             SynthPulseWidth = spec.SynthPulseWidth
         };
+        // A value that would poison a shared stage (a reverb send, the master) is caught here, and that source alone is silent.
+        if (BadValueIn(emitter) is { } bad)
+        {
+            if (_badSources.Add(src.Id))
+                Log.Warning("Audio: source {Id} ({Sound}) is silenced: {Bad}", src.Id, resolvedSoundId, bad);
+            return;
+        }
         // Its path in the emitter the budget holds, the only writer: heard from its point (a machine, a wood),
         // from the edge its path comes round when blocked (an engine, an aeroplane), or from where the path
         // arrives (a recording).
