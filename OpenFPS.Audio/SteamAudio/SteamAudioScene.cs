@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using OpenFPS.Materials;
 using OpenFPS.Geometry;
 using OpenFPS.Acoustics;
+using OpenFPS.Physics;
 using OpenFPS.Native.SteamAudio;
 using PV = OpenFPS.Native.SteamAudio.Phonon.IPLVector3;
 
@@ -140,8 +141,9 @@ public sealed class SteamAudioScene : IDisposable
     }
 
     /// <summary>
-    /// The scene without its open ground: every thin, flat slab at ground level with open sky over it
-    /// (road, pavement, lawn, the ground itself). Floors under a ceiling and everything higher stay.
+    /// The scene without its open ground: every thin slab at ground level with open sky over it (road,
+    /// pavement, lawn, the ground itself, and the narrow or sloped ground a body steps onto: kerb, gutter,
+    /// threshold, ramp). Floors under a ceiling and everything higher stay.
     ///
     /// For the trace from the listener's position (TracedReverb), which plays every sound as if from
     /// where the listener stands: its ground bounce, head to floor and back, put a copy of every voice
@@ -189,15 +191,21 @@ public sealed class SteamAudioScene : IDisposable
     internal static bool IsOpenGround(in Box b, (Vector3 Min, Vector3 Max) own, Func<float, float, float, bool> coveredAt,
                                       GroundHeights? ground = null)
     {
-        if (b.Size.Y > SlabThickness || b.Size.X < 1f || b.Size.Z < 1f) return false;
-        // Turned about anything but the vertical, it is not a floor.
+        if (b.Size.Y > SlabThickness) return false;
+        // Turned so that a body could not walk on its top, it is not a floor (a wall, a fence panel on its side).
         var up = Vector3.Transform(Vector3.UnitY, b.Rotation);
-        if (MathF.Abs(up.Y) < 0.99f) return false;
+        if (up.Y < SolidContact.WalkableCos) return false;
+        bool broadAndLevel = b.Size.X >= 1f && b.Size.Z >= 1f && up.Y >= 0.99f;
         var (min, max) = own;
         float top = max.Y;
         // At ground level where it lies: on terrain, the ground's own height under its middle.
         float groundY = ground?.At((min.X + max.X) * 0.5f, (min.Z + max.Z) * 0.5f) ?? 0f;
         if (top > groundY + GroundLevel) return false;
+        // A broad level slab within GroundLevel is ground as it always was. A narrow or sloped one (a kerb,
+        // a gutter, a threshold, a ramp, a shoulder) is ground when it is stood on, whatever its width: the
+        // lowest of its top is no more than a step above the ground, so a body walks up onto it. A bench
+        // seat, a narrow table top and a low wall's top are higher than that and stay.
+        if (!broadAndLevel && LowestTop(b) > groundY + BodyConstants.StepHeight) return false;
         // Open to the sky over most of it: the middle and four points halfway to the corners.
         var c = (min + max) * 0.5f;
         var q = (max - min) * 0.25f;
@@ -210,6 +218,19 @@ public sealed class SteamAudioScene : IDisposable
         foreach (var p in pts)
             if (!coveredAt(p.X, p.Y, top + Headroom)) open++;
         return open >= 3;
+    }
+
+    /// <summary>The height of the lowest corner of the box's top face, where a body steps onto it.</summary>
+    private static float LowestTop(in Box b)
+    {
+        var h = b.Size * 0.5f;
+        float low = float.MaxValue;
+        for (int i = 0; i < 4; i++)
+        {
+            var corner = new Vector3((i & 1) == 0 ? -h.X : h.X, h.Y, (i & 2) == 0 ? -h.Z : h.Z);
+            low = MathF.Min(low, b.Center.Y + Vector3.Transform(corner, b.Rotation).Y);
+        }
+        return low;
     }
 
     internal static (Vector3 Min, Vector3 Max) WorldExtents(in Box b)

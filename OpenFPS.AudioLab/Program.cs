@@ -216,6 +216,7 @@ string[] usage =
     "  --wall-tl                                     the city's constructions' transmission loss per band",
     "  --layers [map=city]                           layers in contact against walls apart: Steam Audio, tracer, model",
     "  --floor-render [out=DIR]                      steps and a voice in the flat above heard below, and back, through the client",
+    "  --ground-pieces [map=city|magnolia_tx|albany_or] [detail=medium]  the low pieces the listener's trace still holds",
     "  --traced-reverb / --traced-echoes             the traced reverb and per-source echoes, headless",
     "  --sa-frame                                    which way Steam Audio's traced soundfield faces (SA_MIRROR=0: unflipped)",
     "  --tail-bands / --tail-iacc / --late-field [place=flat|tunnel|street]",
@@ -969,6 +970,10 @@ if (args.Contains("--path-probe"))
 if (args.Contains("--distant-woods"))
 {
     Environment.Exit(OpenFPS.AudioLab.Spikes.DistantWoodsSpike.Run(args));
+}
+if (args.Contains("--ground-pieces"))
+{
+    Environment.Exit(OpenFPS.AudioLab.Spikes.GroundPiecesSpike.Run(args));
 }
 if (args.Contains("--tile-scenes"))
 {
