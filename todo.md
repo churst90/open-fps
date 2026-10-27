@@ -90,8 +90,8 @@ fingerprint changed too (3a8a8e7b91ab), so the door renders are made again once.
      under the middle of a 3 m deck, the listener walking across 1 m above, the direction moving smoothly and
      wide over the middle. Needs Cody's ear.
      Done 2026-10-23 (e96ea3e5): both sides summed by energy, 5 degrees per 10 cm where it was 111. No spot on
-     the city exercises it (a scan of every steady source: over the top always wins), so it is heard only if a
-     place is made for it.
+     the city exercises it (a scan of every steady source: over the top always wins). Cody 2026-10-27: no place
+     and no render for it; it stands on its guard.
    - A car switched off leaves a steady offset in the mix (Resonance measured -0.0395, -28 dBFS, for as long
      as the car stands, after bursts to -29 dBFS while it dies). Measure a parked car switched off in AudioLab
      first; fix only if open-fps has it, with a guard on the mix's mean.
@@ -130,7 +130,8 @@ fingerprint changed too (3a8a8e7b91ab), so the door renders are made again once.
        late hides the fault and is a last resort only.
        Done 2026-10-24 (af3ad786): open-fps does not have it (0 of 63,000 scattered starts, 0 on the busy
        street and at login); the check logs `[NEVER-STARTED]` and stands as the guard.
-     - Ground in narrow strips heard as a small room (proposed, not yet agreed). open-fps has the same rule:
+     - Ground in narrow strips heard as a small room (agreed 2026-10-27: Cody, "take it if you think it is more
+       realistic"; it is, since the ground under the feet is already in each voice and a second copy is a box). open-fps has the same rule:
        `SteamAudioScene.IsOpenGround` leaves ground out of the listener's trace only when a piece is at least
        1 m each way and level, so kerbs, gutters, thresholds and ramps' sloped tops stay in and the ground
        under the feet returns about 9 ms late. Sean's fix: judge a piece that is stood on by what it is, not
