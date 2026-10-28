@@ -163,6 +163,7 @@ fingerprint changed too (3a8a8e7b91ab), so the door renders are made again once.
      scene, moved with their bodies, the cost with 40 cars), so each body's shape is made once for collision
      and for the acoustic scene (section 8). Air moved by passing things, leaf litter and impacts that pass on
      momentum ("Next", below) are stages 4 and 5;
+     surveyed 2026-10-27: thirteen steps, costs measured, five decisions for Cody (PHYSICS_BOUNDARY.md 18);
    - stage 5, moving air and loose layers;
    - stage 6, vehicles in full.
 10. A source heard from the whole of itself, steps 5 to 8 (Cody, 2026-10-16: "a river should sound like a flowing
