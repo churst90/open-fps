@@ -6,7 +6,7 @@ using OpenFPS.Materials;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// One constant for each law (docs/PHYSICS_BOUNDARY.md, stage 2, 16.6 and 16.7): the number is written once, in
+/// One constant for each law (docs/PHYSICS_BOUNDARY.md, stage 2, 16.6 to 16.8): the number is written once, in
 /// its home, and everything else reads it there. A second copy drifts: gravity was written 44 times, 40
 /// of them 9.81 and 4 of them 9.80665, so a car's tyres and its brakes fell at different rates.
 /// </summary>
@@ -114,6 +114,47 @@ public class OneConstantPerLawTests
         // The home is found by the same patterns: the guard is not blind to the law it protects.
         Assert.Contains(File.ReadLines(Path.Combine(RepoRoot(), "OpenFPS.Physics", "Wind.cs")),
                         l => GustLaws[1].IsMatch(l.TrimStart()));
+    }
+
+    /// <summary>The road load's two forms (16.8): a drag area, or a rolling resistance, in a product.</summary>
+    private static readonly Regex[] RoadLoadForms =
+    {
+        new(@"(?i)\w*DragArea\w*\s*\*|\*\s*[\w.?]*DragArea\b", RegexOptions.Compiled),
+        new(@"(?i)\w*RollingResistance\w*\s*\*|\*\s*[\w.?]*RollingResistance\b", RegexOptions.Compiled),
+    };
+
+    internal static List<string> RoadLoadCopies()
+        => CodeLines()
+            .Where(l => l.File != "OpenFPS.Physics/RoadLoad.cs")
+            .Where(l => RoadLoadForms.Any(r => r.IsMatch(l.Code)))
+            .Select(l => $"{l.File}:{l.Line}: {l.Code.Trim()}")
+            .ToList();
+
+    /// <summary>The capability (16.8): a tyre's peak grip times a gravity.</summary>
+    private static readonly Regex CapabilityForm =
+        new(@"(?=.*\bPeakGripG\b)(?=.*(?:Gravity|gravity|\bg\b)).*\*", RegexOptions.Compiled);
+
+    internal static List<string> CapabilityCopies()
+        => CodeLines()
+            .Where(l => l.File != "OpenFPS.Physics/Brakes.cs")
+            .Where(l => CapabilityForm.IsMatch(l.Code))
+            .Select(l => $"{l.File}:{l.Line}: {l.Code.Trim()}")
+            .ToList();
+
+    [Fact]
+    public void Road_load_is_written_once()
+    {
+        var copies = RoadLoadCopies();
+        Assert.True(copies.Count == 0,
+            "Drag and rolling resistance are RoadLoad.Drag and RoadLoad.Rolling; these write them again:\n" + string.Join("\n", copies));
+    }
+
+    [Fact]
+    public void Braking_capability_is_written_once()
+    {
+        var copies = CapabilityCopies();
+        Assert.True(copies.Count == 0,
+            "What a car's tyres can slow it at is Brakes.Capacity; these write it again:\n" + string.Join("\n", copies));
     }
 
     [Fact]

@@ -18,6 +18,10 @@ tag (docs/SOUND_LIBRARY_BOUNDARY.md, stage 8 and decision 8) and references the 
   `WindField`: `AirSample.Of(weather, at, heightAboveGround, worldSeconds).Velocity`, or `WindField.VelocityAt`, with the
   weather built from the broadcast as `WindWeather.Steady(WindAir.FromBroadcast(wind, gustiness, worldSeconds,
   travelEast, travelNorth))`. The field's wind falls off toward the ground by its log law and still gusts at gustiness 0.
+- Two laws in OpenFPS.Physics, each written once (docs/PHYSICS_BOUNDARY.md 16.8): `RoadLoad.Drag` and `RoadLoad.Rolling`,
+  a vehicle's drag and rolling resistance in newtons, and `Brakes.Capacity`, the most a car's tyres can slow it at under a
+  gravity, with an optional factor for the road's water. `VehicleStep.Capacity` is gone: a host that called it reads
+  `Brakes.Capacity(mechanics.Tyres, gravity)`. Nothing moves; the wire hash moves only because the source did.
 
 ## library/v0.2.0 (2026-10-24)
 

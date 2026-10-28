@@ -25,6 +25,8 @@ OpenFPS.Physics.RoadTexture	V
 OpenFPS.Physics.MagicCurve	P
 OpenFPS.Physics.WheelDynamics	P
 OpenFPS.Physics.TyreGrip	P
+OpenFPS.Physics.Brakes	P
+OpenFPS.Physics.RoadLoad	P
 OpenFPS.Physics.TyreMechanics	P
 OpenFPS.Physics.VehicleMechanics	P
 OpenFPS.Physics.RunningGear	P

@@ -60,8 +60,8 @@ public sealed class Driveline
         var v = Vehicle;
         float r = _gb.WheelRadiusMetres;
         float i = Ratio(Gear);
-        float drag = 0.5f * AirDensity * v.DragArea * Speed * Speed;
-        float roll = Speed > 0.05f ? v.RollingResistance * v.MassKg * Earth.StandardGravity : 0f;
+        float drag = RoadLoad.Drag(AirDensity, v.DragArea, Speed);
+        float roll = Speed > 0.05f ? RoadLoad.Rolling(v.RollingResistance, v.MassKg, Earth.StandardGravity) : 0f;
         float brake = Brake * MaxBrake * v.MassKg;
         float resist = drag + roll + brake;                 // N, against motion
 
@@ -434,8 +434,8 @@ public sealed class VirtualDriver
         // integral so a cruise settles.
         float wantAccel = _accelEstimate + err * 0.9f;
         float mass = _dl.Vehicle.MassKg;
-        float need = wantAccel * mass + 0.5f * Driveline.AirDensity * _dl.Vehicle.DragArea * _dl.Speed * _dl.Speed
-                   + _dl.Vehicle.RollingResistance * mass * Earth.StandardGravity;
+        float need = wantAccel * mass + RoadLoad.Drag(Driveline.AirDensity, _dl.Vehicle.DragArea, _dl.Speed)
+                   + RoadLoad.Rolling(_dl.Vehicle.RollingResistance, mass, Earth.StandardGravity);
         float available = MathF.Max(50f, e.PeakTorqueNm * 0.85f * _dl.Ratio(_dl.Gear) / _gb.WheelRadiusMetres);
         // The integral only while it can act: locked in gear, and not pushing past a throttle already
         // shut or wide open. Wound to -0.3 on a pull-away overshoot, it held a bike 10 km/h slow for 2 s.

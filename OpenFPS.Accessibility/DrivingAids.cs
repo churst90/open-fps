@@ -658,19 +658,22 @@ public sealed class DrivingAids
     }
 
     /// <summary>
-    /// What the tyres can give on this road now, m/s²: the car's peak grip, less what the water under every
-    /// wheel takes (RoadGripLaw.GripFactor), the least grip. Without wheels on the wire, dry.
+    /// What the tyres can give on this road now, m/s²: the car's capability (Brakes.Capacity) at standard
+    /// gravity, less what the water under every wheel takes (RoadGripLaw.GripFactor), the least grip. Without
+    /// wheels on the wire, dry; without a profile, a road tyre's.
     /// </summary>
     internal static float AvailableDecel(in AcousticBody car, VehicleProfile? profile, float speed)
     {
-        float grip = (profile?.Tyres.PeakGripG ?? 0.95f) * Earth.StandardGravity;
         float factor = 1f;
         if (car.HasWheels && profile != null)
             foreach (var wheel in car.Wheels.Span)
                 factor = MathF.Min(factor, RoadGripLaw.GripFactor(wheel.Surface, wheel.WaterMm, speed,
                                                                   profile.Tyres.InflationKPa, profile.Tyres.TreadDepthMm));
-        return grip * factor;
+        return Brakes.Capacity(profile?.Tyres.Mechanics ?? RoadTyre, Earth.StandardGravity, factor);
     }
+
+    /// <summary>The tyre a car without a profile is taken to have: the default's.</summary>
+    private static readonly TyreMechanics RoadTyre = new();
 
     /// <summary>Whether a crossing's bells are ringing: its bell is an emitter above the crossing whose
     /// SynthRunning the server sets while it is closed (CrossingSystem).</summary>

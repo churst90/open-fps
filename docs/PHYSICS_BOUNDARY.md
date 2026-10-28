@@ -2074,6 +2074,25 @@ run beside other work on the vehicle step, the sound's car or the guard. The phy
 surveys' `files.tsv` gain the new law file. About half a session for the renames and the guard; A with its
 listen about another half.
 
+**Built: the renames (2026-10-27).** On main `632639cf`. `OpenFPS.Physics/RoadLoad.cs` has `RoadLoad.Drag` and
+`RoadLoad.Rolling`, and `OpenFPS.Physics/Brakes.cs` has `Brakes.Capacity(tyres, gravity, gripFactor = 1)`, the
+tyres' peak grip (floored at 0.1 g, as `VehicleStep.Capacity` was) times the gravity and the water's factor. The
+server's car, the sound's `Driveline` and its `VirtualDriver` read `RoadLoad`, each keeping its own standstill cut
+(decision 3); `VehicleStep.Capacity` went, and the step, the world's edge and the driving aids read
+`Brakes.Capacity`, the aids' 0.95 fallback now a default `TyreMechanics`. Engine braking is one torque,
+`VehicleStep.EngineBrakingTorque`, read for the force and the reported torque. The trains' default pull-away and
+service brake are `TrainData.DefaultAccelerationMps2` and `DefaultBrakingMps2`, which `RailSystem` reads. Every
+float is computed in the order it was: the drives, traffic, rail, walks, the emitter streams, the spoken lines and
+the render fingerprint are unchanged, and the replays pass with 4 processors too. None of A to G was made.
+`OneConstantPerLawTests` gains two guards: a drag area or a rolling resistance in a product outside `RoadLoad.cs`,
+and a tyre's peak grip times a gravity outside `Brakes.cs`, each proven by writing copies back (drag in
+`Driveline`, rolling in `VehicleStep`, the capability in `DrivingAids`). `Brakes` and `RoadLoad` are on the
+physics' type list (P) and in both surveys' `files.tsv`; no crossing came or went. The plan above said the wire
+hash would stay: it cannot, because the hash is of the source text of every hashed project (Common, and Geometry,
+Materials, Acoustics, Sound but its `Core/`, Schema, Physics, Environment, Models and World), so any edit to one of
+their files moves it. It went from 053dd7700918 to f9e12325a5f2 with no change to the wire, and the server and the
+Windows client go out together. The door fingerprint stays 3a8a8e7b91ab.
+
 ## 17. Stage 3 as built (2026-10-16): the state, the world view, the vehicle step
 
 Made on Linux, on main `450b0244`, in four commits: the state types and a body's grounding on the wire; one

@@ -214,7 +214,7 @@ public static class DrivingSystem
         if (fence is { } f && going != 0f)
         {
             var way = new Vector3(MathF.Sin(drive.Heading), 0f, MathF.Cos(drive.Heading)) * going;
-            float stop = speed * speed / (2f * 0.8f * VehicleStep.Capacity(mechanics, gravity)) + 2f * speed * dt + EdgeMarginMetres;
+            float stop = speed * speed / (2f * 0.8f * Brakes.Capacity(mechanics.Tyres, gravity)) + 2f * speed * dt + EdgeMarginMetres;
             var here = transform.Position;
             if (UnbuiltWithin(here, way, stop, f))
             {

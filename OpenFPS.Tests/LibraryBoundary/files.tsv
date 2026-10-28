@@ -296,6 +296,7 @@ OpenFPS.Native/SteamAudio/Phonon.cs	lib	Native
 OpenFPS.Native/SteamAudio/PhononAmbisonics.cs	lib	Native	
 OpenFPS.Native/SteamAudio/PhononSim.cs	lib	Native	
 OpenFPS.Physics/BodyConstants.cs	lib	Physics	
+OpenFPS.Physics/Brakes.cs	lib	Physics	
 OpenFPS.Physics/Chassis.cs	lib	Physics	
 OpenFPS.Physics/ContactStream.cs	lib	Physics	
 OpenFPS.Physics/Earth.cs	lib	Physics	
@@ -308,6 +309,7 @@ OpenFPS.Physics/PhysicsState.cs	lib	Physics
 OpenFPS.Physics/PhysicsWorld.cs	lib	Physics	
 OpenFPS.Physics/RicochetLaw.cs	lib	Physics	
 OpenFPS.Physics/RoadGrip.cs	lib	Physics	
+OpenFPS.Physics/RoadLoad.cs	lib	Physics	
 OpenFPS.Physics/RunningGear.cs	lib	Physics	
 OpenFPS.Physics/SharedMovementEngine.cs	lib	Physics	
 OpenFPS.Physics/TyreGrip.cs	lib	Physics	

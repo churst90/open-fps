@@ -80,6 +80,8 @@ RULES = [
     (PH + 'MagicCurve', 'P', 'the Magic Formula'),
     (PH + 'WheelDynamics', 'P', 'planar per-wheel vehicle dynamics'),
     (PH + 'TyreGrip', 'P', 'the friction circle: the demand on a tyre against what it can give'),
+    (PH + 'Brakes', 'P', 'what a car can do to slow itself: its tyres\' capability (physics stage 2, 16.8)'),
+    (PH + 'RoadLoad', 'P', 'drag and rolling resistance, against a vehicle\'s motion (physics stage 2, 16.8)'),
     (PH + 'TyreMechanics', 'P', 'the physics half of a tyre preset: grip, Magic Formula shape, pressure, tread depth'),
     (PH + 'VehicleMechanics', 'P', 'the physics half of a vehicle preset: running gear, tyres, mass'),
     (SO + 'TyreFriction', 'S', 'the squeal onsets and amounts (the friction circle went to TyreGrip, physics stage 2)'),
