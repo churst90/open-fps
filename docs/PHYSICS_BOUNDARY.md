@@ -2505,6 +2505,45 @@ Swept queries stand in Geometry and a vehicle has one shape; no system uses eith
   no-penetration property, agreement with rays and `Overlapping`, a moved piece, terrain, an empty world) and
   VehicleBodyShapeTests (2).
 
+### 18.9 Step 4 as built (2026-10-27)
+
+Tests only (`BodyWorldAnalyticTests`, 31 cases): `BodyWorld` against closed-form physics. Nothing in the game or in
+`OpenFPS.Physics` changed, so the wire hash and the door fingerprint stand. Jolt agreed with every law; what it did
+not agree with was the step.
+
+- Restitution is exact in speed: a ball leaves at e times the speed it arrived at, 0.50000, 0.80000, 0.93000 and
+  0.20000 to five places over twelve drop heights each, and the pair rule holds (ball 0.8 on floor 0.3, and the
+  reverse, both bounce at 0.8; glass on glass through `ContactMaterial.Of` is 0.93, the table's one measured
+  restitution).
+- Heights are not exact, by the step. Jolt makes contacts ahead of touching within 2 cm (its default speculative
+  distance) and a ball at 6 m/s moves 5 cm a step. A ball that ends a step within 2 cm of the floor is turned back
+  there, early; one that was farther goes into the floor (31 mm at 6.3 m/s) and is turned back from there. The
+  first apex of a drop from 2 m therefore runs above and below h0 e^2 along a sawtooth of the impact's phase,
+  zero mean (mean -1.2, +2.3 and +2.2 mm for e 0.2, 0.5, 0.8; worst 25.4, 19.9 and 10.6 mm). The bound in the test is
+  2 cm plus half of (1 - e) v dt. An unlucky e 0.5 ball bounces 0.512 m for 0.500, and its third bounce 0.041 m for
+  0.031. Continuous collision (`MotionQuality.LinearCast`) was tried on dynamic bodies and changed nothing: it
+  stops tunnelling, not this. Not adopted; `BodyWorld` is unchanged. A bounce under 1 m/s does not happen at all
+  (Jolt's restitution speed threshold): a ball dropped 2 cm at e 0.9 stays down.
+- Two bodies: momentum is conserved to 1e-5 relative and both speeds after match the restitution law to float
+  rounding for e 0, 0.5, 0.7 and 1 (frictionless spheres, no gravity, masses 0.5 to 10 kg); the kinetic energy lost
+  is (1 - e^2) of the relative energy, 6.25 J for 6.25 J, 8.33333 J for 8.33333 J.
+- Slope: a Metal box (measured kinetic 0.57) on a Metal slab stays within 0.5 mm in two seconds at 10, 25 and 28
+  degrees (tan 28 = 0.53, 7 percent under the friction angle). Past it, at 20 to 40 degrees and mu 0.1 to 0.57, the
+  acceleration over one second is g (sin t - mu cos t) within half a percent, and the box slides straight. The
+  pair rule is the geometric mean: Metal on Ice, sqrt(0.57 x 0.035) = 0.141, an angle of 8.04 degrees, held at 6.54
+  and sliding at 0.259 m/s^2 as the law says at 9.54.
+- A throw: a ball thrown off an 8 m roof at 5 to 6 m/s lands within two steps of the ballistic flight, the vertical
+  landing speed within 0.15 m/s and the range within 31 mm of 6.5 to 9.1 m, on a box roof (vx, vy of 6/0, 5/4,
+  6/-3) and on a roof and street made as city tile meshes through `PieceBodies` (23 mm of 8.3 m). Jolt integrates
+  velocity and then position, so after n steps a body is below the true parabola by g dt t / 2 (5 cm after a
+  second): the ball lands 3 to 5 ms early by that, and the landing step is read up to one step late.
+- A stack of four 5 kg wood boxes (friction 0.38 on a floor of 0.6) set 2 mm apart sleeps together at 61 steps
+  (0.508 s, the half second under 0.03 m/s that Jolt waits), within 0.14 mm of stacked height, and stays put.
+- The same busy scene (62 bodies: boxes, balls and capsules on a floor and a slab, spinning, 6 s) run three
+  times, the third on another thread, gives the same hash of every pose and velocity (949e781cb21a8cfe on this
+  machine, at 12 cores and at `DOTNET_PROCESSOR_COUNT=4`). The hash is not stored in the test: it is the
+  machine's libm that CI might differ in (memory "ci-differs-from-local"), so only the runs are compared.
+
 ## Decisions (Cody, 2026-10-11)
 
 - Approved as recommended, all ten (section 8), with two changes:
