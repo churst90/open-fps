@@ -167,7 +167,8 @@ fingerprint changed too (3a8a8e7b91ab), so the door renders are made again once.
      steps 1 and 2 (Jolt shipped, `BodyWorld`) built 2026-10-27, unused by any system, wire hash 59dd0b1e4b31
      (PHYSICS_BOUNDARY.md 18.6); step 3 (tiles and door leaves as Jolt meshes, `PieceBodies`) and step 5 (sweeps,
      the vehicle's one shape as a kinematic body) built 2026-10-27, unused by any system, wire hash 4bd285bc1e17
-     (18.7, 18.8);
+     (18.7, 18.8); step 4 (analytic tests of `BodyWorld` against closed-form physics, tests only) built
+     2026-10-27 (18.9);
    - stage 5, moving air and loose layers;
    - stage 6, vehicles in full.
 10. A source heard from the whole of itself, steps 5 to 8 (Cody, 2026-10-16: "a river should sound like a flowing
