@@ -376,8 +376,12 @@ public class TrainData
     public string Track { get; set; } = "";
     public float TopSpeedKmh { get; set; } = 45f;
     public float StartOffsetMetres { get; set; }
-    public float AccelerationMps2 { get; set; } = 0.9f;
-    public float BrakingMps2 { get; set; } = 1.0f;
+    public float AccelerationMps2 { get; set; } = DefaultAccelerationMps2;
+    public float BrakingMps2 { get; set; } = DefaultBrakingMps2;
+
+    /// <summary>A train driver's pull-away and service brake, m/s², where the map gives none: the driver's
+    /// choice, not what the train can do.</summary>
+    public const float DefaultAccelerationMps2 = 0.9f, DefaultBrakingMps2 = 1.0f;
 }
 
 /// <summary>

@@ -14,6 +14,10 @@ tag (docs/SOUND_LIBRARY_BOUNDARY.md, stage 8 and decision 8) and references the 
   gutters, thresholds, shoulders and ramps no longer come back as a small room 9-15 ms after a close sound. A host does
   nothing; one whose maps have such pieces hears them go from the late field, the tail and far sources' echoes. Benches,
   tables, low walls and roofs stay, and so does a rail with air under it.
+- Two laws in OpenFPS.Physics, each written once (docs/PHYSICS_BOUNDARY.md 16.8): `RoadLoad.Drag` and `RoadLoad.Rolling`,
+  a vehicle's drag and rolling resistance in newtons, and `Brakes.Capacity`, the most a car's tyres can slow it at under a
+  gravity, with an optional factor for the road's water. `VehicleStep.Capacity` is gone: a host that called it reads
+  `Brakes.Capacity(mechanics.Tyres, gravity)`. Nothing moves; the wire hash moves only because the source did.
 
 ## library/v0.2.0 (2026-10-24)
 

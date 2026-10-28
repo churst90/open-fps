@@ -86,9 +86,6 @@ public sealed class VehicleStep
         if (gone != null) foreach (int id in gone) _cars.Remove(id);
     }
 
-    /// <summary>The most a car can do on its tyres in any direction, m/s².</summary>
-    public static float Capacity(VehicleMechanics mechanics, float gravity) => MathF.Max(0.1f, mechanics.Tyres.PeakGripG) * gravity;
-
     /// <summary>What a car is told for one step: where it is, what its driver has on the pedals and the wheel,
     /// the world's gravity and air, and what it must not stand on or drive into.</summary>
     public struct Input
@@ -139,7 +136,7 @@ public sealed class VehicleStep
         float v = input.Speed;
         float speed = MathF.Abs(v);
         float mass = MathF.Max(1f, mechanics.MassKg);
-        float capacity = Capacity(mechanics, gravity);
+        float capacity = Brakes.Capacity(mechanics.Tyres, gravity);
 
         // ── What the engine is pulling ──────────────────────────────────────────────────────────────
         var gb = mechanics.Gearbox!;
@@ -154,13 +151,10 @@ public sealed class VehicleStep
         if (throttle < 0f && speed > ReverseTopSpeed) tractive = 0f;
 
         // ── What is holding it back ─────────────────────────────────────────────────────────────────
-        float drag = 0.5f * input.AirDensity * mechanics.DragArea * v * v;
-        float rolling = mechanics.RollingResistance * mass * gravity;
+        float drag = RoadLoad.Drag(input.AirDensity, mechanics.DragArea, v);
+        float rolling = RoadLoad.Rolling(mechanics.RollingResistance, mass, gravity);
         float braking = Math.Clamp(brake, 0f, 1f) * capacity * mass;
-        float engineBraking = (1f - MathF.Abs(throttle))
-                            * engine.PeakTorqueNm * EngineBrakingFraction
-                            * (rpm / MathF.Max(1f, engine.RedlineRpm))
-                            * ratio / MathF.Max(0.05f, gb.WheelRadiusMetres);
+        float engineBraking = EngineBrakingTorque(engine, throttle, rpm) * ratio / MathF.Max(0.05f, gb.WheelRadiusMetres);
 
         float longitudinal = MathF.Sign(throttle) * tractive / mass;
         if (speed > StandstillSpeed)
@@ -313,7 +307,7 @@ public sealed class VehicleStep
             Clutch = 1f,
             LoadTorqueNm = MathF.Abs(throttle) > 0f && tractive > 0f
                 ? MathF.Abs(throttle) * torque
-                : -(1f - MathF.Abs(throttle)) * engine.PeakTorqueNm * EngineBrakingFraction * (rpm / MathF.Max(1f, engine.RedlineRpm)),
+                : -EngineBrakingTorque(engine, throttle, rpm),
             TyreDemand = demand,
             Wheels = car.Wire,
         };
@@ -321,6 +315,11 @@ public sealed class VehicleStep
     }
 
     private readonly List<PhysicsBody> _bodies = new(32);
+
+    /// <summary>What a closed throttle holds the crank back with at <paramref name="rpm"/>, Nm: a share of the
+    /// peak torque, in proportion to the revs. Stage 6 gives the server the engine's own friction instead.</summary>
+    private static float EngineBrakingTorque(EngineMechanics engine, float throttle, float rpm)
+        => (1f - MathF.Abs(throttle)) * engine.PeakTorqueNm * EngineBrakingFraction * (rpm / MathF.Max(1f, engine.RedlineRpm));
 
     /// <summary>
     /// The gear a driver would be in at this speed: the lowest not yet past the upshift. The client's engine

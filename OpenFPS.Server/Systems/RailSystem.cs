@@ -180,7 +180,7 @@ public sealed class RailSystem
                     continue;
                 }
                 float top = MathF.Max(1f, td.TopSpeedKmh) / 3.6f;
-                float brake = td.BrakingMps2 > 0 ? td.BrakingMps2 : 1.0f;
+                float brake = td.BrakingMps2 > 0 ? td.BrakingMps2 : TrainData.DefaultBrakingMps2;
                 RaceLine line;
                 // A tram leans into nothing and slides on nothing: the cornering figure is the
                 // lateral acceleration passengers stand up through, about 0.1 g.
@@ -236,7 +236,7 @@ public sealed class RailSystem
                               : TrainSignal.BellSource(layout) is int b and >= 0 ? layout[b].LevelDb : 0f,
                     Head = td.StartOffsetMetres, Speed = MathF.Min(v0, top), TopSpeed = top,
                     LengthMetres = profile.LengthMetres,
-                    Accel = td.AccelerationMps2 > 0 ? td.AccelerationMps2 : 0.9f, Brake = brake,
+                    Accel = td.AccelerationMps2 > 0 ? td.AccelerationMps2 : TrainData.DefaultAccelerationMps2, Brake = brake,
                 };
                 consist.NextStop = FirstStopAhead(consist.Stops, consist.Head);
                 _trains.Add(consist);
