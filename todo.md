@@ -131,7 +131,9 @@ fingerprint changed too (3a8a8e7b91ab), so the door renders are made again once.
        Done 2026-10-24 (af3ad786): open-fps does not have it (0 of 63,000 scattered starts, 0 on the busy
        street and at login); the check logs `[NEVER-STARTED]` and stands as the guard.
      - Ground in narrow strips heard as a small room (agreed 2026-10-27: Cody, "take it if you think it is more
-       realistic"; it is, since the ground under the feet is already in each voice and a second copy is a box). open-fps has the same rule:
+       realistic"; it is, since the ground under the feet is already in each voice and a second copy is a box).
+       Done 2026-10-27 (073ecdcc): a slab whose top is walkable and within a step of the ground is open ground
+       whatever its width. Albany's spawn keeps 175 low pieces where it kept 366; the city has no kerb boxes. open-fps has the same rule:
        `SteamAudioScene.IsOpenGround` leaves ground out of the listener's trace only when a piece is at least
        1 m each way and level, so kerbs, gutters, thresholds and ramps' sloped tops stay in and the ground
        under the feet returns about 9 ms late. Sean's fix: judge a piece that is stood on by what it is, not
