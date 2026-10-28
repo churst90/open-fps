@@ -281,8 +281,8 @@ public sealed class SteamAudioScene : IDisposable
     }
 
     /// <summary>How far over the ground a slab's underside may be and still rest on it, metres: an eighth of a
-    /// step, 5 cm. That is the ground's own unevenness under a piece laid on it; Albany's rails on their posts
-    /// hang 10-25 cm clear and are in the trace, a kerb on a road slab or a threshold is within a few cm.</summary>
+    /// step, 5 cm, the ground's own unevenness under a piece laid on it. A kerb on a road slab, a threshold and
+    /// a railway's rails on their ballast are within it; a rail on posts hangs clear and stays in the trace.</summary>
     private const float RestGap = BodyConstants.StepHeight * 0.125f;
 
     internal static (Vector3 Min, Vector3 Max) WorldExtents(in Box b)
