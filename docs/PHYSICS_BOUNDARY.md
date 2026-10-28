@@ -2585,7 +2585,7 @@ untouched and no system's stream content changed (DrivingReplay and MovementRepl
   continues with m * g * t; asleep it still continues; lifted away it ends; a box slid at 3 m/s slips at 3.0000 and
   both materials are right; ids stay in the band; two runs agree bit for bit; the collector between steps; off, the
   step is the same.
-- Wire hash 4bd285bc1e17 to WIREHASH (Physics is hashed), so the server and the Windows client deploy together.
+- Wire hash 4bd285bc1e17 to 262885684b9c (Physics is hashed), so the server and the Windows client deploy together.
   The door fingerprint does not move.
 
 ## Decisions (Cody, 2026-10-11)
