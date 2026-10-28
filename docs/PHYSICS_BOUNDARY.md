@@ -18,9 +18,9 @@ physics lives in Sound (docs/SOUND_LIBRARY_BOUNDARY.md, decision 2).
   accessibility, the editor) are surveyed in docs/ENGINE_PACKAGES.md, which places its materials and catalogue
   stages before stage 2 here.
 
-Where it stands (2026-10-17): stages 0 to 3 built (2026-10-11 to 16, sections 14 to 17). Stage 2 left one
-rolling resistance and drag law, one brake law, `WindModel` folded into `WindField`, and `VehicleChassisSpec`
-(16.6, "Left of stage 2"). Left: stages 4 to 6; stage 4 (rigid and soft bodies) goes with geometry stage 6's
+Where it stands (2026-10-27): stages 0 to 3 built (2026-10-11 to 16, sections 14 to 17). Stage 2 left one
+rolling resistance and drag law, one brake law and `VehicleChassisSpec` (16.6, "Left of stage 2"); `WindModel` went
+into `WindField` (16.7). Left: stages 4 to 6; stage 4 (rigid and soft bodies) goes with geometry stage 6's
 second half (docs/GEOMETRY.md section 7). Cody's decisions are in the last section (2026-10-11: all ten as
 recommended, soft bodies as well as rigid ones, gravity a property of the world, Jolt Physics through
 JoltPhysicsSharp).
@@ -43,7 +43,7 @@ JoltPhysicsSharp).
 14. Stage 0 as built (2026-10-11): the guards, the Jolt trial, other machines
 15. Stage 1 as built (2026-10-12): the project, the crossings, the moves
 16. Stage 2 as it is built: the tyre, the vehicle, the engine, the ground probes and the body (2026-10-12), the
-    ricochet, one gravity and one air (2026-10-16)
+    ricochet, one gravity and one air (2026-10-16), one wind (2026-10-27)
 17. Stage 3 as built (2026-10-16): the state, the world view, the vehicle step
 
 ---
@@ -1821,12 +1821,70 @@ octave band, most of it by a few hundredths, but where landings re-roll.
   `DoorModelFingerprint` changes (cfb37eeb081b, d8da086ecd2c after): the door renders cached on disk are made
   again.
 - **Left of stage 2:** `VehicleSpec`'s `VehicleChassisSpec` (16.2); one rolling resistance and drag law and
-  one brake law; `WindModel` folded into `WindField`. Of the constants:
+  one brake law (`WindModel` went into `WindField` in 16.7). Of the constants:
   `tools/gen_city.py` and `tools/gen_osm.py` still write g as 9.81 into the maps' braking and pulling numbers
   (with 9.80665 two would round differently, 2.58 to 2.57 and 1.79 to 1.78 m/s², so the maps regenerate with
   it); the heard laws' 343 beside the density, which the plan has them take from the same air; the
   engine's own gas law for its charge (`Gas`, R = 288 for burnt gas and air together); the client's aids
   reading the map's gravity from the manifest.
+
+### 16.7 One wind (2026-10-27)
+
+Made on Linux, on main `f55dd320`, in one code commit. The server's bullets read the wind the ears hear, and
+`WindModel` is gone. Nothing stored moved.
+
+- **Before.** A round felt `WindModel.Felt`: the broadcast 10 m wind, the same at every height and place,
+  swung by three sines of the server's monotonic clock (0.11, 0.29 and 0.73 Hz, weighted 0.5, 0.3 and 0.2,
+  times 1.2 times the gustiness). The comment called the rates incommensurate; they repeat exactly every
+  100 s. Everything heard reads `WindField`: a log law by height (0.15 m roughness, 10 m reference) and a
+  carried eddy pattern of 180, 72, 29, 12 and 5 m eddies.
+- **Now.** A round reads `WindField` through `AirSample.Of`, the physics' one air sample, once a 0.01 s
+  segment (about 8 m of a rifle's flight), at its own place, at its height over the ground its shooter stands
+  on, and at the world time it is there. The height is measured from the shooter's feet as the ears measure
+  theirs from the listener's feet; the ground under the round's path is not looked up. The world time is the
+  server's `WorldTime` (`WindField.Now`), the clock every client reads the field at, through
+  `CombatService.WorldClock` so a test can set it. The weather is built at the shot as `FireSystem.WindFor`
+  builds it: the broadcast wind and gustiness, with the eddy pattern carried as far as
+  `WorldEnvironmentSystem.WindTravel` says, which is what the clients are sent. It is held for the flight
+  (4 s at most). The flight flown ahead for the flyby sounds and the real flight read the same weather, so
+  the two still agree.
+- **Along the flight, not at the muzzle.** Reading once a segment costs 0.8 µs a read in a Debug build, 0.33
+  ms for a 4 s flight's 400 reads against 1.5 ms of integrating it, once a shot for the flight flown ahead;
+  each tick's real flight adds about two reads a round. The eddies are 5 to 180 m, and a 300 m shot crosses
+  several, so a reading at the muzzle would hand the whole flight one eddy's gust.
+- **What moves.** A Remington 700 at 300 m through the 4-12 scope, zeroed at 100 m and come up for 300 m,
+  standing on open ground, 8 m/s straight across, gustiness 0.6, a shot every half second for a minute:
+
+  | Wind | Drift, mean | Spread (sd) | Range |
+  |---|---|---|---|
+  | `WindModel` (any minute: it repeats every 100 s) | 0.436 m | 0.133 m | 0.18 to 0.70 m |
+  | `WindField`, minute from world time 25,000,000 | 0.253 m | 0.037 m | 0.20 to 0.35 m |
+  | `WindField`, the same an hour later | 0.291 m | 0.036 m | |
+  | 8 m/s held steady | 0.429 m | | |
+  | `WindField`'s mean alone, no eddies | 0.255 m | | |
+
+  Over an hour the field's mean drift is 0.251 m (sd 0.042 m); read only at the muzzle it would be 0.236 m
+  (sd 0.065 m). The round flies at about 1.7 m, where the log law gives 0.58 of the 10 m wind: the height is
+  most of the difference, and the spread from shot to shot is about a quarter of the sines'. No shelter is
+  added; a shot from behind a building feels the open wind as before (the field's shelter is stage 5's).
+- **Gustiness 0 is not steady air now.** The field's turbulence is 0.18 + 0.12 × gustiness, so a wind the
+  server calls steady still gusts, as it already did for the ears. Still air is exactly zero.
+- **Tests.** `WeatherAndConvergenceTests` kept one of `WindModel`'s five tests, moved onto the field: two
+  hours at 10 m at gustiness 1, the wind never reverses, swells past 1.6 times and lulls below half. The
+  bounds and determinism tests tested only the sines (`WeatherWindTests` covers the field's determinism and
+  its still air), and the shelter test tested a factor nothing passed. `ScopedFireTests` has a 500 m
+  crosswind shot: unaided it misses right, held off by the field's drift it hits, and the 10 m wind held
+  steady would have drifted it more than half the target's width further.
+- **Guard** (`OneConstantPerLawTests.Wind_is_one_gust_law`): outside `Wind.cs`, no method that takes a
+  gust-named number and a time (a double or float called seconds, time, t, clock or now, or ending in
+  Seconds, Time or Clock), no gust-named method of a time, and no line that weighs a sine or cosine by a
+  gust. Proven by writing `WindModel.cs` back (it listed `GustFactor`, `Felt` and `FeltSpeed`) and a scratch
+  sine weighed by a gustiness (listed). It reads names: a law whose parameters are called g and at passes it.
+- **The ratchet:** `WindModel` left the physics' types, the survey's rules and both `files.tsv`; the surveys
+  rerun write the lists exactly, and no crossing came or went.
+- **The wire hash** changes (053dd7700918 at `f55dd320`, dbce021dfe02 after): it hashes `OpenFPS.Physics`'
+  source text and `WindModel.cs` left it. Nothing sent changed shape, but the server and the Windows client go
+  out together. `DoorModelFingerprint` stays 3a8a8e7b91ab.
 
 ## 17. Stage 3 as built (2026-10-16): the state, the world view, the vehicle step
 
