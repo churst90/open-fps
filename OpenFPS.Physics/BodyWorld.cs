@@ -237,6 +237,9 @@ public sealed class BodyWorld : IDisposable
             // Jolt damps every body by 5 percent a second unless told not to, a drag we never chose: the air's drag is
             // the physics' own law (docs/PHYSICS_BOUNDARY.md 16.8), so a body falls at the world's gravity alone.
             LinearDamping = 0f, AngularDamping = 0f,
+            // A ball rolling over a flat mesh hops 55 mm at the seams without it: a sphere meeting an edge the mesh shares
+            // with a coplanar neighbour takes the edge's normal. Costs nothing on shapes that are not meshes.
+            EnhancedInternalEdgeRemoval = motion == BodyMotion.Dynamic,
         };
         if (motion == BodyMotion.Dynamic)
         {

@@ -26,6 +26,9 @@ public class PieceBodiesTests
     /// resting body sink into a surface by up to its penetration slop (2 cm); the measured worst is in 18.7.</summary>
     public const float Tolerance = 0.02f;
 
+    /// <summary>The same on the maps' tiles, where nothing is thicker than a mesh's skin: measured 0.2 mm at worst.</summary>
+    public const float MapTolerance = 0.005f;
+
     private readonly ITestOutputHelper _out;
     public PieceBodiesTests(ITestOutputHelper output) => _out = output;
 
@@ -108,18 +111,8 @@ public class PieceBodiesTests
         w.SetVelocity(ball, new Vector3(3f, 0f, 1.3f));
         w.SetAngularVelocity(ball, new Vector3(1.3f, 0f, -3f) / 0.15f);   // already rolling, so only the seams can slow it
         float highest = 0f;
-        for (int i = 0; i < 240; i++) { w.Step(); float e = MathF.Abs(w.Position(ball).Y - 0.15f); if (e > highest) { highest = e; { var any = new AcceptAll(); var q = w.Position(ball); _out.WriteLine($"step {i}: {q} floor here {world.FloorAt(q.X, q.Z, 2f, GeometryLayers.Ground, ref any, out var hh)} normal {hh.Normal}"); } } }
+        for (int i = 0; i < 240; i++) { w.Step(); highest = MathF.Max(highest, MathF.Abs(w.Position(ball).Y - 0.15f)); }
         _out.WriteLine($"rolled {w.Position(ball) - new Vector3(100f, 0.151f, 110f)}, speed {w.Velocity(ball)}, worst height error {highest * 1000:F2} mm");
-        {
-            using var w2 = new BodyWorld();
-            int floor = w2.Add(w2.AddBox(new Vector3(100f, 1f, 100f)), BodyMotion.Static, new Vector3(100f, -1f, 100f), Quaternion.Identity, "Dirt");
-            int b2 = w2.Add(w2.AddSphere(0.15f), BodyMotion.Dynamic, new Vector3(100f, 0.151f, 110f), Quaternion.Identity, "Metal", 2f);
-            w2.SetVelocity(b2, new Vector3(3f, 0f, 1.3f));
-            w2.SetAngularVelocity(b2, new Vector3(1.3f, 0f, -3f) / 0.15f);
-            float hi2 = 0f;
-            for (int i = 0; i < 240; i++) { w2.Step(); hi2 = MathF.Max(hi2, MathF.Abs(w2.Position(b2).Y - 0.15f)); }
-            _out.WriteLine($"control on a box: speed {w2.Velocity(b2)}, worst height error {hi2 * 1000:F2} mm");
-        }
         Assert.True(highest < 0.002f, $"the ball left the floor by {highest * 1000:F2} mm");
         Assert.True(w.Velocity(ball).X > 2.9f, $"the ball slowed to {w.Velocity(ball)}");
         Assert.True(w.Velocity(ball).Z > 1.25f, $"the ball veered to {w.Velocity(ball)}");
@@ -329,7 +322,7 @@ public class PieceBodiesTests
         public required TriangleWorld Geometry;
         public required BodyWorld World;
         public required PieceBodies Bodies;
-        public double LoadMs, PrepareMs, AddMs, WorstPumpMs;
+        public double LoadMs, PrepareMs, AddMs, WorstPumpMs, FirstTickMs, SecondTickMs;
         public int Pieces, Triangles, Vertices, PumpCalls, Leaves;
         public double WorstPrepareMs;
         public void Dispose() { Bodies.Dispose(); World.Dispose(); }
@@ -391,9 +384,14 @@ public class PieceBodiesTests
             calls++;
         }
         double add = clock.Elapsed.TotalMilliseconds;
+        // The first step after the tiles are in is where an unoptimised broad phase would show itself (18.4).
+        int probe = w.Add(w.AddSphere(0.2f), BodyMotion.Dynamic, new Vector3(0f, 500f, 0f), Quaternion.Identity, "Metal", 1f);
+        var step = Stopwatch.StartNew(); w.Tick(); double first = step.Elapsed.TotalMilliseconds;
+        step.Restart(); w.Tick(); double second = step.Elapsed.TotalMilliseconds;
+        w.Remove(probe);
         return new Held
         {
-            Map = map, Geometry = geo, World = w, Bodies = bodies, LoadMs = load, PrepareMs = prepare, AddMs = add, WorstPumpMs = worst,
+            Map = map, Geometry = geo, World = w, Bodies = bodies, LoadMs = load, PrepareMs = prepare, AddMs = add, WorstPumpMs = worst, FirstTickMs = first, SecondTickMs = second,
             Pieces = made.Count, Triangles = made.Values.Sum(p => p.Triangles), Vertices = made.Values.Sum(p => p.Vertices), PumpCalls = calls,
             WorstPrepareMs = made.Values.Max(p => p.BuildMs), Leaves = bodies.LeafCount,
         };
@@ -404,7 +402,7 @@ public class PieceBodiesTests
     /// plane to 1 cm), all at once with 1.2 m between. Each comes to rest where <c>FloorAt</c> at its place says, a
     /// radius along the floor's normal. Returns how many were dropped, the worst miss, and the worst ball's place.
     /// </summary>
-    private (int Dropped, float Worst, Vector3 At) Drop(Held h, Func<float, float, bool> inside, int want, int seed, float radius = 0.2f)
+    private (int Dropped, float Worst, Vector3 At, int Rolling) Drop(Held h, Func<float, float, bool> inside, int want, int seed, float radius = 0.2f)
     {
         var any = new AcceptAll();
         var rng = new Random(seed);
@@ -441,24 +439,27 @@ public class PieceBodiesTests
             balls.Add((h.World.Add(shape, BodyMotion.Dynamic, start, Quaternion.Identity, "Metal", 4f), start));
         }
         for (int i = 0; i < 180; i++) h.World.Step();
-        float worst = 0f; var worstAt = Vector3.Zero;
+        float worst = 0f; var worstAt = Vector3.Zero; int shown = 0, rolling = 0;
         foreach (var (id, start) in balls)
         {
             var at = h.World.Position(id);
             float y = geo.FloorAt(at.X, at.Z, at.Y + 0.5f, GeometryLayers.Ground, ref any, out var hit);
             float expected = y + radius / hit.Normal.Y;
             float miss = MathF.Abs(at.Y - expected);
+            // A ball that rolled off a ledge or down a bank is still falling or rolling and has left the floor it started on: not a miss of the floor.
+            if (miss > Tolerance && h.World.Velocity(id).Length() > 0.05f) { rolling++; continue; }
             if (miss > worst) { worst = miss; worstAt = start; }
+            if (miss > Tolerance && ++shown <= 12) _out.WriteLine($"miss {miss * 1000:F0} mm: dropped at {start} (floor {start.Y - 0.6f}), ended {at} (floor {y}, normal {hit.Normal.Y:F3}), speed {h.World.Velocity(id).Length():F2}");
         }
         foreach (var (id, _) in balls) h.World.Remove(id);
         h.World.RemoveShape(shape);
-        return (balls.Count, worst, worstAt);
+        return (balls.Count, worst, worstAt, rolling);
     }
 
-    private void Report(string mapId, Held h, (int Dropped, float Worst, Vector3 At) r)
+    private void Report(string mapId, Held h, (int Dropped, float Worst, Vector3 At, int Rolling) r)
         => _out.WriteLine($"{mapId}: map loaded {h.LoadMs:F0} ms; {h.Pieces} pieces ({h.Triangles:N0} triangles, {h.Vertices:N0} welded vertices) "
                           + $"made on workers in {h.PrepareMs:F0} ms (slowest piece {h.WorstPrepareMs:F0} ms); added {h.World.BodyCount} bodies in {h.PumpCalls} calls "
-                          + $"of 4 in {h.AddMs:F0} ms (worst call {h.WorstPumpMs:F1} ms); {h.Leaves} leaves; {r.Dropped} balls dropped, worst miss "
+                          + $"of 4 in {h.AddMs:F0} ms (worst call {h.WorstPumpMs:F1} ms); first tick after {h.FirstTickMs:F1} ms, second {h.SecondTickMs:F1} ms; {h.Leaves} leaves; {r.Dropped} balls dropped ({r.Rolling} rolled off a ledge or bank, left out), worst miss "
                           + $"{r.Worst * 1000:F1} mm at {r.At.X:F1}, {r.At.Z:F1}, {r.At.Y:F2}");
 
     [Fact]
@@ -468,7 +469,8 @@ public class PieceBodiesTests
         var r = Drop(h, (_, _) => true, 600, 1);
         Report("city", h, r);
         Assert.True(r.Dropped >= 400, $"only {r.Dropped} places were level enough to test");
-        Assert.True(r.Worst <= Tolerance, $"a ball came to rest {r.Worst * 1000:F1} mm off the floor, dropped at {r.At}");
+        Assert.True(r.Rolling <= r.Dropped / 50, $"{r.Rolling} of {r.Dropped} balls rolled off");
+        Assert.True(r.Worst <= MapTolerance, $"a ball came to rest {r.Worst * 1000:F1} mm off the floor, dropped at {r.At}");
     }
 
     [Fact]
@@ -478,7 +480,8 @@ public class PieceBodiesTests
         var r = Drop(h, (_, _) => true, 600, 2);
         Report("magnolia_tx", h, r);
         Assert.True(r.Dropped >= 400, $"only {r.Dropped} places were level enough to test");
-        Assert.True(r.Worst <= Tolerance, $"a ball came to rest {r.Worst * 1000:F1} mm off the floor, dropped at {r.At}");
+        Assert.True(r.Rolling <= r.Dropped / 50, $"{r.Rolling} of {r.Dropped} balls rolled off");
+        Assert.True(r.Worst <= MapTolerance, $"a ball came to rest {r.Worst * 1000:F1} mm off the floor, dropped at {r.At}");
     }
 
     [Fact]

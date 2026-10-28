@@ -2440,6 +2440,44 @@ Jolt is in and the body API stands; no game system uses it, so nothing heard mov
 - The wire hash moves from 54ce2252ff38 to 59dd0b1e4b31 (the new package reference), so the server and the
   Windows client deploy together. The door fingerprint does not move.
 
+### 18.7 Step 3 as built (2026-10-27)
+
+Jolt holds the tiles and the door leaves as meshes; nothing steps them in the game yet, so nothing heard moves. The
+server is untouched: the feeder is a Physics type, `PieceBodies`, and the tests drive it.
+
+- Meshes, not height fields. Our ground is two triangles a cell with the diagonal from post (i, j) to (i+1, j+1) and a
+  material a cell; Jolt's height field has its own diagonal rule and one material per block, and posts differ by up to
+  3.6 mm (14.8). Meshes made from the very triangles the BVH holds keep Jolt's ground the BVH's, and cost the same
+  mesh path as buildings and leaves.
+- `PieceBodies.Prepare(GeometryPiece)` runs on any thread and touches no world: it keeps the triangles on the
+  Movement and Ground layers, groups them by material (friction and restitution are per body, so a piece is one body a
+  material), welds corners within 2 mm, and has Jolt build each shape (`BuiltMesh`). Welding matters: Jolt finds the
+  active edges by shared vertex indices, and our corners come from different edges to a float's rounding.
+  `Pump(n)` on the world's thread registers shapes and adds n bodies, and calls `Optimize` once when a tile's last body
+  is in. `Follow(TriangleWorld, ...)` diffs tiles by key and signature and leaves by owner, asks for pieces it lacks
+  (`missing`) and takes them on the next call. A prepared piece goes into a world once (`Taken`). Leaves of one build
+  share a shape; a leaf is kinematic, moved with `MoveKinematic` over the tick so it carries what stands on it, and
+  told once to stop when it stops (a kinematic body keeps its last velocity).
+- Added to `BodyWorld`: `AddMesh(BuiltMesh)`, `MoveKinematic`, and `EnhancedInternalEdgeRemoval` on dynamic bodies.
+  Measured: a ball rolling at 3.3 m/s over a flat welded mesh hopped 55 mm at the seams and lost a tenth of its speed
+  without it, whatever the grid (126 posts at 2 m, 51 at 5 m); with it 0.32 mm, the same as on a box.
+- Measured, city (loaded as the server loads it, 279 ms): 20 pieces, 71,180 triangles, 41,382 welded vertices,
+  made on workers in 34 to 61 ms (slowest piece 33 to 57 ms), 605 bodies added four a call in 2 ms (worst call
+  0.1 ms), 514 leaves; the first tick after the tiles are in 1.4 ms, the second 0.5 ms. Magnolia (5.6 to 7.4 s to load):
+  206 pieces, 6,537,928 triangles, 3,361,791 welded vertices, made on workers in 1.3 to 1.6 s (slowest piece 220 to
+  320 ms), 2,605 bodies added four a call in 21 to 29 ms (worst call 0.6 to 3.1 ms, `Optimize` included), 1,324
+  leaves; first tick after 3.5 ms, second 1.1 ms. So the 18 to 72 ms first-add spikes of 18.4 are gone from the tick:
+  the tree is built on a worker, a tile arrives a few bodies a tick, and the broad phase is rebuilt once per tile.
+- Tests (`PieceBodiesTests`): 600 balls dropped 0.6 m on level places of the city and of Magnolia (the floor within
+  1 cm of its plane at 0.6 m on four sides) come to rest where `FloorAt` says: worst miss 0.0 mm on the city, 0.2 mm
+  on Magnolia, bound 5 mm. One ball in 600 on the city and three on Magnolia rolled off a ledge or bank and are left
+  out (each still moving). A tile dropped takes its ground with it and its shape; a tile changed under its key is
+  replaced; pieces made on workers go in on the world's thread; a leaf moved moves its body and carries a ball up;
+  all 514 city leaves stand at their instances' poses and every door's at `DoorSystem.LeafAt`. The two map tests take
+  about 7 s together, almost all of it Magnolia's load.
+- The wire hash moves from 59dd0b1e4b31 to 34e9a14ed702 (Physics is hashed; this includes the layer-table fix
+  merged from main), so the server and the Windows client deploy together. The door fingerprint does not move.
+
 ## Decisions (Cody, 2026-10-11)
 
 - Approved as recommended, all ten (section 8), with two changes:
