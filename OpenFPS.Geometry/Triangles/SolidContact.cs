@@ -391,7 +391,7 @@ public static class SolidContact
     }
 
     /// <summary>The point of triangle abc nearest to p (Ericson 5.1.5).</summary>
-    private static Vector3 ClosestOnTriangle(Vector3 p, Vector3 a, Vector3 b, Vector3 c)
+    internal static Vector3 ClosestOnTriangle(Vector3 p, Vector3 a, Vector3 b, Vector3 c)
     {
         var ab = b - a; var ac = c - a; var ap = p - a;
         float d1 = Vector3.Dot(ab, ap), d2 = Vector3.Dot(ac, ap);

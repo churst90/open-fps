@@ -127,6 +127,8 @@ RULES = [
     (SO + 'ImpactAcoustics', 'S', 'the sound of an impact from two masses and a closing speed'),
     # Geometry
     (G + 'SolidContact', 'G', 'cylinder and capsule against a solid'),
+    (G + 'SweptShape', 'G', 'a ball, capsule or box moved along a segment against the triangles (step 5)'),
+    (G + 'SweepHit', 'G', ''),
     (G + 'BodyShape', 'G', ''),
     (G + 'WheelRays', 'G', 'a ray down at each wheel; Rest (the pose from the rays) is mechanics'),
     (G + 'WheelContact', 'G', ''),

@@ -254,6 +254,7 @@ OpenFPS.Geometry/Triangles/BodyShell.cs	lib	Geometry
 OpenFPS.Geometry/Triangles/Bvh.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/Facets.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/FloodOpenings.cs	lib	Geometry	
+OpenFPS.Geometry/Triangles/GeometryPiece.Sweeps.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/GeometryPiece.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/Heightfield.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/MeshAssets.cs	lib	Geometry	
@@ -266,7 +267,9 @@ OpenFPS.Geometry/Triangles/Shapes.cs	lib	Geometry
 OpenFPS.Geometry/Triangles/SolidContact.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/StraightSkeleton.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/Surfaces.cs	lib	Geometry	
+OpenFPS.Geometry/Triangles/SweptShapes.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/TriangleGeometry.cs	lib	Geometry	
+OpenFPS.Geometry/Triangles/TriangleWorld.Sweeps.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/TriangleWorld.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/TriangleWorldBuilder.cs	lib	Geometry	
 OpenFPS.Geometry/Triangles/WheelRays.cs	lib	Geometry	
