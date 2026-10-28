@@ -58,6 +58,16 @@ public class NarrowGroundTests
     }
 
     [Fact]
+    public void A_slab_turned_over_is_judged_as_it_lies()
+    {
+        // Turned half over about a level axis, a box is the same slab: the old test took either face as the top.
+        var over = Quaternion.CreateFromAxisAngle(Vector3.UnitX, MathF.PI);
+        Assert.True(IsOpen(new SteamAudioScene.Box(new Vector3(5f, 0.05f, 0), new Vector3(4f, 0.1f, 4f), over, "Asphalt", default, 22)), "broad slab");
+        Assert.True(IsOpen(new SteamAudioScene.Box(new Vector3(5f, 0.075f, 0), new Vector3(0.15f, 0.15f, 3f), over, "Concrete", default, 23)), "kerb");
+        Assert.False(IsOpen(new SteamAudioScene.Box(new Vector3(5f, 0.725f, 0), new Vector3(1.5f, 0.05f, 0.8f), over, "Wood", default, 24)), "table top");
+    }
+
+    [Fact]
     public void A_bench_a_table_a_low_wall_and_a_roof_are_not()
     {
         Assert.False(IsOpen(At(30, 5f, 0.45f, 1.6f, 0.45f, 0.5f, "Wood")), "bench seat");

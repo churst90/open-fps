@@ -193,9 +193,10 @@ public sealed class SteamAudioScene : IDisposable
     {
         if (b.Size.Y > SlabThickness) return false;
         // Turned so that a body could not walk on its top, it is not a floor (a wall, a fence panel on its side).
+        // A slab turned over is the same slab: either Y face may be the top.
         var up = Vector3.Transform(Vector3.UnitY, b.Rotation);
-        if (up.Y < SolidContact.WalkableCos) return false;
-        bool broadAndLevel = b.Size.X >= 1f && b.Size.Z >= 1f && up.Y >= 0.99f;
+        if (MathF.Abs(up.Y) < SolidContact.WalkableCos) return false;
+        bool broadAndLevel = b.Size.X >= 1f && b.Size.Z >= 1f && MathF.Abs(up.Y) >= 0.99f;
         var (min, max) = own;
         float top = max.Y;
         // At ground level where it lies: on terrain, the ground's own height under its middle.
@@ -205,7 +206,7 @@ public sealed class SteamAudioScene : IDisposable
         // a gutter, a threshold, a ramp, a shoulder) is ground when it is stood on, whatever its width: the
         // lowest of its top is no more than a step above the ground, so a body walks up onto it. A bench
         // seat, a narrow table top and a low wall's top are higher than that and stay.
-        if (!broadAndLevel && LowestTop(b) > groundY + BodyConstants.StepHeight) return false;
+        if (!broadAndLevel && LowestTop(b, MathF.Sign(up.Y)) > groundY + BodyConstants.StepHeight) return false;
         // Open to the sky over most of it: the middle and four points halfway to the corners.
         var c = (min + max) * 0.5f;
         var q = (max - min) * 0.25f;
@@ -220,14 +221,15 @@ public sealed class SteamAudioScene : IDisposable
         return open >= 3;
     }
 
-    /// <summary>The height of the lowest corner of the box's top face, where a body steps onto it.</summary>
-    private static float LowestTop(in Box b)
+    /// <summary>The height of the lowest corner of the box's top face (its +Y face, or -Y when turned over),
+    /// where a body steps onto it.</summary>
+    private static float LowestTop(in Box b, float upSign)
     {
         var h = b.Size * 0.5f;
         float low = float.MaxValue;
         for (int i = 0; i < 4; i++)
         {
-            var corner = new Vector3((i & 1) == 0 ? -h.X : h.X, h.Y, (i & 2) == 0 ? -h.Z : h.Z);
+            var corner = new Vector3((i & 1) == 0 ? -h.X : h.X, upSign * h.Y, (i & 2) == 0 ? -h.Z : h.Z);
             low = MathF.Min(low, b.Center.Y + Vector3.Transform(corner, b.Rotation).Y);
         }
         return low;
