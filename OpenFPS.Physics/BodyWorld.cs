@@ -175,6 +175,15 @@ public sealed class BodyWorld : IDisposable
         return Keep(settings.Create());
     }
 
+    /// <summary>A mesh made ahead (<see cref="BuiltMesh.Build"/>, on any thread) and put in this world: the world takes the
+    /// shape over, so the mesh is not disposed by the caller after this. The shape's handle.</summary>
+    public int AddMesh(BuiltMesh built)
+    {
+        Check();
+        ArgumentNullException.ThrowIfNull(built);
+        return Keep(built.Release());
+    }
+
     /// <summary>Lets go of a shape no body uses.</summary>
     public void RemoveShape(int shapeId)
     {
@@ -261,6 +270,18 @@ public sealed class BodyWorld : IDisposable
         var e = Get(bodyId);
         var id = e.Body.ID;
         _system.BodyInterface.SetPositionAndRotation(id, position, orientation, e.Motion == BodyMotion.Static ? Activation.DontActivate : Activation.Activate);
+    }
+
+    /// <summary>Moves a kinematic body to a pose over <paramref name="seconds"/>, so it carries the velocity that gets it there
+    /// and pushes what it meets; <see cref="SetPose"/> would put it there without a speed. The pose is reached at the
+    /// next step.</summary>
+    public void MoveKinematic(int bodyId, Vector3 position, Quaternion orientation, float seconds)
+    {
+        var e = Get(bodyId);
+        if (e.Motion != BodyMotion.Kinematic) throw new InvalidOperationException($"body {bodyId} is not kinematic");
+        if (!(seconds > 0f) || !float.IsFinite(seconds)) throw new ArgumentOutOfRangeException(nameof(seconds), seconds, "a positive time");
+        var id = e.Body.ID;
+        _system.BodyInterface.MoveKinematic(id, position, orientation, seconds);
     }
 
     public Vector3 Position(int bodyId)
