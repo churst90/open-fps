@@ -260,6 +260,7 @@ OpenFPS.Geometry/Triangles/BodyShell.cs	Geometry
 OpenFPS.Geometry/Triangles/Bvh.cs	Geometry	
 OpenFPS.Geometry/Triangles/Facets.cs	Geometry	
 OpenFPS.Geometry/Triangles/FloodOpenings.cs	Geometry	
+OpenFPS.Geometry/Triangles/GeometryPiece.Sweeps.cs	Geometry	
 OpenFPS.Geometry/Triangles/GeometryPiece.cs	Geometry	
 OpenFPS.Geometry/Triangles/Heightfield.cs	Geometry	
 OpenFPS.Geometry/Triangles/MeshAssets.cs	Geometry	
@@ -272,7 +273,9 @@ OpenFPS.Geometry/Triangles/Shapes.cs	Geometry
 OpenFPS.Geometry/Triangles/SolidContact.cs	Geometry	
 OpenFPS.Geometry/Triangles/StraightSkeleton.cs	Geometry	
 OpenFPS.Geometry/Triangles/Surfaces.cs	Geometry	
+OpenFPS.Geometry/Triangles/SweptShapes.cs	Geometry	
 OpenFPS.Geometry/Triangles/TriangleGeometry.cs	Geometry	
+OpenFPS.Geometry/Triangles/TriangleWorld.Sweeps.cs	Geometry	
 OpenFPS.Geometry/Triangles/TriangleWorld.cs	Geometry	
 OpenFPS.Geometry/Triangles/TriangleWorldBuilder.cs	Geometry	
 OpenFPS.Geometry/Triangles/WheelRays.cs	Geometry	

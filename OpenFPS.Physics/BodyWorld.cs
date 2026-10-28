@@ -180,6 +180,20 @@ public sealed class BodyWorld : IDisposable
         return Keep(settings.Create());
     }
 
+    /// <summary>The shape of a mesh, made the first time and shared after: bodies of one vehicle kind all stand on the
+    /// one mesh (by its content hash). Let go of with <see cref="RemoveShape"/> like any other.</summary>
+    public int AddMeshOnce(MeshAsset mesh)
+    {
+        Check();
+        ArgumentNullException.ThrowIfNull(mesh);
+        if (_meshShapes.TryGetValue(mesh.Hash, out int had) && _shapes.ContainsKey(had)) return had;
+        int id = AddMesh(mesh);
+        _meshShapes[mesh.Hash] = id;
+        return id;
+    }
+
+    private readonly Dictionary<ulong, int> _meshShapes = new();
+
     /// <summary>Lets go of a shape no body uses.</summary>
     public void RemoveShape(int shapeId)
     {
@@ -187,6 +201,7 @@ public sealed class BodyWorld : IDisposable
         if (_bodies.Values.Any(b => b.ShapeId == shapeId)) throw new InvalidOperationException($"shape {shapeId} is used by a body");
         if (!_shapes.Remove(shapeId, out var shape)) throw new KeyNotFoundException($"no shape {shapeId}");
         shape.Dispose();
+        foreach (var kv in _meshShapes) if (kv.Value == shapeId) { _meshShapes.Remove(kv.Key); break; }
     }
 
     private int Keep(Shape shape)

@@ -74,7 +74,7 @@ public struct GeometryHit
 /// Distances are along a unit direction, in metres. Points and directions are in the world; each piece is
 /// asked in its own frame (a tile's corner, a door's pose) and its answers are brought back.
 /// </summary>
-public sealed class TriangleWorld
+public sealed partial class TriangleWorld
 {
     private readonly GeometryInstance[] _instances;
     private readonly BvhNode[] _nodes;

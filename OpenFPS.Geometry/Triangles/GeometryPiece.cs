@@ -125,7 +125,7 @@ public readonly record struct SolidSpec(int Owner, Vector3 Position, Quaternion 
 /// float holds sub-millimetre detail anywhere in the world); a door leaf is a piece of its own, placed by
 /// an instance that moves.
 /// </summary>
-public sealed class GeometryPiece
+public sealed partial class GeometryPiece
 {
     public TileKey Key { get; }
     /// <summary>Where the piece's frame starts, in the world: its tile's corner, or zero.</summary>

@@ -290,7 +290,25 @@ public sealed partial class Catalogue
     public VehicleBodyShell Shell(string id, Vector3? size = null)
     {
         var vehicle = VehicleFor(id);
-        return VehicleBodyShell.For(vehicle, Describe(vehicle, id), size);
+        // Made once per vehicle kind (and size). The assembled vehicle is replaced whenever a model it depends on is
+        // edited, so a shell made from an older one is known by the reference and made again.
+        var key = (id.ToLowerInvariant(), size);
+        if (_shells.TryGetValue(key, out var kept) && ReferenceEquals(kept.Vehicle, vehicle)) return kept.Shell;
+        var made = VehicleBodyShell.For(vehicle, Describe(vehicle, id), size);
+        _shells[key] = (vehicle, made);
+        return made;
+    }
+
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<(string, Vector3?), (VehicleProfile Vehicle, VehicleBodyShell Shell)> _shells = new();
+
+    /// <summary>
+    /// Adds the vehicle <paramref name="id"/> names to a body world as a kinematic body: its one shape (the shell's closed
+    /// mesh, shared by every body of that kind), at a pose. The handle of the body.
+    /// </summary>
+    public int AddVehicleBody(BodyWorld world, string id, Vector3 position, Quaternion orientation, string material = "Metal", Vector3? size = null)
+    {
+        int shape = world.AddMeshOnce(Shell(id, size).Shell.Mesh);
+        return world.Add(shape, BodyMotion.Kinematic, position, orientation, material);
     }
 
     /// <summary>A vehicle as it is without the world editor (a vehicle model's version 0): an authored

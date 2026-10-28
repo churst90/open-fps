@@ -2440,6 +2440,33 @@ Jolt is in and the body API stands; no game system uses it, so nothing heard mov
 - The wire hash moves from 54ce2252ff38 to 59dd0b1e4b31 (the new package reference), so the server and the
   Windows client deploy together. The door fingerprint does not move.
 
+### 18.8 Step 5 as built (2026-10-27)
+
+Swept queries stand in Geometry and a vehicle has one shape; no system uses either, so nothing heard moves.
+
+- Sweeps: `TriangleWorld.Sweep` moves a sphere, an upright capsule or an oriented box (`SweptShape`) along a
+  displacement through the same BVH `Closest` and `Overlapping` use, and returns a `SweepHit` (fraction,
+  distance, point, normal, triangle, owner, material, and whether the shape started embedded). It advances
+  conservatively by the exact gap to the nearest triangle feature (segment to triangle for the ball and
+  capsule, SAT over thirteen axes then feature pairs for the box), so it cannot step over a thin triangle.
+  Terrain triangles and skirts are swept as they are queried. Pieces are swept in their own frame and the hit
+  is turned back to the world.
+- Rules measured by tests: slop is 1e-4 m; overlap deeper than that is embedded and gives fraction 0; touching
+  and moving in hits at the current fraction; touching and moving away or along is no hit. A shape sliding
+  along the seam between two coplanar triangles used to stop on the seam (a ghost edge); the gap under linear
+  motion is convex in time, so a ternary search asks whether the shape ever goes deeper than the slop, and a
+  seam that is only touched is not a hit. At equal distance the deepest hit wins, then the smaller footprint,
+  then the lower owner.
+- The shell: `Catalogue.Shell` caches the BodyShell mesh per vehicle kind and size, checked against the
+  memoised profile, so it is made once; `Catalogue.AddVehicleBody` adds it to a `BodyWorld` as a kinematic body
+  (Jolt has no dynamic mesh), and `BodyWorld.AddMeshOnce` shares one Jolt shape among every body of a kind by
+  mesh hash. Changes to `BodyWorld` are additions only. `VehicleStep.Blocked` is untouched, so DrivingReplay
+  is byte-identical.
+- Tests: GeometrySweepTests (20: faces, edges, vertices, grazing, contact start, embedded, capsule wall and
+  overhead, box face, edge and corner, a sweep across 40 tiles, zero-thickness triangles, a random
+  no-penetration property, agreement with rays and `Overlapping`, a moved piece, terrain, an empty world) and
+  VehicleBodyShapeTests (2).
+
 ## Decisions (Cody, 2026-10-11)
 
 - Approved as recommended, all ten (section 8), with two changes:

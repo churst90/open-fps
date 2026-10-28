@@ -21,7 +21,8 @@ AudioLab `--geometry map=<id> [terrain=<metres>]`.
 Where it stands (2026-10-17): stages 1 to 4 built (2026-10-06 to 10, sections 9 to 12), with rooms from their walls
 and regions become places (12.6). Stage 6's first half, each vehicle's body as one closed mesh from its parts list,
 built 2026-10-12. Left: stage 6's second half (the meshes in the Steam Audio scene, moved with their bodies, with
-physics stage 4), and stage 5, held until wanted.
+physics stage 4), and stage 5, held until wanted. The shell is now made once per vehicle kind and can stand in
+a `BodyWorld` as a kinematic body (2026-10-27, PHYSICS_BOUNDARY.md 18.8); the Steam Audio scene does not use it yet.
 
 ## Contents
 
