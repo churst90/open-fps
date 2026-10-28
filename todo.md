@@ -155,7 +155,8 @@ fingerprint changed too (3a8a8e7b91ab), so the door renders are made again once.
    manners are unchanged line for line (`PeopleReplayTests`).
 9. Physics, then (docs/PHYSICS_BOUNDARY.md):
    - stage 2's leftovers (16.6): one rolling resistance and drag law, one brake law (surveyed 2026-10-27, 16.8:
-     the renames DONE 2026-10-27, nothing moved; nine decisions for Cody), `VehicleChassisSpec`; the generators' 9.81 at the maps'
+     the renames DONE 2026-10-27, nothing moved; nine decisions for Cody); `VehicleChassisSpec` went whole to `OpenFPS.Models` with `VehicleSpec` (engine
+     packages stage 2), so nothing is left of it; the generators' 9.81 at the maps'
      next regeneration. `WindModel` folded into `WindField`: DONE 2026-10-27 (16.7), bullets feel the air the
      ears do;
    - stage 4, rigid and soft bodies, with geometry stage 6's second half (the vehicle meshes in the Steam Audio

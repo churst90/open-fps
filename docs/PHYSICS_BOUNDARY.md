@@ -18,9 +18,11 @@ physics lives in Sound (docs/SOUND_LIBRARY_BOUNDARY.md, decision 2).
   accessibility, the editor) are surveyed in docs/ENGINE_PACKAGES.md, which places its materials and catalogue
   stages before stage 2 here.
 
-Where it stands (2026-10-27): stages 0 to 3 built (2026-10-11 to 16, sections 14 to 17). Stage 2 left one
-rolling resistance and drag law, one brake law and `VehicleChassisSpec` (16.6, "Left of stage 2"); `WindModel` went
-into `WindField` (16.7). Left: stages 4 to 6; stage 4 (rigid and soft bodies) goes with geometry stage 6's
+Where it stands (2026-10-27): stages 0 to 3 built (2026-10-11 to 16, sections 14 to 17). Stage 2's leftovers
+are done: `WindModel` went into `WindField` (16.7); one road-load law and one brake law are written once, with
+nine decisions on who reads them left for Cody (16.8); `VehicleChassisSpec` went whole with `VehicleSpec` to the
+catalogue, `OpenFPS.Models` (engine packages stage 2, ENGINE_PACKAGES.md). The generators' 9.81 goes at the
+maps' next regeneration. Left: stages 4 to 6; stage 4 (rigid and soft bodies) goes with geometry stage 6's
 second half (docs/GEOMETRY.md section 7). Cody's decisions are in the last section (2026-10-11: all ten as
 recommended, soft bodies as well as rigid ones, gravity a property of the world, Jolt Physics through
 JoltPhysicsSharp).
