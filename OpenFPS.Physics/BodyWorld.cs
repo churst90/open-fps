@@ -95,6 +95,11 @@ public sealed class BodyWorld : IDisposable
 
     private readonly PhysicsSystem _system;
     private readonly JobSystem _jobs;
+    // The solver keeps pointers to these and does not own them: held here, or the collector frees them under it and the
+    // process dies in the next step (2026-10-27, one run in two of BodyWorldTests).
+    private readonly ObjectLayerPairFilterTable _pairs;
+    private readonly BroadPhaseLayerInterfaceTable _broad;
+    private readonly ObjectVsBroadPhaseLayerFilterTable _objectVsBroad;
     private readonly Dictionary<int, Shape> _shapes = new();
     private readonly SortedDictionary<int, Entry> _bodies = new();
     private int _nextShape = 1, _nextBody = 1;
@@ -105,17 +110,17 @@ public sealed class BodyWorld : IDisposable
     public BodyWorld(float gravity = Earth.StandardGravity, int maxBodies = 4096)
     {
         if (!TryStartNative(out var problem)) throw new InvalidOperationException("Jolt Physics could not start: " + problem);
-        var pairs = new ObjectLayerPairFilterTable(2);
-        pairs.EnableCollision(NonMoving, Moving);
-        pairs.EnableCollision(Moving, Moving);
-        var broad = new BroadPhaseLayerInterfaceTable(2, 2);
-        broad.MapObjectToBroadPhaseLayer(NonMoving, 0);
-        broad.MapObjectToBroadPhaseLayer(Moving, 1);
+        _pairs = new ObjectLayerPairFilterTable(2);
+        _pairs.EnableCollision(NonMoving, Moving);
+        _pairs.EnableCollision(Moving, Moving);
+        _broad = new BroadPhaseLayerInterfaceTable(2, 2);
+        _broad.MapObjectToBroadPhaseLayer(NonMoving, 0);
+        _broad.MapObjectToBroadPhaseLayer(Moving, 1);
+        _objectVsBroad = new ObjectVsBroadPhaseLayerFilterTable(_broad, 2, _pairs, 2);
         _system = new PhysicsSystem(new PhysicsSystemSettings
         {
             MaxBodies = maxBodies, MaxBodyPairs = Math.Max(1024, maxBodies * 8), MaxContactConstraints = Math.Max(1024, maxBodies * 8),
-            ObjectLayerPairFilter = pairs, BroadPhaseLayerInterface = broad,
-            ObjectVsBroadPhaseLayerFilter = new ObjectVsBroadPhaseLayerFilterTable(broad, 2, pairs, 2),
+            ObjectLayerPairFilter = _pairs, BroadPhaseLayerInterface = _broad, ObjectVsBroadPhaseLayerFilter = _objectVsBroad,
         });
         // No worker threads: the caller's thread runs every job, in the same order each time.
         _jobs = new JobSystemThreadPool(new JobSystemThreadPoolConfig { maxJobs = 2048, maxBarriers = 8, numThreads = 0 });
@@ -428,5 +433,8 @@ public sealed class BodyWorld : IDisposable
         _shapes.Clear();
         _jobs.Dispose();
         _system.Dispose();
+        _objectVsBroad.Dispose();
+        _broad.Dispose();
+        _pairs.Dispose();
     }
 }
