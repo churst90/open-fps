@@ -12,6 +12,7 @@ using OpenFPS.Sound;
 using OpenFPS.Materials;
 using OpenFPS.Physics;
 using OpenFPS.Models;
+using OpenFPS.Environment;
 
 namespace OpenFPS.Tests;
 
@@ -109,6 +110,65 @@ public class ScopedFireTests : IDisposable
         r.Fire((MathF.PI, 0.01f), 0f);
         r.Run(0.5);
         Assert.Empty(r.HitsOn(behind));
+    }
+
+    [Fact]
+    public void ACrosswindIsHeldOffByTheWindTheEarsHear()
+    {
+        // 8 m/s from the west at 10 m, gusty. The round flies through the wind field's log law and eddies,
+        // read along its flight at its height above the shooter's feet, not the 10 m wind on a clock.
+        const float range = 500f;
+        var weather = new OutdoorAir(15f, 0.5f, 1013.25f, new Vector3(8f, 0f, 0f), 0.6f);
+        const double worldStart = 25_000_000;
+
+        var unaided = Crosswind(weather, worldStart);
+        var a = unaided.Walker(unaided.Feet + new Vector3(0f, 0f, range));
+        unaided.Fire(unaided.AimAt(unaided.Feet + new Vector3(0f, 0f, range)), ComeUp(range));
+        unaided.Run(1.2);
+        Assert.Empty(unaided.HitsOn(a));
+        Assert.Contains("right", Assert.Single(unaided.Said(), t => t.StartsWith("Miss")));
+
+        // The drift the field gives this shot, flown as the server flies it, segment by segment.
+        var (east, north) = unaided.Server.WorldEnvironment.WindTravel;
+        var wind = WindWeather.Steady(WindAir.FromBroadcast(weather.Wind, weather.Gustiness, worldStart + unaided.Now, east, north));
+        float drift = FieldDrift(wind, worldStart + unaided.Now, weather.Air, unaided.Feet, range);
+        // The 10 m wind held steady would drift it further than half the target is wide: the old reading
+        // would have missed.
+        float steady = MathF.Abs(ExternalBallistics.Fly(WeaponRegistry.M700.Projectile, range,
+            ExternalBallistics.ZeroAngle(WeaponRegistry.M700.Projectile, range, 0.038f), 0.038f, weather.Air, weather.Wind).Drift);
+        Assert.True(steady - drift > 0.25f, $"field drift {drift:F2} m against a steady 10 m wind's {steady:F2} m");
+
+        var held = Crosswind(weather, worldStart, Path.Combine(_dir, "held"));
+        var b = held.Walker(held.Feet + new Vector3(0f, 0f, range));
+        held.Fire(held.AimAt(held.Feet + new Vector3(-drift, 0f, range)), ComeUp(range));
+        held.Run(1.2);
+        Assert.Single(held.HitsOn(b));
+    }
+
+    private Field Crosswind(OutdoorAir weather, double worldStart, string? dir = null)
+    {
+        var r = new Field(dir ?? _dir);
+        r.Combat.Weather = _ => weather;
+        r.Combat.WorldClock = () => worldStart + r.Now;
+        r.Arm(r.Shooter);
+        return r;
+    }
+
+    /// <summary>How far east a round fired level-ish north from the eye lands at <paramref name="range"/>,
+    /// with the wind read each segment where the round is, as the server reads it.</summary>
+    private static float FieldDrift(WindWeather wind, double firedAt, Air air, Vector3 feet, float range)
+    {
+        var p = WeaponRegistry.M700.Projectile;
+        float angle = ExternalBallistics.ZeroAngle(p, range, ScopeRegistry.Scope4To12.SightHeightMetres);
+        var s = new BulletState
+        {
+            Position = feet + new Vector3(0f, CombatService.EyeHeight, 0f),
+            Velocity = ExternalBallistics.Raise(Vector3.UnitZ, angle) * p.MuzzleVelocity,
+        };
+        while (s.Position.Z - feet.Z < range)
+            ExternalBallistics.Advance(ref s, CombatService.SegmentSeconds, ExternalBallistics.CoefficientOf(p), air,
+                                       CombatService.WindAt(wind, firedAt, feet.Y, s));
+        return s.Position.X - feet.X;
     }
 
     private static float ComeUp(float metres)

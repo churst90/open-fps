@@ -322,7 +322,6 @@ OpenFPS.Physics/VehicleStep.cs	Physics
 OpenFPS.Physics/WheelDynamics.cs	Physics	
 OpenFPS.Physics/WheelState.cs	Physics	
 OpenFPS.Physics/Wind.cs	Physics	
-OpenFPS.Physics/WindModel.cs	Physics	
 OpenFPS.Schema/FieldDescriptor.cs	Schema	
 OpenFPS.Schema/Tunable.cs	Schema	
 OpenFPS.Server/Core/Arms.cs	game	

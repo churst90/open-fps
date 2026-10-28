@@ -6,7 +6,7 @@ using OpenFPS.Materials;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// One constant for each law (docs/PHYSICS_BOUNDARY.md, stage 2, 16.6): the number is written once, in
+/// One constant for each law (docs/PHYSICS_BOUNDARY.md, stage 2, 16.6 and 16.7): the number is written once, in
 /// its home, and everything else reads it there. A second copy drifts: gravity was written 44 times, 40
 /// of them 9.81 and 4 of them 9.80665, so a car's tyres and its brakes fell at different rates.
 /// </summary>
@@ -80,6 +80,41 @@ public class OneConstantPerLawTests
             .Where(l => DensityLiterals.Any(r => r.IsMatch(l.Code)))
             .Select(l => $"{l.File}:{l.Line}: {l.Code.Trim()}")
             .ToList();
+
+    /// <summary>A time parameter: a double or float named seconds, time, t, clock or now, or ending in
+    /// Seconds, Time or Clock.</summary>
+    private const string TimeParameter = @"\b(?:double|float)\s+(?:seconds|time|t|clock|now|\w+(?:Seconds|Time|Clock))\b";
+
+    /// <summary>How a second gust law was written: a method taking a gustiness and a clock and returning the
+    /// wind swung by it (WindModel.Felt), a gust-named method of a clock (WindModel.GustFactor), or a sine
+    /// or cosine weighed by the gustiness on one line.</summary>
+    private static readonly Regex[] GustLaws =
+    {
+        new(@"^(?:\w+\s+)*[\w<>\[\],.?]+\s+\w+\s*\((?=[^)]*\b(?:float|double)\s+\w*[Gg]ust\w*)(?=[^)]*" + TimeParameter + ")", RegexOptions.Compiled),
+        new(@"^(?:\w+\s+)*[\w<>\[\],.?]+\s+\w*Gust\w*\s*\((?=[^)]*" + TimeParameter + ")", RegexOptions.Compiled),
+        new(@"(?i)gust.*\bMathF?\.(?:Sin|Cos)\(|\bMathF?\.(?:Sin|Cos)\(.*gust", RegexOptions.Compiled),
+    };
+
+    internal static List<string> GustLawCopies()
+        => CodeLines()
+            .Where(l => l.File != "OpenFPS.Physics/Wind.cs")
+            .Where(l => GustLaws.Any(r => r.IsMatch(l.Code)))
+            .Select(l => $"{l.File}:{l.Line}: {l.Code.Trim()}")
+            .ToList();
+
+    [Fact]
+    public void Wind_is_one_gust_law()
+    {
+        // Bullets felt WindModel's three sines on a clock while the ears heard WindField's eddies: an 8 m/s
+        // crosswind moved a 300 m shot 0.44 m on the one and 0.25 m on the other (PHYSICS_BOUNDARY 16.7).
+        var copies = GustLawCopies();
+        Assert.True(copies.Count == 0,
+            "The wind's gusts are WindField's (AirSample.Of, or WindField.VelocityAt with the broadcast weather); these "
+            + "write another gust law:\n" + string.Join("\n", copies));
+        // The home is found by the same patterns: the guard is not blind to the law it protects.
+        Assert.Contains(File.ReadLines(Path.Combine(RepoRoot(), "OpenFPS.Physics", "Wind.cs")),
+                        l => GustLaws[1].IsMatch(l.TrimStart()));
+    }
 
     [Fact]
     public void Air_density_is_one_law()
