@@ -99,6 +99,24 @@ public class BodyWorldTests
     }
 
     [Fact]
+    public void AWorldOutlivesACollection()
+    {
+        // The solver points at its layer tables without owning them; when only the constructor held them the collector
+        // freed them under a live world and the next step took the process down (2026-10-27).
+        using var w = new BodyWorld();
+        int ball = w.Add(w.AddSphere(0.1f), BodyMotion.Dynamic, new Vector3(0f, 1f, 0f), Upright, "Metal", 1f);
+        w.Add(w.AddBox(new Vector3(5f, 0.5f, 5f)), BodyMotion.Static, new Vector3(0f, -0.5f, 0f), Upright, "Concrete");
+        for (int i = 0; i < 3; i++)
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+            Run(w, 60);
+        }
+        Assert.True(w.Position(ball).Y < 0.2f);
+    }
+
+    [Fact]
     public void NoDragIsAddedThatTheWorldDidNotAsk()
     {
         // Jolt's default damping is 5 percent a second, which would take 0.24 m/s off a body in free fall in one second.
