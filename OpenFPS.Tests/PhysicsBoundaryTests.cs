@@ -62,7 +62,7 @@ public class PhysicsBoundaryTests
     [Fact]
     public void PhysicsReferencesOnlyGeometry()
     {
-        var allowed = new[] { "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Schema" };
+        var allowed = new[] { "OpenFPS.Geometry", "OpenFPS.Materials", "OpenFPS.Schema", "JoltPhysicsSharp" };
         var wrong = typeof(OpenFPS.Physics.SharedMovementEngine).Assembly.GetReferencedAssemblies()
             .Select(r => r.Name!)
             .Where(n => !(n == "System" || n.StartsWith("System.", StringComparison.Ordinal) || n is "netstandard" or "mscorlib"
@@ -73,9 +73,72 @@ public class PhysicsBoundaryTests
             + "OpenFPS.Geometry, OpenFPS.Materials and OpenFPS.Schema only.");
     }
 
+    /// <summary>The files that may name Jolt: the physics project, which hides it behind its own body types, and the lab's
+    /// trial spike, which measured it before any of that existed (docs/PHYSICS_BOUNDARY.md 14.8).</summary>
+    private static bool MayNameJolt(string path)
+        => path.StartsWith("OpenFPS.Physics/", StringComparison.Ordinal) || path == "OpenFPS.AudioLab/Spikes/JoltTrialSpike.cs";
+
+    /// <summary>Every place the text names Jolt's package: a using, a qualified name, an alias, or (in a project file) a
+    /// package reference. A comment or a string that says the word is not a name.</summary>
+    internal static List<string> JoltNames(string path, string text)
+    {
+        var found = new List<string>();
+        if (MayNameJolt(path)) return found;
+        if (path.EndsWith(".csproj", StringComparison.Ordinal) || path.EndsWith(".props", StringComparison.Ordinal) || path.EndsWith(".targets", StringComparison.Ordinal))
+        {
+            if (text.Contains("JoltPhysics", StringComparison.Ordinal)) found.Add($"{path}: a reference to Jolt's package");
+            return found;
+        }
+        var root = CSharpSyntaxTree.ParseText(text).GetRoot();
+        foreach (var name in root.DescendantNodes().OfType<IdentifierNameSyntax>())
+            if (name.Identifier.ValueText == "JoltPhysicsSharp")
+                found.Add($"{path}:{name.GetLocation().GetLineSpan().StartLinePosition.Line + 1}: {name.Parent}");
+        return found;
+    }
+
+    /// <summary>
+    /// Nothing outside OpenFPS.Physics (and the lab's trial spike) names a Jolt type or references its package: the
+    /// game sees rigid bodies as <c>BodyWorld</c>'s handles and <c>BodyState</c> alone (docs/PHYSICS_BOUNDARY.md 18.2,
+    /// the decision of 2026-10-11 that nothing outside Physics sees Jolt).
+    /// </summary>
+    [Fact]
+    public void NothingOutsidePhysicsNamesJolt()
+    {
+        string root = RepoRoot();
+        var found = new List<string>();
+        foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+        {
+            string rel = Path.GetRelativePath(root, file).Replace('\\', '/');
+            if (rel.StartsWith(".", StringComparison.Ordinal) || rel.Contains("/obj/", StringComparison.Ordinal)
+                || rel.Contains("/bin/", StringComparison.Ordinal)) continue;
+            if (!(rel.EndsWith(".cs", StringComparison.Ordinal) || rel.EndsWith(".csproj", StringComparison.Ordinal)
+                  || rel.EndsWith(".props", StringComparison.Ordinal) || rel.EndsWith(".targets", StringComparison.Ordinal))) continue;
+            // This file holds the examples of a violation.
+            if (rel == "OpenFPS.Tests/PhysicsBoundaryTests.cs") continue;
+            found.AddRange(JoltNames(rel, File.ReadAllText(file)));
+        }
+        Assert.True(found.Count == 0, "Jolt is named outside OpenFPS.Physics (docs/PHYSICS_BOUNDARY.md 18.2): hide it behind BodyWorld.\n  "
+            + string.Join("\n  ", found));
+    }
+
+    /// <summary>The rule above fails when broken: each kind of naming is caught outside Physics, and none inside it.</summary>
+    [Fact]
+    public void TheJoltRuleFailsWhenBroken()
+    {
+        Assert.Single(JoltNames("OpenFPS.Server/Systems/X.cs", "using JoltPhysicsSharp;\nclass X {}"));
+        Assert.NotEmpty(JoltNames("OpenFPS.Common/Y.cs", "class Y { global::JoltPhysicsSharp.Body b; }"));
+        Assert.NotEmpty(JoltNames("OpenFPS.Sound/Z.cs", "using J = JoltPhysicsSharp.Body;\nclass Z {}"));
+        Assert.NotEmpty(JoltNames("OpenFPS.Server/OpenFPS.Server.csproj", "<PackageReference Include=\"JoltPhysicsSharp\" Version=\"2.22.0\" />"));
+        Assert.Empty(JoltNames("OpenFPS.Server/Systems/X.cs", "// JoltPhysicsSharp is behind BodyWorld\nclass X { string s = \"JoltPhysicsSharp\"; }"));
+        Assert.Empty(JoltNames("OpenFPS.Physics/BodyWorld.cs", "using JoltPhysicsSharp;"));
+        Assert.Empty(JoltNames("OpenFPS.Physics/OpenFPS.Physics.csproj", "<PackageReference Include=\"JoltPhysicsSharp\" />"));
+        Assert.Empty(JoltNames("OpenFPS.AudioLab/Spikes/JoltTrialSpike.cs", "using JoltPhysicsSharp;"));
+        Assert.NotEmpty(JoltNames("OpenFPS.AudioLab/Spikes/OtherSpike.cs", "using JoltPhysicsSharp;"));
+    }
+
     /// <summary>What steps the world. The sound may read the physics' values and presets; it never steps it
     /// (section 9). A stepper added later (a physics world, stage 4's bodies) goes on this list.</summary>
-    private static readonly string[] Steppers = { "OpenFPS.Physics.SharedMovementEngine", "OpenFPS.Physics.OnFoot", "OpenFPS.Physics.VehicleStep" };
+    private static readonly string[] Steppers = { "OpenFPS.Physics.SharedMovementEngine", "OpenFPS.Physics.OnFoot", "OpenFPS.Physics.VehicleStep", "OpenFPS.Physics.BodyWorld" };
 
     /// <summary>
     /// Nothing in the sound project names a stepper: the server steps the physics, the client predicts the

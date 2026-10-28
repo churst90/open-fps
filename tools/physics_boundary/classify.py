@@ -69,6 +69,9 @@ RULES = [
     ('OpenFPS.Server.Systems.ContactStreams', 'H', 'each map\'s contact stream, by its world'),
     # Sound: the body constants, wheels, tyres, chassis, presets
     (PH + 'BodyConstants', 'P', 'the body: size, mass, walk, run, jump, step, turn'),
+    (PH + 'BodyWorld', 'P', 'rigid bodies solved by Jolt behind our own handles and BodyState (stage 4, steps 1 and 2)'),
+    (PH + 'BodyMotion', 'P', 'static, kinematic or dynamic'),
+    (PH + 'ContactMaterial', 'P', 'friction and restitution from a material\'s own values'),
     (PH + 'Earth', 'P', 'standard gravity, the one number a map\'s own starts from (physics stage 2)'),
     (PH + 'ChassisSpec', 'P', 'axles, centre of gravity, roll stiffness, steering lock'),
     (PH + 'AxleSpec', 'P', ''),

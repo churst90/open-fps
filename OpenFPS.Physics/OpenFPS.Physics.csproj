@@ -17,6 +17,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Jolt Physics, solved behind OpenFPS.Physics' own body types (docs/PHYSICS_BOUNDARY.md 14.8, 18.2): nothing outside
+         this project names it. MIT, as is Jolt. 2.22.0 of 2026-07-13, the one trialled; this is the one line to change.
+         Its native package (JoltPhysics.Native) carries libjoltc.so and joltc.dll in runtimes/, which the build copies
+         beside every executable that reaches this project. -->
+    <PackageReference Include="JoltPhysicsSharp" Version="2.22.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\OpenFPS.Geometry\OpenFPS.Geometry.csproj" />
     <ProjectReference Include="..\OpenFPS.Materials\OpenFPS.Materials.csproj" />
     <ProjectReference Include="..\OpenFPS.Schema\OpenFPS.Schema.csproj" />

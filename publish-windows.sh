@@ -35,7 +35,7 @@ DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1 DOTNET_CLI_USE_MSBUILD_SERVER=0 \
 BUILD=$(grep -rho '"[0-9a-f]\{12\}"' "$ART"/obj/OpenFPS.Common/*/WireContract.g.cs | head -1 | tr -d '"')
 
 # What must be there, or the zip is not worth sending.
-for f in OpenFPS.Client.exe fmod.dll phonon.dll nvdaControllerClient64.dll machines ASSETS/SOUNDS; do
+for f in OpenFPS.Client.exe fmod.dll phonon.dll joltc.dll nvdaControllerClient64.dll machines ASSETS/SOUNDS; do
   [ -e "$OUT/$f" ] || { echo "!! $f is missing from the publish output." >&2; exit 1; }
 done
 # Every door model sound the client renders at start, rendered here and shipped: a door's simulation
