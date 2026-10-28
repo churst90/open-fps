@@ -132,8 +132,10 @@ fingerprint changed too (3a8a8e7b91ab), so the door renders are made again once.
        street and at login); the check logs `[NEVER-STARTED]` and stands as the guard.
      - Ground in narrow strips heard as a small room (agreed 2026-10-27: Cody, "take it if you think it is more
        realistic"; it is, since the ground under the feet is already in each voice and a second copy is a box).
-       Done 2026-10-27 (073ecdcc): a slab whose top is walkable and within a step of the ground is open ground
-       whatever its width. Albany's spawn keeps 175 low pieces where it kept 366; the city has no kerb boxes. open-fps has the same rule:
+       Done 2026-10-27 (073ecdcc, then the merge after it): a walkable slab whose underside rests on the ground,
+       or on a broad slab laid on it, with its top within a step there, is open ground whatever its width; each
+       point is judged against the ground under it. A rail on posts stays. Albany's rails on their ballast leave
+       the trace; the city changes by one step on a platform; Magnolia not at all. open-fps has the same rule:
        `SteamAudioScene.IsOpenGround` leaves ground out of the listener's trace only when a piece is at least
        1 m each way and level, so kerbs, gutters, thresholds and ramps' sloped tops stay in and the ground
        under the feet returns about 9 ms late. Sean's fix: judge a piece that is stood on by what it is, not
