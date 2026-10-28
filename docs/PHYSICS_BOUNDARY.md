@@ -2475,7 +2475,7 @@ server is untouched: the feeder is a Physics type, `PieceBodies`, and the tests 
   replaced; pieces made on workers go in on the world's thread; a leaf moved moves its body and carries a ball up;
   all 514 city leaves stand at their instances' poses and every door's at `DoorSystem.LeafAt`. The two map tests take
   about 7 s together, almost all of it Magnolia's load.
-- The wire hash moves (Physics is hashed); with step 5 merged beside it, it is WIREHASH, so the server and the Windows
+- The wire hash moves (Physics is hashed); with step 5 merged beside it, it is 4bd285bc1e17, so the server and the Windows
   client deploy together. The door fingerprint does not move.
 
 ### 18.8 Step 5 as built (2026-10-27)
