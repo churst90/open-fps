@@ -155,9 +155,41 @@ public sealed class SteamAudioScene : IDisposable
         var ext = new (Vector3 Min, Vector3 Max)[boxes.Count];
         for (int i = 0; i < boxes.Count; i++) ext[i] = WorldExtents(boxes[i]);
         var kept = new List<Box>(boxes.Count);
+        var floorAt = FloorOf(boxes);
         for (int i = 0; i < boxes.Count; i++)
-            if (!IsOpenGround(boxes[i], ext[i], ext, ground)) kept.Add(boxes[i]);
+            if (!IsOpenGround(boxes[i], ext[i], ext, ground, floorAt)) kept.Add(boxes[i]);
         return kept;
+    }
+
+    /// <summary>
+    /// The broad level slabs of the scene filed in a grid: <c>floorAt(x, z, maxTop)</c> is the top of the
+    /// highest of them under (x, z) that is no higher than <c>maxTop</c>, or minus infinity. What a kerb
+    /// lies on when it lies on a road slab and not on the ground itself.
+    /// </summary>
+    internal static Func<float, float, float, float> FloorOf(IReadOnlyList<Box> boxes)
+    {
+        const float cell = 16f;
+        var grid = new Dictionary<(int, int), List<(Vector3 Min, Vector3 Max)>>();
+        foreach (var b in boxes)
+        {
+            if (b.Size.X < 1f || b.Size.Z < 1f || b.Size.Y > SlabThickness) continue;
+            if (MathF.Abs(Vector3.Transform(Vector3.UnitY, b.Rotation).Y) < 0.99f) continue;
+            var (lo, hi) = WorldExtents(b);
+            for (int cx = (int)MathF.Floor(lo.X / cell); cx <= (int)MathF.Floor(hi.X / cell); cx++)
+                for (int cz = (int)MathF.Floor(lo.Z / cell); cz <= (int)MathF.Floor(hi.Z / cell); cz++)
+                {
+                    if (!grid.TryGetValue((cx, cz), out var l)) grid[(cx, cz)] = l = new List<(Vector3, Vector3)>();
+                    l.Add((lo, hi));
+                }
+        }
+        return (x, z, maxTop) =>
+        {
+            float best = float.NegativeInfinity;
+            if (grid.TryGetValue(((int)MathF.Floor(x / cell), (int)MathF.Floor(z / cell)), out var l))
+                foreach (var (lo, hi) in l)
+                    if (hi.Y <= maxTop && hi.Y > best && x >= lo.X && x <= hi.X && z >= lo.Z && z <= hi.Z) best = hi.Y;
+            return best;
+        };
     }
 
     /// <summary>How thin a slab is to count as a floor rather than a block, metres.</summary>
@@ -171,7 +203,8 @@ public sealed class SteamAudioScene : IDisposable
     /// </summary>
     private const float GroundLevel = 1.0f;
 
-    internal static bool IsOpenGround(in Box b, (Vector3 Min, Vector3 Max) own, (Vector3 Min, Vector3 Max)[] all, GroundHeights? ground = null)
+    internal static bool IsOpenGround(in Box b, (Vector3 Min, Vector3 Max) own, (Vector3 Min, Vector3 Max)[] all, GroundHeights? ground = null,
+                                      Func<float, float, float, float>? floorAt = null)
         => IsOpenGround(b, own, (x, z, above) =>
         {
             foreach (var (omin, omax) in all)
@@ -180,7 +213,7 @@ public sealed class SteamAudioScene : IDisposable
                 if (x >= omin.X && x <= omax.X && z >= omin.Z && z <= omax.Z) return true;
             }
             return false;
-        }, ground);
+        }, ground, floorAt);
 
     /// <summary>Anything this high or higher could stand over a slab of open ground (its top at most
     /// <see cref="GroundLevel"/>, cover at least <see cref="Headroom"/> over that).</summary>
@@ -189,7 +222,7 @@ public sealed class SteamAudioScene : IDisposable
     /// <summary>The same test, asking <paramref name="coveredAt"/>(x, z, lowest) whether anything whose
     /// underside is at least <c>lowest</c> stands over the point (x, z).</summary>
     internal static bool IsOpenGround(in Box b, (Vector3 Min, Vector3 Max) own, Func<float, float, float, bool> coveredAt,
-                                      GroundHeights? ground = null)
+                                      GroundHeights? ground = null, Func<float, float, float, float>? floorAt = null)
     {
         if (b.Size.Y > SlabThickness) return false;
         // Turned so that a body could not walk on its top, it is not a floor (a wall, a fence panel on its side).
@@ -199,14 +232,13 @@ public sealed class SteamAudioScene : IDisposable
         bool broadAndLevel = b.Size.X >= 1f && b.Size.Z >= 1f && MathF.Abs(up.Y) >= 0.99f;
         var (min, max) = own;
         float top = max.Y;
-        // At ground level where it lies: on terrain, the ground's own height under its middle.
-        float groundY = ground?.At((min.X + max.X) * 0.5f, (min.Z + max.Z) * 0.5f) ?? 0f;
-        if (top > groundY + GroundLevel) return false;
-        // A broad level slab within GroundLevel is ground as it always was. A narrow or sloped one (a kerb,
-        // a gutter, a threshold, a ramp, a shoulder) is ground when it is stood on, whatever its width: the
-        // lowest of its top is no more than a step above the ground, so a body walks up onto it. A bench
-        // seat, a narrow table top and a low wall's top are higher than that and stay.
-        if (!broadAndLevel && LowestTop(b, MathF.Sign(up.Y)) > groundY + BodyConstants.StepHeight) return false;
+        if (broadAndLevel)
+        {
+            // At ground level where it lies: on terrain, the ground's own height under its middle.
+            float groundY = ground?.At((min.X + max.X) * 0.5f, (min.Z + max.Z) * 0.5f) ?? 0f;
+            if (top > groundY + GroundLevel) return false;
+        }
+        else if (!RestsOnGround(b, MathF.Sign(up.Y), ground, floorAt)) return false;
         // Open to the sky over most of it: the middle and four points halfway to the corners.
         var c = (min + max) * 0.5f;
         var q = (max - min) * 0.25f;
@@ -221,19 +253,37 @@ public sealed class SteamAudioScene : IDisposable
         return open >= 3;
     }
 
-    /// <summary>The height of the lowest corner of the box's top face (its +Y face, or -Y when turned over),
-    /// where a body steps onto it.</summary>
-    private static float LowestTop(in Box b, float upSign)
+    /// <summary>
+    /// Whether a narrow or sloped slab is stood on, judged where it lies: at its four top corners and its
+    /// middle, each against the ground at that point. Nowhere may its top be more than <see cref="GroundLevel"/>
+    /// over the ground there (a roof, a deck), and at one point at least it must rest, its underside no more
+    /// than <see cref="RestGap"/> over the ground or over a broad slab lying on it (a kerb on a road; a rail on posts does not) with its
+    /// top within a step of it (a body walks up onto it; the rest of a ramp may climb). A bench seat, a table
+    /// top and a low wall's top are higher than a step and stay.
+    /// </summary>
+    private static bool RestsOnGround(in Box b, float upSign, GroundHeights? ground, Func<float, float, float, float>? floorAt)
     {
         var h = b.Size * 0.5f;
-        float low = float.MaxValue;
-        for (int i = 0; i < 4; i++)
+        bool rests = false;
+        for (int i = 0; i < 5; i++)
         {
-            var corner = new Vector3((i & 1) == 0 ? -h.X : h.X, upSign * h.Y, (i & 2) == 0 ? -h.Z : h.Z);
-            low = MathF.Min(low, b.Center.Y + Vector3.Transform(corner, b.Rotation).Y);
+            float lx = i == 4 ? 0f : ((i & 1) == 0 ? -h.X : h.X);
+            float lz = i == 4 ? 0f : ((i & 2) == 0 ? -h.Z : h.Z);
+            var top = b.Center + Vector3.Transform(new Vector3(lx, upSign * h.Y, lz), b.Rotation);
+            var under = b.Center + Vector3.Transform(new Vector3(lx, -upSign * h.Y, lz), b.Rotation);
+            float g = ground?.At(top.X, top.Z) ?? 0f;
+            if (top.Y > g + GroundLevel) return false;
+            // What it lies on: the ground, or a broad slab laid on it (a road) that its underside meets.
+            float floor = MathF.Max(g, floorAt?.Invoke(top.X, top.Z, under.Y + RestGap) ?? float.NegativeInfinity);
+            if (top.Y <= floor + BodyConstants.StepHeight && under.Y <= floor + RestGap) rests = true;
         }
-        return low;
+        return rests;
     }
+
+    /// <summary>How far over the ground a slab's underside may be and still rest on it, metres: an eighth of a
+    /// step, 5 cm. That is the ground's own unevenness under a piece laid on it; Albany's rails on their posts
+    /// hang 10-25 cm clear and are in the trace, a kerb on a road slab or a threshold is within a few cm.</summary>
+    private const float RestGap = BodyConstants.StepHeight * 0.125f;
 
     internal static (Vector3 Min, Vector3 Max) WorldExtents(in Box b)
     {

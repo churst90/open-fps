@@ -100,11 +100,12 @@ public sealed class AcousticGeometry
         if (dirty.Count > 0)
         {
             var coveredAt = CoverOf(boxes, ground?.Lowest ?? 0f);
+            var floorAt = SteamAudioScene.FloorOf(boxes);
             foreach (var k in dirty)
             {
                 var specs = new List<SolidSpec>(byTile[k].Count + 1);
                 foreach (var b in byTile[k])
-                    specs.Add(SpecOf(b, SteamAudioScene.IsOpenGround(b, SteamAudioScene.WorldExtents(b), coveredAt, ground),
+                    specs.Add(SpecOf(b, SteamAudioScene.IsOpenGround(b, SteamAudioScene.WorldExtents(b), coveredAt, ground, floorAt),
                                      leaves != null && b.EntityId != 0 && leaves.Contains(b.EntityId)));
                 if (terrainOf.TryGetValue(k, out var ts)) specs.Add(ts with { Surface = SceneTerrain.Surface });
                 rebuilt[k] = specs;

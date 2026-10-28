@@ -107,6 +107,41 @@ public static class GroundPiecesSpike
         }
         Console.WriteLine($"  open-to-the-sky low pieces kept: {n} pieces, {a:F0} m2");
         foreach (var e in examples) Console.WriteLine(e);
+
+        // Every piece the rule takes out of the trace that ebeb7c5b's rule (broad, level, within a metre,
+        // open to the sky) kept, grouped by material and size, with how high it lies over the ground.
+        var removed = new Dictionary<string, (int N, double Area, float MinTop, float MaxTop, float MinUnder, float MaxUnder)>();
+        int removedN = 0;
+        for (int i = 0, k = 0; i < boxes.Count; i++)
+        {
+            if (k < kept.Count && kept[k].Equals(boxes[i])) { k++; continue; }
+            var b = boxes[i];
+            var (lo, hi) = SteamAudioScene.WorldExtents(b);
+            float gy = ground.At((lo.X + hi.X) * 0.5f, (lo.Z + hi.Z) * 0.5f);
+            if (OldOpenGround(b, lo, hi, gy, Covered)) continue;
+            removedN++;
+            string key = $"{b.Material,-10} {b.Size.X,6:F2} x {b.Size.Y:F2} x {b.Size.Z:F2}{(MathF.Abs(Vector3.Transform(Vector3.UnitY, b.Rotation).Y) < 0.99f ? " sloped" : "")}";
+            float top = hi.Y - gy, under = lo.Y - gy;
+            removed.TryGetValue(key, out var r);
+            removed[key] = r.N == 0 ? (1, b.Size.X * (double)b.Size.Z, top, top, under, under)
+                : (r.N + 1, r.Area + b.Size.X * (double)b.Size.Z, MathF.Min(r.MinTop, top), MathF.Max(r.MaxTop, top), MathF.Min(r.MinUnder, under), MathF.Max(r.MaxUnder, under));
+        }
+        Console.WriteLine($"  removed from the trace by this rule that ebeb7c5b's kept: {removedN} pieces");
+        foreach (var (k, v) in removed.OrderByDescending(r => r.Value.N).ThenBy(r => r.Key))
+            Console.WriteLine($"    {v.N,5} x {k}  {v.Area,8:F0} m2  top {v.MinTop:F2}..{v.MaxTop:F2}  underside {v.MinUnder:F2}..{v.MaxUnder:F2} m over the ground");
         return 0;
+    }
+
+    /// <summary>ebeb7c5b's rule: a broad level slab within a metre of the ground, open to the sky over it.</summary>
+    private static bool OldOpenGround(SteamAudioScene.Box b, Vector3 lo, Vector3 hi, float groundY, Func<Vector3, float, bool> covered)
+    {
+        if (b.Size.Y > 0.5f || b.Size.X < 1f || b.Size.Z < 1f) return false;
+        if (MathF.Abs(Vector3.Transform(Vector3.UnitY, b.Rotation).Y) < 0.99f) return false;
+        if (hi.Y > groundY + 1.0f) return false;
+        var c = (lo + hi) * 0.5f; var q = (hi - lo) * 0.25f;
+        int open = 0;
+        foreach (var p in new[] { c, c + new Vector3(-q.X, 0, -q.Z), c + new Vector3(q.X, 0, -q.Z), c + new Vector3(-q.X, 0, q.Z), c + new Vector3(q.X, 0, q.Z) })
+            if (!covered(p, hi.Y)) open++;
+        return open >= 3;
     }
 }
