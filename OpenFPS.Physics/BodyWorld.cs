@@ -180,6 +180,15 @@ public sealed class BodyWorld : IDisposable
         return Keep(settings.Create());
     }
 
+    /// <summary>A mesh made ahead (<see cref="BuiltMesh.Build"/>, on any thread) and put in this world: the world takes the
+    /// shape over, so the mesh is not disposed by the caller after this. The shape's handle.</summary>
+    public int AddMesh(BuiltMesh built)
+    {
+        Check();
+        ArgumentNullException.ThrowIfNull(built);
+        return Keep(built.Release());
+    }
+
     /// <summary>The shape of a mesh, made the first time and shared after: bodies of one vehicle kind all stand on the
     /// one mesh (by its content hash). Let go of with <see cref="RemoveShape"/> like any other.</summary>
     public int AddMeshOnce(MeshAsset mesh)
@@ -243,6 +252,9 @@ public sealed class BodyWorld : IDisposable
             // Jolt damps every body by 5 percent a second unless told not to, a drag we never chose: the air's drag is
             // the physics' own law (docs/PHYSICS_BOUNDARY.md 16.8), so a body falls at the world's gravity alone.
             LinearDamping = 0f, AngularDamping = 0f,
+            // A ball rolling over a flat mesh hops 55 mm at the seams without it: a sphere meeting an edge the mesh shares
+            // with a coplanar neighbour takes the edge's normal. Costs nothing on shapes that are not meshes.
+            EnhancedInternalEdgeRemoval = motion == BodyMotion.Dynamic,
         };
         if (motion == BodyMotion.Dynamic)
         {
@@ -281,6 +293,18 @@ public sealed class BodyWorld : IDisposable
         var e = Get(bodyId);
         var id = e.Body.ID;
         _system.BodyInterface.SetPositionAndRotation(id, position, orientation, e.Motion == BodyMotion.Static ? Activation.DontActivate : Activation.Activate);
+    }
+
+    /// <summary>Moves a kinematic body to a pose over <paramref name="seconds"/>, so it carries the velocity that gets it there
+    /// and pushes what it meets; <see cref="SetPose"/> would put it there without a speed. The pose is reached at the
+    /// next step.</summary>
+    public void MoveKinematic(int bodyId, Vector3 position, Quaternion orientation, float seconds)
+    {
+        var e = Get(bodyId);
+        if (e.Motion != BodyMotion.Kinematic) throw new InvalidOperationException($"body {bodyId} is not kinematic");
+        if (!(seconds > 0f) || !float.IsFinite(seconds)) throw new ArgumentOutOfRangeException(nameof(seconds), seconds, "a positive time");
+        var id = e.Body.ID;
+        _system.BodyInterface.MoveKinematic(id, position, orientation, seconds);
     }
 
     public Vector3 Position(int bodyId)

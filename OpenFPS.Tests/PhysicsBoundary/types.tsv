@@ -18,6 +18,9 @@ OpenFPS.Physics.Earth	P
 OpenFPS.Physics.BodyWorld	P
 OpenFPS.Physics.BodyMotion	P
 OpenFPS.Physics.ContactMaterial	P
+OpenFPS.Physics.BuiltMesh	P
+OpenFPS.Physics.PieceBodies	P
+OpenFPS.Physics.PreparedPiece	P
 OpenFPS.Physics.ChassisSpec	P
 OpenFPS.Physics.AxleSpec	P
 OpenFPS.Physics.TyreSize	P
