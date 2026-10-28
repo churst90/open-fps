@@ -47,6 +47,7 @@ JoltPhysicsSharp).
 16. Stage 2 as it is built: the tyre, the vehicle, the engine, the ground probes and the body (2026-10-12), the
     ricochet, one gravity and one air (2026-10-16), one wind (2026-10-27)
 17. Stage 3 as built (2026-10-16): the state, the world view, the vehicle step
+18. Stage 4 surveyed (2026-10-27): the steps, what it costs, the risks, five decisions
 
 ---
 
@@ -2258,6 +2259,162 @@ with their look.
 - The vehicle's collision test still meets every solid as a box; stage 4 meets the triangles with the car as a
   mesh. `VehicleShadow` and `CabinWalls` still read vehicles from snapshots (library stage 6 reads `BodyState`).
 - Walkers' grounding (placed on their paths, not stepped) is unknown on the wire and read from their motion.
+
+## 18. Stage 4 surveyed (2026-10-27): the steps
+
+Survey and plan only. Nothing in the game changed. The one code change is the lab spike's `fleet` option
+(`OpenFPS.AudioLab/Spikes/JoltTrialSpike.cs`), which took the measurements of 18.3.
+
+### 18.1 What exists today
+
+- Bodies as boxes. `PhysicsBody` and `IPhysicsWorld.Boxes` (`OpenFPS.Physics/PhysicsWorld.cs`) are the only
+  solids physics knows; `BodyState` (`PhysicsState.cs`) already carries angular velocity, mass, `ShapeId`
+  (`NoShape` = -1) and `Sleeping`, so the state has room for bodies that nothing fills yet.
+- Vehicle collision. `VehicleStep.Blocked` (`VehicleStep.cs` about :359-389) samples three cylinders against the
+  boxes (`AABBIntersectsCylinder`). A hit stops the vehicle dead (comment at about :269: stage 4 exchanges the
+  momentum and damages it) and reports `output.Struck` as a `ContactEvent` (:271-276). This is the old
+  "stage 4" TODO at :388.
+- Contacts. `ContactStream` has Began, Continued and Ended. `DrivingSystem` reads it at :152 and turns a hit
+  into sound at :276-281 when the closing speed passes `ImpactAcoustics.MinimumSpeed` (0.4 m/s);
+  `DrivingSystem.Collision` is :306-321. `ImpactAcoustics.Between` takes two materials, masses and a closing
+  speed. Nothing produces Continued today, so there are no scrape or roll sounds.
+- Falls are scripted. `CombatService.BodyFall` (`CombatService.cs:1292`) plays legs from 0.5 m and trunk from
+  1.0 m after 0.45 s, whatever the person fell from. `HandsService.Drop` (`HandsService.cs:364`) puts the item
+  on the ground at once and takes the impact speed as sqrt(2 g h) (BodyFall again at :420). A thrown item has no
+  flight. A corpse is an item (`Bodies.cs`, `MaxPerMap` 30).
+- Doors. A leaf is a kinematic collider: `DoorComponent.Openness` (`OpenFPS.Common/Components.cs:653`) moves
+  towards `Target` at a set rate, `DoorSystem.LeafAt` (:708) gives the pose, `EdgeSpeed` (:267) feeds the
+  sounds. `TriangleWorld.WithMoverPoses` refits the tree for the leaves' poses (client `ClientGeometry.cs:167`,
+  `EntityAcoustics.cs:127`).
+- Geometry queries. `TriangleWorld` has Closest, Any, All, Overlapping, Along, Column, Ground and FloorAt and no
+  swept shape. Capsule overlap is in `SolidContact.cs:218/228`.
+- Vehicle meshes. `BodyShell.cs` and `OpenFPS.Sound/VehicleBodyShell.cs` (with `VehicleBodyShellTests`) are the
+  first half of geometry stage 6: a shell made once from the body. It is not in any scene. `TileSceneSet`
+  (`Update` about :129, `Assemble` about :155 with the commits at :187-188, `MakeInstances` :305, `Matrix` :356) keeps
+  two alternating top-scene pairs (Full and Listener); `SteamAudioScene.Build` (:301) and `AddPieceMesh` (:398)
+  make the sub-scenes. `VehicleShadow` and `CabinWalls` still stand in for a car's body, read from snapshots.
+- Jolt. Only the lab spike (`--jolt-trial`, section 14). No game project references JoltPhysicsSharp, no Jolt
+  native library is shipped, and `OpenFPS.Native` carries libfmod and libphonon only.
+
+### 18.2 The steps
+
+Each is one agent session. "Heard" says whether a stored stream, replay or render moves. The wire hash moves for
+any edit to a hashed project (Common, Geometry, Materials, Acoustics, Sound outside Core, Schema, Physics,
+Environment, Models, World). The door fingerprint (`DoorModelFingerprint`, OpenFPS.Sound) moves only in step 11.
+
+1. Ship Jolt. Add the Jolt native for Linux x64 and Windows x64 to `OpenFPS.Native` the way libfmod and libphonon
+   are shipped, with a loader test. Touches `OpenFPS.Native`, the client and server project files, the publish
+   scripts, `tools/engine_packages/classify.py` and the surveys' lists if a project is added. Heard: nothing.
+   Wire hash: no (Native is not hashed). Door fingerprint: no. Decision: which JoltPhysicsSharp (18.5).
+2. The body API. A Physics-owned world and body type (`IBodyWorld` or similar: add, remove, set pose and
+   velocity, step, read back, shapes by our own handle) with Jolt behind it; nothing outside Physics names Jolt,
+   and the PhysicsBoundary guard gains that rule. Every binding call that sets something has a read-back test
+   (the 2.22.0 `MotionQuality` setter did nothing; use the body interface's `SetMotionQuality`). Gravity is the
+   world's. Steps at 120 Hz, four per tick. Heard: nothing. Wire hash: yes. Door fingerprint: no. After step 1.
+3. Tile shapes. Hand each tile's triangles (and the height field where the ground is a field) to Jolt as a mesh
+   shape, made once per tile off the placement thread, added and dropped with streaming (`TileSceneSet`'s
+   moment) and with doors, so Jolt's ground is the BVH's. Tests: floor under a dropped sphere agrees with
+   `FloorAt` across the city and Magnolia tiles. Heard: nothing. Wire hash: yes. Door fingerprint: no. After 2.
+4. Analytic tests. Bounce heights from restitution, momentum and energy across a collision, a box on a slope held
+   at its friction angle and sliding past it, a throw off a roof landing where the flight says, a stack at rest
+   going to sleep, and the same scene twice giving the same positions. Tests only. Can run beside step 1;
+   needs step 2 (and 3 for the roof and the slope on a tile).
+5. Swept queries and the vehicle's one shape. Shape casts in Geometry (a sphere, a capsule and a box swept
+   against the BVH, for sweeps Jolt does not need to do) and the vehicle body mesh as the shape used for both
+   collision and, later, the acoustic scene (Decision 13 keeps the sound preset separate). `VehicleStep.Blocked`
+   still stops the car; nothing is changed in what it does. Heard: nothing. Wire hash: yes. After 2; beside 3.
+6. Contacts from Jolt into `ContactStream`: impulse, closing and slip speeds, both materials, Continued while
+   touching. No system uses a body yet, so nothing is heard. Wire hash: yes (Physics). After 3.
+7. Dropped and thrown things. `HandsService.Drop` and a throw create a body; the impact speed is the flight's, and
+   its sound comes from `ImpactAcoustics.Between` at the contact. Heard: yes (item drops get their real fall
+   speeds); moves the stored item-drop renders and any stream that holds a drop. Needs Cody's ear.
+8. Scrape and roll. Continued contacts drive scrape and roll sounds (a box dragged, a barrel rolling). Heard:
+   new sounds only. Needs Cody's ear. After 7.
+9. People as eleven parts and the body plan as data (decisions 11 and 12), driven kinematically to the walk's
+   pose and left to fall when hit or shot, replacing the scripted `BodyFall`. Heard: yes (falls no longer
+   scripted). Needs Cody's ear. After 6; can follow 7.
+10. Geometry stage 6's second half. The vehicle meshes go into `TileSceneSet` as Steam Audio instances,
+    `iplInstancedMeshUpdateTransform` with each body, sources at the shell's points; `VehicleShadow` and
+    `CabinWalls` retired, or kept for far cars. Heard: yes (engine voices were tuned with no body around them).
+    Needs Cody's ear. Moves vehicle renders. After 5 and 6; can run beside 7 to 9.
+11. Door leaves as hinged bodies, with the closer as a spring and damper and the latch as a contact. This changes
+    the input motion of every approved door sound (the swing is no longer a lerp), so it needs Cody's ear
+    before it merges. It may move `DoorModelFingerprint` and then the door renders are made again. Wire hash: yes.
+    After 6. Last of the stage by choice.
+12. Soft bodies, when Cody names a first use (cloth, a hanging sign, a rope). Heard: new only.
+13. Separate, and Cody's pick, not part of this stage's run: a car striking a person, a vehicle exchanging
+    momentum and being damaged, and anything of driving, traffic or walkers. Cody (2026-10): "an object/item needs
+    to exist to cause an effect on something else... let's slow down with the intricate traffic/road/driving/npc
+    type stuff... we can go one by one." Nothing above depends on it.
+
+Parallel: 1 with 4's test writing; 3 with 5; 7 to 9 with 10 once 5 and 6 are in. Sequential: 2 after 1; 3 and 5
+after 2; 6 after 3; 7, 8, 9, 10 and 11 after 6. Steps 1 to 6 change nothing heard.
+
+### 18.3 What it costs, measured
+
+Release build, Linux x64, pinned to four cores, one thread, `DOTNET_PROCESSOR_COUNT=4`, in
+`--jolt-trial fleet` on the city tile's mesh. Each tick is four 120 Hz steps.
+
+Jolt:
+
+- 40 car boxes and 200 walker capsules, all kinematic: tick mean 0.379 ms, p95 0.479 ms; the 299 ticks beside the
+  worst average 0.320 ms; one spike of 17.9 ms (tick 19). Reading 240 poses back costs 0.068 ms.
+- The same with 100 dynamic boxes: mean 0.893 ms, p95 1.85 ms; the first step costs 71.7 ms; the other 299 ticks
+  average 0.657 ms.
+- The cars driven into 200 standing 75 kg dynamic people: mean 0.664 ms, p95 0.775 ms, worst 1.0 ms; 132 of the
+  200 moving or thrown by the end, fastest 7.9 m/s.
+- The tick is 33.3 ms. A street's movers cost about 1 to 3 percent of it.
+- The same scene run twice in one process gave the same final positions (hash 05d5541d).
+
+Steam Audio (Embree, one top scene, a commit including the transform updates, 13 city tile instances in it):
+
+- 1 car 0.011 ms, 10 cars 0.015 ms, 40 cars all moved 0.026 ms (p95 0.030), 20 moved 0.025 ms, 100 cars all
+  moved 0.050 ms. The first commit with 40 cars: 0.06 ms. The engine commits two top scenes (Full and
+  Listener), so about double.
+- The car sub-scene was 36 triangles. The earlier 1,000-triangle body measured 0.25 to 1.2 ms a commit (section
+  8), so a real shell should be priced in step 10 with the shell's own triangle count.
+
+Not measured:
+
+- Eleven-part ragdolls (about 2,200 joined bodies for 200 people); the spike used one capsule per person.
+- Jolt on Windows and the packaged native; multithreaded and cross-machine repeatability (only in-process,
+  single-threaded was).
+- A real server tick with 40 cars; collision of the cars as meshes (boxes in the spike) and against the city
+  triangles in motion.
+- Streaming churn into Jolt (tiles added and dropped while bodies stand on them).
+- Whether the moved Steam Audio transforms take effect by a traced ray, and the cost of tracing after a move.
+
+### 18.4 Risks
+
+- Determinism. Bodies are server-only and not predicted on the client (5.4), so only run-to-run repeatability on
+  the server matters. In-process and single-threaded it held. Jolt's cross-platform deterministic build is an
+  option if the Windows server or CI differs (memory "ci-differs-from-local" is the warning); step 4 includes
+  the replay and CI runs it. Stored streams stay unmoved until step 7.
+- JoltPhysicsSharp version. 2.22.0 was trialled. 2.23.0 was published 2026-10-05, now 22 days old, and needs
+  JoltPhysics.Native 1.1.0 (the latest, 2026-07-13). Package references were not changed here. The 2.22.0
+  `MotionQuality` setter bug may or may not be fixed, so read every set value back.
+- Windows packaging. The package carries `joltc.dll` for win-x64 and arm64; it must be copied next to the client
+  and server like libfmod, and the Windows publish script and its 0-warning build
+  (`-p:EnableWindowsTargeting=true`) checked. Not tried here.
+- Tile streaming churn. Jolt holds a second copy of every tile (77 MB on Magnolia). Tiles and door leaves must be
+  added, dropped and moved in step with `TileSceneSet`, or a body falls through a gap or stands on a ghost.
+- Single-step spikes. First contacts and adds cost 18 to 72 ms in one step; shapes must be made ahead and bodies
+  added a few at a time off the tick that carries sound placement.
+- Doors and the approved sounds (step 11): the swing's input changes. Do it last, and with Cody listening.
+
+### 18.5 Decisions for Cody
+
+1. What to build first once step 6 is in. Recommended: dropped and thrown things (step 7), because they need no
+   vehicles, no people and no doors, and replace two scripted guesses with a real flight.
+2. Car strikes person, damage and all driving, traffic and walkers stay one later step each, picked by Cody
+   (step 13). Recommended: yes, as he said.
+3. Door leaves as hinged bodies (step 11). Recommended: last, after his ear check; the approved door sounds stand
+   until then.
+4. JoltPhysicsSharp 2.23.0 at step 1 in place of 2.22.0. Recommended: yes, with the read-back tests; its native is
+   the same.
+5. People as eleven parts (step 9) after dropped things (step 7). Recommended: after.
+
+The step rate (120 Hz, four to a tick) was settled in section 11 and is not asked again.
 
 ## Decisions (Cody, 2026-10-11)
 

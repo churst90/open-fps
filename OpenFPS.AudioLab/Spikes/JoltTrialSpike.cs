@@ -8,14 +8,16 @@ using OpenFPS.Physics;
 namespace OpenFPS.AudioLab;
 
 /// <summary>
-/// --jolt-trial [map=city] [place=magnolia_tx] [threads=0]
+/// --jolt-trial [map=city] [place=magnolia_tx] [threads=0] [fleet]
 ///
 /// The Jolt trial of physics stage 0 (docs/PHYSICS_BOUNDARY.md, Decisions 2026-10-11): Jolt Physics through
 /// JoltPhysicsSharp, in the lab only, fed our own geometry. One city tile's static triangles as one mesh
 /// shape, the whole city as one, and a place tile's terrain as a height field; then the step's cost at 120 Hz
 /// with 0, 50 and 500 bodies on the city tile, a stack of ten boxes settling, a bullet-sized sphere at a thin
 /// wall with continuous collision off and on, a soft ball and a cloth on the ground, and the memory each
-/// takes. A ball dropped at points of each shape must come to rest on our own floor there (FloorAt), which
+/// takes. With <c>fleet</c> it stops after the city tile and measures a street's movers instead (docs/PHYSICS_BOUNDARY.md 18.3):
+/// 40 cars and 200 walkers stepped four times a tick, cars striking standing people, and Steam Audio's commit with
+/// car meshes moved as instances. A ball dropped at points of each shape must come to rest on our own floor there (FloorAt), which
 /// is the check that our axes, units and windings reach Jolt unchanged. Nothing in the game references Jolt.
 /// </summary>
 public static class JoltTrialSpike
@@ -222,6 +224,8 @@ public static class JoltTrialSpike
         Console.WriteLine($"  The whole city ({statics.Count} static pieces): {ct.Count:N0} triangles as one mesh shape in {clock.Elapsed.TotalMilliseconds:F0} ms, "
                           + $"RSS +{Mb(RssKb() - rssBefore)}");
 
+        if (args.Contains("fleet")) { Fleet(tileMesh, geo, spawn, statics, lo, hi, threads); Foundation.Shutdown(); return 0; }
+
         var rng = new Random(1);
         var points = Enumerable.Range(0, 64).Select(_ => (lo.X + 2f + (float)rng.NextDouble() * (TileMetres - 4f), lo.Y + 2f + (float)rng.NextDouble() * (TileMetres - 4f))).ToList();
         var (worst, resting, count) = RestsOnOurFloor(tileMesh, Vector3.Zero, geo, points, threads);
@@ -381,6 +385,197 @@ public static class JoltTrialSpike
         Console.WriteLine($"\n  RSS at the end {Mb(RssKb())}; managed heap {GC.GetTotalMemory(false) / 1048576.0:F1} MB");
         Foundation.Shutdown();
         return 0;
+    }
+
+    // ── The fleet: a street's worth of movers (physics stage 4 survey, 2026-10-27) ───────────────────
+
+    [System.Runtime.InteropServices.DllImport("phonon", CallingConvention = System.Runtime.InteropServices.CallingConvention.Cdecl)]
+    private static extern void iplInstancedMeshUpdateTransform(IntPtr mesh, IntPtr scene, OpenFPS.Native.SteamAudio.Phonon.IPLMatrix4x4 transform);
+
+    /// <summary>Row-major, translation in the last column, z mirrored as Phonon.World does.</summary>
+    private static unsafe OpenFPS.Native.SteamAudio.Phonon.IPLMatrix4x4 Translate(Vector3 t)
+    {
+        var m = new OpenFPS.Native.SteamAudio.Phonon.IPLMatrix4x4();
+        m.elements[0] = 1; m.elements[5] = 1; m.elements[10] = 1; m.elements[15] = 1;
+        m.elements[3] = t.X; m.elements[7] = t.Y; m.elements[11] = -t.Z;
+        return m;
+    }
+
+    private static void Fleet(Shape tileMesh, TriangleWorld geo, Vector3 spawn, List<GeometryInstance> statics, Vector2 lo, Vector2 hi, int threads)
+    {
+        var rng = new Random(3);
+        var any = new AcceptAll();
+        // Street level: where our floor is the spawn's, so cars and people stand on the road, not a roof.
+        Vector3 Spot(float yUp)
+        {
+            for (int tries = 0; tries < 2000; tries++)
+            {
+                float x = spawn.X + (float)(rng.NextDouble() - 0.5) * 200f, z = spawn.Z + (float)(rng.NextDouble() - 0.5) * 200f;
+                float floor = geo.FloorAt(x, z, 300f, GeometryLayers.Ground, ref any, out _);
+                if (MathF.Abs(floor - spawn.Y) < 0.3f) return new Vector3(x, floor + yUp, z);
+            }
+            return spawn + new Vector3(0f, yUp, 0f);
+        }
+
+        Console.WriteLine("\n  Fleet on the city tile: 40 cars (kinematic boxes 4.5 x 1.4 x 1.8 m, 8 to 15 m/s), 200 walkers (capsules, 1.4 m/s), 120 Hz x 4 a tick,");
+        Console.WriteLine("  300 ticks (10 s). A tick = every mover's velocity set, four steps, every mover's pose read back. Single thread.");
+        foreach (var (label, debris, standing) in new[] { ("movers only", 0, false), ("+ 100 dynamic boxes on the street", 100, false),
+                                                          ("walkers dynamic and standing in the cars' way (cars strike people)", 0, true),
+                                                          ("the same again, same seed", 0, true) })
+        {
+            rng = new Random(3);
+            using var w = new World(threads);
+            w.Add(tileMesh, Vector3.Zero, Quaternion.Identity, moving: false);
+            using var carShape = new BoxShape(new Vector3(2.25f, 0.7f, 0.9f));
+            using var personShape = new CapsuleShape(0.55f, 0.3f);
+            var movers = new List<(BodyID Id, Vector3 Velocity, bool Kinematic)>();
+            BodyID Make(Shape shape, Vector3 at, MotionType type, float mass = 0f)
+            {
+                using var s = new BodyCreationSettings(shape, at, Quaternion.Identity, type, type == MotionType.Static ? NonMoving : Moving) { Friction = 0.6f, Restitution = 0.1f };
+                if (mass > 0f) { s.OverrideMassProperties = OverrideMassProperties.CalculateInertia; s.MassPropertiesOverride = new MassProperties { Mass = mass }; }
+                var id = w.Bi.CreateAndAddBody(s, type == MotionType.Static ? Activation.DontActivate : Activation.Activate);
+                w.Bodies.Add(id);
+                return id;
+            }
+            for (int i = 0; i < 40; i++)
+            {
+                float speed = 8f + (float)rng.NextDouble() * 7f;
+                var dir = i % 2 == 0 ? Vector3.UnitX : Vector3.UnitZ;
+                movers.Add((Make(carShape, Spot(0.7f), MotionType.Kinematic), dir * speed * (i % 4 < 2 ? 1f : -1f), true));
+            }
+            for (int i = 0; i < 200; i++)
+            {
+                var at = Spot(0.85f);
+                if (standing)
+                {
+                    // Ahead of one of the cars, a second or so down its road.
+                    var car = movers[i % 40];
+                    at = w.Bi.GetCenterOfMassPosition(car.Id) + car.Velocity * (0.5f + (float)rng.NextDouble() * 6f);
+                    at.Y = spawn.Y + 0.85f;
+                    movers.Add((Make(personShape, at, MotionType.Dynamic, 75f), Vector3.Zero, false));
+                }
+                else
+                {
+                    var dir = new Vector3(MathF.Cos(i), 0f, MathF.Sin(i));
+                    movers.Add((Make(personShape, at, MotionType.Kinematic), dir * 1.4f, true));
+                }
+            }
+            using var box = new BoxShape(new Vector3(0.25f));
+            for (int i = 0; i < debris; i++) Make(box, Spot(0.3f), MotionType.Dynamic, 5f);
+            w.System.OptimizeBroadPhase();
+            var ticks = new List<double>(300);
+            var sw = new Stopwatch();
+            double read = 0;
+            for (int t = 0; t < 300; t++)
+            {
+                sw.Restart();
+                for (int i = 0; i < movers.Count; i++)
+                {
+                    var (id, v, kin) = movers[i];
+                    if (!kin) continue;
+                    var p = w.Bi.GetCenterOfMassPosition(id);
+                    if (MathF.Abs(p.X - spawn.X) > 110f || MathF.Abs(p.Z - spawn.Z) > 110f) { v = -v; movers[i] = (id, v, kin); }
+                    w.Bi.SetLinearVelocity(id, v);
+                }
+                for (int k = 0; k < 4; k++)
+                {
+                    var e = w.System.Update(Dt, 1, w.Jobs);
+                    if (e != PhysicsUpdateError.None) throw new InvalidOperationException($"Jolt step: {e}");
+                }
+                long r0 = Stopwatch.GetTimestamp();
+                float sink = 0f;
+                foreach (var (id, _, _) in movers) { var p = w.Bi.GetCenterOfMassPosition(id); var q = w.Bi.GetRotation(id); sink += p.X + q.W; }
+                read += Stopwatch.GetElapsedTime(r0).TotalMilliseconds + (sink == float.MaxValue ? 1 : 0);
+                ticks.Add(sw.Elapsed.TotalMilliseconds);
+            }
+            uint awake = w.System.GetNumActiveBodies(BodyType.Rigid);
+            float fastest = 0f; int thrown = 0;
+            if (standing)
+                foreach (var (id, _, kin) in movers)
+                    if (!kin)
+                    {
+                        var p = w.Bi.GetCenterOfMassPosition(id); var v = w.Bi.GetLinearVelocity(id);
+                        if (v.Length() > 0.5f || p.Y > spawn.Y + 1.2f) thrown++;
+                        fastest = MathF.Max(fastest, v.Length());
+                    }
+            var worstAt = ticks.IndexOf(ticks.Max());
+            // Run-to-run: the same scene twice in one process lands every person in the same place to the bit.
+            var hash = new HashCode();
+            foreach (var (id, _, kin) in movers) { var p = w.Bi.GetCenterOfMassPosition(id); hash.Add(p.X); hash.Add(p.Y); hash.Add(p.Z); }
+            Console.WriteLine($"    {label}: final positions hash {hash.ToHashCode():x8}");
+            Console.WriteLine($"    {label}: tick {Times(ticks)} (worst was tick {worstAt}; the other 299 average {(ticks.Sum() - ticks.Max()) / 299:F3} ms); pose read-back {read / 300:F3} ms of it; {awake} awake at the end"
+                              + (standing ? $"; {thrown} of 200 people moving or lifted at the end, fastest {fastest:F1} m/s" : ""));
+        }
+
+        // ── Steam Audio: the cost of moving vehicle meshes (instances in an Embree top scene) ────────
+        Console.WriteLine("\n  Steam Audio top scene, Embree: the city tile's boxes as one sub-scene instanced 13 times (the streamed tiles of a view),");
+        Console.WriteLine("  plus N car sub-scene instances (a saloon of 3 boxes, 36 triangles), each given a new transform and the scene committed:");
+        var cs = OpenFPS.Native.SteamAudio.Phonon.DefaultContextSettings();
+        if (OpenFPS.Native.SteamAudio.Phonon.iplContextCreate(ref cs, out IntPtr ctx) != OpenFPS.Native.SteamAudio.Phonon.IPL_STATUS_SUCCESS)
+        { Console.WriteLine("    no Steam Audio context here (libphonon not found): not measured"); return; }
+        bool embree = OpenFPS.Audio.SteamAudio.SteamAudioScene.UseEmbree(ctx);
+        Console.WriteLine($"    Embree {(embree ? "on" : "NOT available: default tracer")}");
+        var cityBoxes = new List<OpenFPS.Audio.SteamAudio.SteamAudioScene.Box>();
+        foreach (var inst in statics)
+        {
+            var piece = inst.Piece;
+            if (inst.Position.X < lo.X - 100 || inst.Position.X > hi.X + 100 || inst.Position.Z < lo.Y - 100 || inst.Position.Z > hi.Y + 100) continue;
+            for (int s = 0; s < piece.SolidCount; s++)
+            {
+                ref readonly var rec = ref piece.Solid(s);
+                if (rec.BoxSize.X <= 0 || rec.BoxSize.Y <= 0 || rec.BoxSize.Z <= 0) continue;
+                cityBoxes.Add(new(rec.PlacedAt, rec.BoxSize, rec.BoxRotation, piece.Surfaces[rec.Surface].Material));
+            }
+        }
+        using var citySub = new OpenFPS.Audio.SteamAudio.SteamAudioScene(ctx);
+        citySub.Build(cityBoxes);
+        using var carSub = new OpenFPS.Audio.SteamAudio.SteamAudioScene(ctx);
+        carSub.Build(new List<OpenFPS.Audio.SteamAudio.SteamAudioScene.Box>
+        {
+            new(new Vector3(0f, 0.6f, 0f), new Vector3(1.8f, 0.6f, 4.5f), Quaternion.Identity, "Metal"),
+            new(new Vector3(0f, 1.15f, -0.2f), new Vector3(1.6f, 0.5f, 2.2f), Quaternion.Identity, "Glass"),
+            new(new Vector3(0f, 0.3f, 0f), new Vector3(1.7f, 0.2f, 4.2f), Quaternion.Identity, "Metal"),
+        });
+        Console.WriteLine($"    city sub-scene: {cityBoxes.Count} boxes ({cityBoxes.Count * 12:N0} triangles); car sub-scene: 36 triangles");
+        foreach (int cars in new[] { 0, 1, 10, 40, 100 })
+        foreach (int moving in new[] { cars, cars / 2 }.Distinct())
+        {
+            var top = OpenFPS.Audio.SteamAudio.SteamAudioScene.CreateScene(ctx);
+            var tiles = new IntPtr[13];
+            for (int i = 0; i < 13; i++)
+            {
+                var ts = new OpenFPS.Native.SteamAudio.Phonon.IPLInstancedMeshSettings { subScene = citySub.Handle, transform = Translate(new Vector3((i % 4) * 250f, 0f, (i / 4) * 250f)) };
+                OpenFPS.Native.SteamAudio.Phonon.iplInstancedMeshCreate(top, ref ts, out tiles[i]);
+                OpenFPS.Native.SteamAudio.Phonon.iplInstancedMeshAdd(tiles[i], top);
+            }
+            var inst = new IntPtr[cars];
+            var at = Enumerable.Range(0, cars).Select(_ => Spot(0f)).ToArray();
+            for (int i = 0; i < cars; i++)
+            {
+                var cst = new OpenFPS.Native.SteamAudio.Phonon.IPLInstancedMeshSettings { subScene = carSub.Handle, transform = Translate(at[i]) };
+                OpenFPS.Native.SteamAudio.Phonon.iplInstancedMeshCreate(top, ref cst, out inst[i]);
+                OpenFPS.Native.SteamAudio.Phonon.iplInstancedMeshAdd(inst[i], top);
+            }
+            var clock = Stopwatch.StartNew();
+            OpenFPS.Native.SteamAudio.Phonon.iplSceneCommit(top);
+            double first = clock.Elapsed.TotalMilliseconds;
+            var times = new List<double>();
+            for (int f = 0; f < 200; f++)
+            {
+                clock.Restart();
+                for (int i = 0; i < moving; i++)
+                {
+                    at[i] += new Vector3(0.4f, 0f, 0f);
+                    iplInstancedMeshUpdateTransform(inst[i], top, Translate(at[i]));
+                }
+                OpenFPS.Native.SteamAudio.Phonon.iplSceneCommit(top);
+                times.Add(clock.Elapsed.TotalMilliseconds);
+            }
+            Console.WriteLine($"    {cars,3} cars, {moving,3} moved a commit: first commit {first:F2} ms; later {Times(times)}");
+            for (int i = 0; i < cars; i++) OpenFPS.Native.SteamAudio.Phonon.iplInstancedMeshRelease(ref inst[i]);
+            for (int i = 0; i < 13; i++) OpenFPS.Native.SteamAudio.Phonon.iplInstancedMeshRelease(ref tiles[i]);
+            OpenFPS.Native.SteamAudio.Phonon.iplSceneRelease(ref top);
+        }
     }
 
     /// <summary>A sphere of latitude rings, its faces wound outward, with edge constraints for a soft body.</summary>
