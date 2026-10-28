@@ -49,7 +49,7 @@ public readonly record struct ContactMaterial(float Friction, float Restitution)
 /// constant here. Stepping is on the calling thread alone (no worker threads), so a scene run twice gives the same
 /// positions. Not thread safe: one thread steps and reads.
 /// </summary>
-public sealed class BodyWorld : IDisposable
+public sealed partial class BodyWorld : IDisposable
 {
     /// <summary>The step, s (docs/PHYSICS_BOUNDARY.md 11): four to a 30 Hz tick.</summary>
     public const float StepSeconds = 1f / 120f;
@@ -91,6 +91,7 @@ public sealed class BodyWorld : IDisposable
         public int ShapeId;
         public BodyMotion Motion;
         public float MassKg;
+        public string Material = "Generic";
     }
 
     private readonly PhysicsSystem _system;
@@ -103,6 +104,7 @@ public sealed class BodyWorld : IDisposable
     private readonly Dictionary<int, Shape> _shapes = new();
     private readonly SortedDictionary<int, Entry> _bodies = new();
     private int _nextShape = 1, _nextBody = 1;
+    private readonly Dictionary<uint, (int Id, Entry Entry)> _byJolt = new();
     private bool _disposed;
 
     /// <param name="gravity">Metres per second squared, downward: the world's own (docs/PHYSICS_BOUNDARY.md, Decisions
@@ -125,6 +127,8 @@ public sealed class BodyWorld : IDisposable
         // No worker threads: the caller's thread runs every job, in the same order each time.
         _jobs = new JobSystemThreadPool(new JobSystemThreadPoolConfig { maxJobs = 2048, maxBarriers = 8, numThreads = 0 });
         Gravity = gravity;
+        _onAdded = OnContactAdded;
+        _onPersisted = OnContactPersisted;
     }
 
     /// <summary>Metres per second squared, downward; read from the solver, not remembered.</summary>
@@ -264,7 +268,10 @@ public sealed class BodyWorld : IDisposable
         var body = _system.BodyInterface.CreateBody(settings);
         _system.BodyInterface.AddBody(body, motion == BodyMotion.Static ? Activation.DontActivate : Activation.Activate);
         int id = _nextBody++;
-        _bodies[id] = new Entry { Body = body, ShapeId = shapeId, Motion = motion, MassKg = motion == BodyMotion.Dynamic ? massKg : 0f };
+        var entry = new Entry { Body = body, ShapeId = shapeId, Motion = motion, MassKg = motion == BodyMotion.Dynamic ? massKg : 0f,
+                                Material = string.IsNullOrEmpty(material) ? "Generic" : material };
+        _bodies[id] = entry;
+        _byJolt[body.ID.ID] = (id, entry);
         return id;
     }
 
@@ -275,6 +282,7 @@ public sealed class BodyWorld : IDisposable
         if (!_bodies.Remove(bodyId, out var e)) throw new KeyNotFoundException($"no body {bodyId}");
         var bi = _system.BodyInterface;
         var jolt = e.Body.ID;
+        ForgetContacts(bodyId, jolt.ID);
         bi.RemoveAndDestroyBody(jolt);
     }
 
@@ -418,12 +426,15 @@ public sealed class BodyWorld : IDisposable
         Check();
         var error = _system.Update(StepSeconds, 1, _jobs);
         if (error != PhysicsUpdateError.None) throw new InvalidOperationException($"Jolt step: {error}");
+        FinishStepContacts();
     }
 
-    /// <summary>A server tick's worth: <see cref="StepsPerTick"/> steps.</summary>
-    public void Tick()
+    /// <summary>A server tick's worth: <see cref="StepsPerTick"/> steps. With <paramref name="contacts"/> the tick's contacts
+    /// are added to it afterwards (<see cref="Deliver"/>); the host begins and closes the stream.</summary>
+    public void Tick(ContactStream? contacts = null)
     {
         for (int i = 0; i < StepsPerTick; i++) Step();
+        if (contacts != null) Deliver(contacts);
     }
 
     /// <summary>Rebuilds the broad phase once after many bodies were added together (a tile's worth), so the first
@@ -447,6 +458,8 @@ public sealed class BodyWorld : IDisposable
             bi.RemoveAndDestroyBody(id);
         }
         _bodies.Clear();
+        _byJolt.Clear();
+        ReportContacts = false;
         foreach (var shape in _shapes.Values) shape.Dispose();
         _shapes.Clear();
         _jobs.Dispose();

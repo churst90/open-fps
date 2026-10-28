@@ -2544,6 +2544,50 @@ not agree with was the step.
   machine, at 12 cores and at `DOTNET_PROCESSOR_COUNT=4`). The hash is not stored in the test: it is the
   machine's libm that CI might differ in (memory "ci-differs-from-local"), so only the runs are compared.
 
+### 18.10 Step 6 as built (2026-10-27)
+
+Jolt's contacts arrive in a `ContactStream`; no system uses a body yet, so nothing heard moves. The server is
+untouched and no system's stream content changed (DrivingReplay and MovementReplay are byte-identical).
+
+- Switch and call. `BodyWorld.ReportContacts` (off by default, so a world that does not ask steps as before) hooks
+  Jolt's added and persisted callbacks. `Tick(stream)` runs the four steps and then `Deliver`s the tick's contacts
+  into the stream; the host still begins and closes the stream, so Ended comes from the stream's own rule.
+- Ids. A body's id in an event is `BodyWorld.ContactIdBase` (2^30) plus its handle (`ContactId`). Entity ids are small
+  counts and `NoOther` is -1, so the two never meet. One event a pair of bodies: Body is the more moving of the two
+  (dynamic over kinematic over static, the lower handle between equals), Other the rest. Pairs with no dynamic body
+  are not reported.
+- Meaning, as in 17.4. Normal is the way out of Other, towards Body. Surface and OtherSurface are the materials the
+  bodies were added with. Point is the mean of the manifold's points on both bodies.
+- Closing speed is the relative velocity of the two bodies at the contact point, along the normal, read inside
+  `OnContactAdded` and `OnContactPersisted`: after gravity, before the contact is solved. Slip speed is the part of
+  it across the normal. Over a tick's four steps each is the greatest. A tile mesh meets a ball in several
+  triangles; the hardest closing one speaks for the pair. Jolt reports a pair while it is within its speculative
+  margin, so Began comes in the step before the touch: a drop from 2 m gave 6.2926 m/s against sqrt(2gh) 6.2631
+  (the extra 0.03 is part of one step of gravity, g * 1/120 = 0.082 m/s at most). A body at rest reports 0.0817 m/s
+  closing (one step of gravity), well under `ImpactAcoustics.MinimumSpeed`.
+- Impulse. Jolt's listener gives none and the binding does not expose the constraint's. It is derived: after each
+  step, m * (velocity after - velocity the callback saw) for the dynamic body (the lighter of two), along the push of
+  the other, summed over the tick's steps. Exact for one contact; where a body touches several things its change of
+  momentum is shared by how far each pushes along it, and scaled down so the shares do not add up to more than it.
+  Measured on a 0.5 kg ball dropped 2 m: 3.4568 N s reported against m * dv + m * g * t = 3.4568 over the tick
+  (restitution form m * (1 + e) * v 3.4447, which counts the step differently). Resting, 0.16344 N s a tick against
+  m * g * t 0.16344.
+- Continued. A pair reported in a tick continues the next if Jolt reports it, or if Jolt was in contact with it last
+  step, or if both bodies are asleep (Jolt neither looks at nor reports a sleeping pair, and `WereBodiesInContact`
+  says no): those continue with zero impulse and speeds. A body removed ends its pairs at the stream's next close.
+- Order. Events are sorted by (Body, Other) before they are added, and the raw contacts of a step by pair and place,
+  because Jolt's callback order is the job order. Collection is under a lock. The world has no worker threads
+  (`numThreads` 0), so the callbacks run on the caller's thread. The same scene twice gives the same events to the
+  bit, and again with `DOTNET_PROCESSOR_COUNT=4`.
+- Lifetime. The two handlers are fields of the world, held for its life; a test forces `GC.Collect` before and after
+  every tick with the listener on.
+- Tests (`BodyContactsTests`, 9): a ball dropped begins once with the fall's speed and the momentum's impulse; resting
+  continues with m * g * t; asleep it still continues; lifted away it ends; a box slid at 3 m/s slips at 3.0000 and
+  both materials are right; ids stay in the band; two runs agree bit for bit; the collector between steps; off, the
+  step is the same.
+- Wire hash 4bd285bc1e17 to WIREHASH (Physics is hashed), so the server and the Windows client deploy together.
+  The door fingerprint does not move.
+
 ## Decisions (Cody, 2026-10-11)
 
 - Approved as recommended, all ten (section 8), with two changes:
