@@ -1,6 +1,7 @@
 using System.Numerics;
 using OpenFPS.Audio.SteamAudio;
 using OpenFPS.Geometry;
+using OpenFPS.Server.Core;
 
 namespace OpenFPS.Tests;
 
@@ -84,5 +85,52 @@ public class NarrowGroundTests
         Assert.False(IsOpen(At(41, 5f, 0.15f, 0.15f, 0.15f, 3f), canopy), "kerb under a canopy");
         Assert.False(IsOpen(At(42, 5f, 0.03f, 0.9f, 0.03f, 0.2f), canopy), "threshold under a lintel");
         Assert.True(IsOpen(At(43, 30f, 0.15f, 0.15f, 0.15f, 3f), canopy), "the same kerb in the open");
+    }
+
+    [Fact]
+    public void A_rail_on_posts_is_not_open_ground_and_a_kerb_on_a_road_slab_is()
+    {
+        // Albany's rails: 0.15 thick with the top 0.39 up, so 0.24 of air under them.
+        Assert.False(IsOpen(At(50, 5f, 0.39f, 18f, 0.15f, 0.07f, "Metal")), "rail 0.3 m up");
+        Assert.False(IsOpen(At(51, 5f, 0.30f, 18f, 0.07f, 0.15f, "Metal")), "rail with 0.23 under it");
+        Assert.True(IsOpen(At(52, 5f, 0.15f, 18f, 0.15f, 0.07f, "Metal")), "the same rail lying on the ground");
+        // A road slab 0.1 up (not the ground itself) with a kerb on it: the kerb's underside is on open ground.
+        var road = At(53, 5f, 0.10f, 8f, 0.10f, 30f, "Asphalt");
+        Assert.True(IsOpen(At(54, 5f, 0.25f, 0.15f, 0.15f, 30f), road), "kerb on a road slab");
+        Assert.False(IsOpen(At(55, 5f, 0.45f, 18f, 0.15f, 0.07f, "Metal"), road), "rail over the road slab");
+    }
+
+    private const int Posts = 126;
+    private const float Spacing = 2f;
+
+    /// <summary>Whether the piece is open ground on a hillside rising 0.1 per metre east, in both uses.</summary>
+    private static bool IsOpenOnSlope(SteamAudioScene.Box piece)
+    {
+        var heights = new float[Posts * Posts];
+        for (int j = 0; j < Posts; j++)
+            for (int i = 0; i < Posts; i++) heights[j * Posts + i] = 0.1f * i * Spacing;
+        var c = TerrainTiles.Component(Posts, Spacing, heights, out float baseY);
+        var terrain = SolidSpec.OfTerrain(1, new Vector3(125f, baseY, 125f), c.Field(baseY), SceneTerrain.Surface);
+        var all = new List<SteamAudioScene.Box> { piece };
+        bool whole = !SteamAudioScene.WithoutOpenGround(all, new GroundHeights(new[] { terrain })).Any();
+        var world = new AcousticGeometry(250f).Update(all, null, new[] { terrain });
+        var accept = new AcceptAll();
+        var (_, hi) = SteamAudioScene.WorldExtents(piece);
+        Assert.True(world.Closest(new Vector3(piece.Center.X, hi.Y + 0.5f, piece.Center.Z), -Vector3.UnitY, 5f, GeometryLayers.Acoustics, RayFaces.Front, ref accept, out var hit));
+        Assert.Equal(whole, world.SurfaceOf(hit).Is(SurfaceFlags.OpenGround));
+        return whole;
+    }
+
+    [Fact]
+    public void A_long_piece_is_judged_against_the_slope_under_all_of_it()
+    {
+        // 18 m along the slope (rising 1.8 m): its middle is 0.1*110 = 11 m up and its ends 1.8 m either side.
+        var lie = Quaternion.CreateFromAxisAngle(Vector3.UnitZ, MathF.Atan(0.1f));
+        float cos = MathF.Cos(MathF.Atan(0.1f));
+        SteamAudioScene.Box Along(int id, float over, float thick, float width, string material)
+            => new(new Vector3(110f, 11f + (over - thick * 0.5f) / cos, 100f), new Vector3(18f, thick, width), lie, material, default, id);
+        Assert.False(IsOpenOnSlope(Along(60, 0.45f, 0.07f, 0.15f, "Metal")), "rail 0.45 m up, parallel to the slope");
+        Assert.True(IsOpenOnSlope(Along(61, 0.15f, 0.15f, 0.15f, "Concrete")), "kerb along the slope");
+        Assert.True(IsOpenOnSlope(Along(62, 0.04f, 0.04f, 0.3f, "Asphalt")), "gutter along the slope");
     }
 }

@@ -8,10 +8,12 @@ tag (docs/SOUND_LIBRARY_BOUNDARY.md, stage 8 and decision 8) and references the 
 
 - The listener's trace (`SteamAudioScene.WithoutOpenGround`, `AcousticGeometry`) now leaves out narrow and sloped ground
   that is stood on, as it did broad level slabs: a slab at most 0.5 m thick whose top a body can walk (no steeper than
-  45 degrees), whose lowest top point is within `BodyConstants.StepHeight` of the ground, with open sky over it. Kerbs,
+  45 degrees), that rests on the ground (judged at its four top corners and middle against the ground at those points:
+  somewhere its underside is within 5 cm of the ground or of a broad level slab lying on it, its top within
+  `BodyConstants.StepHeight` of that, and nowhere its top more than 1 m over the ground), with open sky over it. Kerbs,
   gutters, thresholds, shoulders and ramps no longer come back as a small room 9-15 ms after a close sound. A host does
   nothing; one whose maps have such pieces hears them go from the late field, the tail and far sources' echoes. Benches,
-  tables, low walls and roofs stay.
+  tables, low walls and roofs stay, and so does a rail with air under it.
 
 ## library/v0.2.0 (2026-10-24)
 
