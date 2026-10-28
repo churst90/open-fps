@@ -147,13 +147,12 @@ fingerprint changed too (3a8a8e7b91ab), so the door renders are made again once.
        faults Sean found that open-fps's traffic may share come first, each shown on open-fps's own roads
        before it is fixed; then lane changes and junctions that list their roads and ways; breakdowns,
        flashers and tow trucks last. None of it before the items above.
-7. Engine package stage 6, Common to the wire. Runs alone: it touches every project file. One session.
-8. Engine package stages 9 and 10. Both unblocked now (library stages 6 and 7 and physics stage 3 are done).
-   - 9: Accessibility on the scene view. The ten aids read the scene view as the audio does. Check: the
-     spoken-lines replay unchanged line for line. Two to three sessions.
-   - 10: Agents, the people. Haunts, door manners, the pavement graph, Alex's day and the pedestrians read a
-     view of people, doors and places. Alex's day and the door manners were approved by ear. Two to three
-     sessions.
+7. Engine package stage 6, Common to the wire: DONE 2026-10-18 (docs/ENGINE_PACKAGES.md, stage 6's built note).
+   Left: the Arch reference, which goes with the physics views and constants; and `Scopes` stays in Common unless
+   Cody wants a shared game project for it.
+8. Engine package stages 9 and 10: DONE 2026-10-18 and 19 (docs/ENGINE_PACKAGES.md, their built notes). The ten
+   aids read the scene view; the people's laws are Agents' and read `IPeopleWorld`. Alex's day and the door
+   manners are unchanged line for line (`PeopleReplayTests`).
 9. Physics, then (docs/PHYSICS_BOUNDARY.md):
    - stage 2's leftovers (16.6): one rolling resistance and drag law, one brake law, `WindModel` folded into
      `WindField` so bullets feel the air the ears do, `VehicleChassisSpec`; the generators' 9.81 at the maps'
