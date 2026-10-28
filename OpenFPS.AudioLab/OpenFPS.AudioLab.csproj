@@ -21,9 +21,6 @@
     <PackageReference Include="Serilog" Version="4.3.1" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
-    <!-- The Jolt trial of physics stage 0 (docs/PHYSICS_BOUNDARY.md): the lab only, no game code reads it.
-         MIT, as is Jolt Physics; 2.22.0 of 2026-07-13, the newest at least two weeks old on 2026-10-11. -->
-    <PackageReference Include="JoltPhysicsSharp" Version="2.22.0" />
   </ItemGroup>
 
   <!-- The audio engine + diagnostics now live in OpenFPS.Client.Core (referenced above);

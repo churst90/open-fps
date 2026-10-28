@@ -15,6 +15,9 @@ OpenFPS.Physics.VehicleState	V
 OpenFPS.Physics.AirSample	V
 OpenFPS.Physics.BodyConstants	P
 OpenFPS.Physics.Earth	P
+OpenFPS.Physics.BodyWorld	P
+OpenFPS.Physics.BodyMotion	P
+OpenFPS.Physics.ContactMaterial	P
 OpenFPS.Physics.ChassisSpec	P
 OpenFPS.Physics.AxleSpec	P
 OpenFPS.Physics.TyreSize	P

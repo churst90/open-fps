@@ -2416,6 +2416,30 @@ Not measured:
 
 The step rate (120 Hz, four to a tick) was settled in section 11 and is not asked again.
 
+### 18.6 Steps 1 and 2 as built (2026-10-27)
+
+Jolt is in and the body API stands; no game system uses it, so nothing heard moves.
+
+- Step 1: `OpenFPS.Physics` references JoltPhysicsSharp 2.22.0 (one line in its csproj). Jolt lives in Physics and
+  not in `OpenFPS.Native` because Physics is the only project that names it, and the package already carries its
+  own native for every platform. The native lands through the package's `runtimes/` folder: `libjoltc.so` for
+  linux-x64 and `joltc.dll` for win-x64 sit under `runtimes/<rid>/native/` beside the server, the GTK client,
+  AudioLab and the tests; a win-x64 self-contained build puts `joltc.dll` at the root, and `publish-windows.sh`
+  now refuses a zip without it. AudioLab's own reference went; it gets the package through Physics.
+- Step 2: `BodyWorld` (sphere, box, capsule and `MeshAsset` shapes by our own handle, static, kinematic and
+  dynamic bodies, pose, velocities, mass, friction and restitution from `AcousticRegistry`, `BodyState`
+  read-back, 120 Hz step, four to a 30 Hz tick, gravity the world's value defaulting to
+  `Earth.StandardGravity`). Dispose frees everything natively. Every setter has a read-back test; the same scene
+  stepped twice gives the same bytes.
+- Measured: Jolt damps linear motion by 0.05 per second by default, which gave -9.563 m/s^2 instead of -9.807 in
+  a fall; it is set to 0. `BodyCreationSettings.MotionQuality` has a broken setter in 2.22.0 and is not used.
+  A mesh shape cannot be dynamic (Jolt has none). Unmeasured materials take friction 0.5 and restitution 0.1;
+  Jolt's pair rule (geometric mean of friction, larger restitution) is the table's.
+- The PhysicsBoundary guard now fails on any file outside `OpenFPS.Physics` (and the trial spike) that names
+  Jolt; a test breaks the rule on purpose and sees it fail.
+- The wire hash moves from 54ce2252ff38 to 59dd0b1e4b31 (the new package reference), so the server and the
+  Windows client deploy together. The door fingerprint does not move.
+
 ## Decisions (Cody, 2026-10-11)
 
 - Approved as recommended, all ten (section 8), with two changes:
