@@ -1828,6 +1828,194 @@ octave band, most of it by a few hundredths, but where landings re-roll.
   engine's own gas law for its charge (`Gas`, R = 288 for burnt gas and air together); the client's aids
   reading the map's gravity from the manifest.
 
+### 16.8 Rolling, drag and brakes: the survey (2026-10-27)
+
+Stage 2 left one rolling resistance and drag law and one brake law (16.6, "Left of stage 2"). This is the
+survey and the plan for them, on main `f55dd320`, modelled on 16.6. Nothing is changed yet: driving and
+traffic are taken slowly (Cody, 2026-10-21), the sound's car is approved by ear, and the roads carry player
+drivers as well as traffic, so nothing here may work for traffic's cars alone. Every line reference below was
+read on `f55dd320`; every number of what would move is worked out from the code, not measured.
+
+The rows in 3.6 for brakes and for rolling and drag name `DrivingSystem.cs:260-262` and `Driveline.cs:35, 57-58`.
+Stage 3 moved the server's car into `VehicleStep`, so they are `VehicleStep.cs:157-159` and `Driveline.cs:41,
+63-65` now.
+
+**Three kinds of number.** What was written as "a brake" is three different things, and the plan keeps them
+apart:
+
+- **What the car can do** is physics: how hard its tyres and brakes can slow it, and what the road and the
+  air take from it. It belongs to the car and the world, in `OpenFPS.Physics`.
+- **What a driver chooses** is behaviour: how hard a driver means to brake for a light, a queue, a bend or a
+  stop. Traffic's IDM "comfortable deceleration" (`CarFollowing`'s b, the map's `BrakingMps2`) is this, and
+  so are the race line's braking passes and a train driver's service rate. It belongs to the drivers, in
+  `OpenFPS.Agents` and the maps. A driver's choice may be worked out from the car's capability (gen_city
+  takes 35 % of the grip), but it is not the capability, and the two must not be merged: a car whose driver
+  brakes at the tyres' limit for every light is a car that squeals at every light.
+- **What the sound listens for** is a threshold: how hard the car must be slowing before a hiss or a squeal
+  starts. It belongs to the sound's mechanism and is not a law of motion.
+
+#### Rolling resistance and drag
+
+The vehicle's own figures are `VehicleMechanics.DragArea` (Cd·A, default 0.62 m²) and `RollingResistance`
+(Crr, default 0.013) (`OpenFPS.Physics/VehicleMechanics.cs:15, 18`; the presets' own values in
+`OpenFPS.Sound/Vehicles.cs`, 0.008 for the heaviest to 0.015, forwarded at `:327-328`; the editor's
+`VehicleSpec.cs:17-20`, `:103`, `:128-129` and `Machines.cs:428-429`, `:546-547`). Only three places use
+them, and all three write the same law:
+
+| Where | What it works out | Air | Gravity | Below what speed rolling stops | Read by | Heard or stored |
+|---|---|---|---|---|---|---|
+| `VehicleStep.cs:157-158` | drag ½ρ·CdA·v², rolling Crr·m·g, against motion | the map's (`input.AirDensity`: the weather's temperature, the map's pressure; `Air.Standard` without one) | the map's (`PhysicsConstants.GravityOf`) | 0.15 m/s (`StandstillSpeed`, `:29`), which cuts every resistance | the server's driven car (players' and the lab's) | stored: `drives/*.tsv` (`DrivingReplayTests`); heard through the speed the sound follows |
+| `Driveline.cs:63-64` | the same, at the audio rate | `Air.Standard` (`:20`) | `Earth.StandardGravity` | 0.05 m/s, rolling only | the sound's car for every heard car: the player's, traffic's, the lab's renders | heard: the engine load, tyres, wind, cooling and wet noise follow its speed (`EngineProcessor.cs:1307-1345`, `FmodAudioProvider.cs:5429-5431`) |
+| `Driveline.cs:437-438` (`VirtualDriver`) | the same again, as the throttle's feed-forward | `Air.Standard` | `Earth.StandardGravity` | none | the sound's car following the server's speed | heard: how far the throttle opens at a cruise |
+
+Traffic (`VehicleSystem`) and the trains (`RailSystem`) have no rolling resistance or drag. Both are kinematic:
+the speed goes up at the map's `AccelerationMps2` and down at the driver's brake, and holds where nothing asks
+it to change. Their heard engine load comes from the sound's car, which does pay drag and rolling, so what is
+heard is consistent; what moves on the map does not need them while it is kinematic.
+
+At city speed the road load is small beside braking. A car (1,620 kg, Crr 0.013, Cd·A 0.62) rolls against
+0.013 × 9.80665 = 0.13 m/s² at any speed; drag adds 0.05 m/s² at 50 km/h and 0.21 m/s² at 108 km/h. The
+two airs differ by 1.7 % (1.204 at 20 °C against 1.225), 6 N of drag at 108 km/h.
+
+Other drag laws, which are not this one and stay where they are: the bullets' G7 drag
+(`ExternalBallistics`, sourced), a tumbling slug's (`RicochetLaw`, `Ricochet.cs`), a shard's terminal speed
+(`GlassFracture`), hail (`Precipitation`, Cd 0.6), the sea's wind stress (`WindWaves.DragCoefficient`), a
+bullet in water (`BulletImpact`, Cd 0.3), and a sliding or lift door's rollers (`SlidingDoor.cs:75, 1056`,
+`ElevatorDoor.cs:368`), which are the door's mechanism at the audio rate. Each is a different body with its
+own coefficient; they already read the one gravity and the one air. `PrefabRepository.cs:176` writes a
+prefab's `Drag` as 0.1 by default, and nothing reads it.
+
+#### Brakes: what the car can do
+
+| Where | What it works out | Number and source | Read by | Heard or stored |
+|---|---|---|---|---|
+| `VehicleStep.cs:90` `Capacity` | the hardest the tyres can slow the car | `PeakGripG` × the map's gravity (0.95 g for a car's tyre, 0.75 a truck's, 1.1 a sports bike's, 3.1 a race slick's; `TyreGrip.cs:43, 83, 91, 95`) | the server's car, at `:159` (brake 0 to 1 times it) | stored: drives |
+| `WheelDynamics.cs:517-540` | that braking force shared among the wheels by load, held under each tyre's limit (`Modulated`, `BrakingUse = 1`) | the tyres' own | the server's car; traffic's wheels for their sound and corner speed (`VehicleSystem.cs:424-432`) | stored: drives, traffic |
+| `VehicleStep.cs:36, 160-163, 316` | engine braking: 15 % of peak torque at the redline, in proportion to the revs, written twice (the force and the reported torque) | `EngineBrakingFraction` 0.15, a shortcut until stage 6 gives the server the engine's own friction | the server's car | stored: drives |
+| `DrivingSystem.cs:210-222` | the edge of the world not yet built: braked to a stop at 80 % of `Capacity` | 0.8, a margin | the server's car near unbuilt tiles | stored where a drive meets the edge |
+| `Driveline.cs:41, 65` `MaxBrake` | the sound's car's hardest stop | 7.5 m/s² for every vehicle, unsourced | the sound's car; its drivers ask for a share (`VirtualDriver` −wantAccel/6 at `:447`, the lab `Driver`'s 0.7 at `:277`) | heard |
+| `StreetEvents.cs:19, 41` `HardestBrake` | traffic's emergency stop | 0.92 × the map's grip (`GripG`, gen_city's 0.85 car, 0.75 van, 0.70 bus and truck, 0.90 bike) × the map's gravity | traffic's following, crossings and hard stops (`VehicleSystem.Following.cs:60`, `Crosswalks.cs:222`, `StreetLife.cs`) | stored: traffic |
+| `DrivingAids.cs:664` `AvailableDecel` | what the tyres can give on this road now, for the cue planner | `PeakGripG` (0.95 if no profile) × standard gravity × the least wet-grip factor under the wheels | the client's driving aids (`DrivingCuePlanner.cs:222, 484-508`) | heard as cues; the emitter streams' driving-aids scenario |
+| `EngineProcessor.cs:1078` `FullServiceDecel` | what full air-brake pressure stops a vehicle at, so a release vents in proportion | 6.0 m/s² | the air brakes' vent | heard |
+| `Aircraft.cs:429` `LandingDecel` | the landing roll's mean deceleration | from each aircraft's sourced touchdown speed, taxi speed and landing roll (Cessna 175 m, Dash 8 600 m, A320 type 1,100 m with autobrake low and reverse, about 0.2 g) | `AircraftGroundRun.cs:60, 120` | heard |
+
+The server's car and the sound's car are one car with two brakes. A player's car on dry road stops at up to
+0.95 × 9.80665 = 9.32 m/s²; the sound's car following it stops at 7.5 m/s² plus its road load and engine
+friction, so in an emergency stop the heard car runs behind the real one and the speed filter catches it up.
+For a bike the gap is 10.8 against 7.5. A race slick's 30.4 against 7.5 is the largest. A truck's tyres give
+7.36, nearly the 7.5. Traffic's own emergency stop for a car is 0.92 × 0.85 × 9.80665 = 7.67 m/s², about the
+sound's limit.
+
+Traffic's grip is a second grip for the same car: the map writes `GripG` per vehicle (0.85 for a car), while
+the same car's preset has tyres of 0.95. Traffic's hardest stop, bends and wheels read the map's; the sound's
+tyres and the player's car read the preset's.
+
+#### Brakes: what a driver chooses (Agents and maps), not merged
+
+| Where | What it is | Number and source |
+|---|---|---|
+| `VehicleSystem.cs:240-241` | a vehicle's service brake and pull-away from its map | `BrakingMps2`, 5.5 if the map gives none; acceleration 3.2 |
+| `tools/gen_city.py:1853-1885` | the city's brakes, from the grip | `BRAKE_SHARE` 0.35 of `GripG` × 9.81 (2.92 m/s² for a car), `ACCEL_SHARE` 0.30; trains 1.0, people movers 0.8 to 1.2 (`:2028-2203`); `gen_osm.py:3959-3960` the same shares; `gen_speedway.py:402, 447, 531` per car |
+| `CarFollowing.cs` | the IDM's comfortable deceleration b, floored at the hardest stop | b = the vehicle's `Brake` |
+| `RaceLine.cs:68-71, 124-131, 205-243` | the braking pass before a bend, and how much of the friction circle the bend leaves | the vehicle's `Brake` |
+| `VehicleSystem.cs:563-578, 738-834` | the shuttle's and the racer's slowing for the line, stops, parking, junctions and crossings | the vehicle's `Brake`, `max(Brake, HardBrakeDecel)` for a hard stop, `FlareDecel` 0.6 |
+| `CrossingRules.cs:91, 129-133`, `JunctionRules.cs:49-50` | whether a car can still stop before a line, and how hard it brakes for it | `Brake`, up to `HardestBrake` |
+| `StreetEvents.cs` `HardStop` | a driver's sudden stop, a street event | above 8 m/s, at `HardestBrake`, plus 0.6 s |
+| `RailSystem.cs:183, 239`, `MapRepository.cs:379-380` | a train driver's service brake and pull-away | 1.0 and 0.9 m/s², written as defaults twice |
+| `LineFollower.cs:59, 143` | a walker's or follower's comfortable turn | standard gravity |
+| `DrivingCuePlanner.cs:17, 108` | the aids' cue bands and the share of the grip a cue plans on | `TrackGripShare` 0.85 |
+
+These stay where they are. A driver's choice may later be stated as a share of the car's capability (as
+gen_city already does), which would make the map's numbers follow the car; that is a choice of how drivers
+behave, not part of the brake law.
+
+#### What the sound listens for, not merged
+
+`EngineProcessor.cs:1075` `BrakingDecel` 0.7 m/s² (air brakes hiss above it); `BrakeSqueal.cs:65` (squeal
+between 0.15 and 4.5 m/s, 0.4 to 3.5 m/s²); `Signals.cs:728` `SirenController.BrakingMps2` 2.3 (a siren car
+counts as braking); `Chassis.cs:209` disc or drum brakes (above 5,000 kg), which says how a brake sings, not
+how hard it stops.
+
+#### The plan
+
+**Two laws, in `OpenFPS.Physics`.**
+
+- **`RoadLoad`**: drag ½ρ·CdA·v² and rolling Crr·m·g, newtons against motion. Inputs: the vehicle's own Cd·A,
+  Crr and mass (`VehicleMechanics`), the air's density and the gravity it is given. Read by `VehicleStep`
+  (the map's air and gravity), the sound's `Driveline` and its `VirtualDriver` (the standard air and gravity,
+  as today). The cut at standstill stays with each integrator, because it is sized to its step: the server's
+  0.15 m/s to its 1/30 s tick (a full brake takes 0.31 m/s off a car in one), the sound's 0.05 to the
+  audio rate. A road's grade, when stage 4 or 6 gives one, is added here.
+- **`Brakes`**: the car's capability, `PeakGripG` × the gravity it is given, the law `VehicleStep.Capacity`
+  is today, with an optional factor for the road's water (`RoadGripLaw.GripFactor`, which the aids already
+  take). Read by `VehicleStep`, the world's edge, the driving aids, and (on Cody's word) the sound's
+  `Driveline`. The engine-braking expression is written once, as a torque, and read twice by `VehicleStep`;
+  stage 6 replaces it with the engine's own friction (section 7, stage 6: "brake torque per wheel with lock-up").
+
+**First, the renames: nothing moves.** One commit, and one guard:
+
+- `VehicleStep`, `Driveline` and `VirtualDriver` read `RoadLoad` with the arguments each uses now. The
+  arithmetic is kept in the order written today (½ × ρ × CdA × v × v; Crr × m × g), so every float is the same.
+- `VehicleStep.Capacity` becomes `Brakes.Capacity`; the edge reads it there. Engine braking becomes one
+  function.
+- `DrivingAids.AvailableDecel` reads `Brakes.Capacity` at standard gravity, with its water factor; its 0.95
+  fallback reads the tyre's default (`TyreMechanics.PeakGripG`) instead of writing it again.
+- The trains' default brake and pull-away are written once (`TrainData`'s), not again in `RailSystem`.
+- `OneConstantPerLawTests` gains "road load written once": a `DragArea` times a speed squared, or a
+  `RollingResistance` times a mass, anywhere but `RoadLoad`, fails; proven by writing one copy back.
+- Stored: nothing. The drives, traffic, rail, the emitter streams and the renders must stay byte for byte;
+  the wire hash stays 053dd7700918 and the door fingerprint stays, since no wire type or door model is
+  touched. If any stored line moves, the move was not a rename and stops there.
+
+**Then the changes in behaviour, each its own commit and only on Cody's word.**
+
+| Change | What moves | Stored files that would regenerate | Estimate |
+|---|---|---|---|
+| A. The sound's `MaxBrake` from the tyres (`Brakes.Capacity` at standard gravity) | the heard car keeps up with an emergency stop instead of running behind | emitter streams if a scenario slows the sound's car harder than its drivers ask now; renders with a lab `Braking` order (the lab `Driver`'s 0.7 of it); not the render fingerprint, whose engine (`engine.v8_muscle`) cranks, idles and holds the dyno at rest | car 7.5 → 9.32 m/s² (+24 %), sports bike 10.8 (+44 %), truck 7.36 (−2 %), race slick 30.4. To keep everything below today's limit as it is, the `VirtualDriver` asks for its deceleration as a share of the new capability (−wantAccel × 7.5 / 6 over it): then only stops past 7.5 m/s² sound different, and a truck's limit falls 2 % |
+| B. The sound's car pushes through the weather's air | the throttle at a cruise, a little | none known; emitter streams if a scenario cruises in non-standard air | −1.7 % drag at 20 °C, +5.5 % at 0 °C; at 108 km/h a few newtons. The client already has the outdoor air (`Components.cs:431-444`, `OutdoorAir`), so no wire change as far as reading shows |
+| C. The aids read the map's gravity (from the manifest, sent since 16.6) | nothing on any map today | none | every map is standard |
+| D. Traffic's hardest stop from the car's tyres, not the map's `GripG` | traffic's emergency stops and the crossings' "can it still stop" | `traffic.tsv.gz` | a car 7.67 → 8.57 m/s² (0.92 × 0.95 × 9.80665) |
+| E. Drag and rolling for traffic and the trains | a coasting car slows; a train's pull-away pays its resistance | `traffic.tsv.gz`, `rail.tsv.gz` | a car would lose 0.18 m/s² at 50 km/h when not driven; in the kinematic model it never coasts, so most of it would be a change in what the controllers ask for |
+| F. The generators' 9.81 → 9.80665 | the maps' brake and pull-away figures | `city.json` and the places' maps from their generators, then `traffic.tsv.gz` | two figures round differently (2.58 → 2.57, 1.79 → 1.78 m/s², 16.6) |
+| G. `FullServiceDecel` from the capability | how much an air brake vents | emitter streams if a scenario releases an air brake | 6.0 → 7.36 for a truck's tyres: a release vents 18 % less for the same stop |
+
+The wire hash changes for none of A to G as far as reading shows; F changes the maps' contents, not a message's
+shape. The door fingerprint changes for none.
+
+**Cody's decisions.**
+
+1. **The sound's brake (A).** Recommended: yes, from the tyres, with the driver's request kept as it is below
+   7.5 m/s², and a listen to a hard stop in a car and on a bike before it merges. The server's car already
+   stops at the tyres' limit; the heard one should be the same car.
+2. **The sound's air (B).** Recommended: not now. The difference is a percent or two of a small force; at
+   stage 6 the server sends the engine's load and the sound's car stops working out its own.
+3. **The standstill cut.** Recommended: each integrator keeps its own (0.15 at the tick, 0.05 at the audio
+   rate); the law has none. Making them one value would move the drives or the sound for no reason heard.
+4. **The IDM's b and the maps' brakes stay the drivers'.** Recommended: keep them in Agents and the maps,
+   never merged with `Brakes`. If wanted later, a map gives a share of the car's capability instead of a
+   figure (gen_city's 0.35 already is one), which is still the driver's.
+5. **Traffic's grip (D).** Recommended: not now. One car should have one grip, and that is the preset's
+   tyres; but it changes every traffic track and the maps' "the brake is a third of the circle" sums, and
+   traffic is taken slowly. With stage 6, "traffic under the same model where the cost allows".
+6. **Drag and rolling for traffic and the trains (E).** Recommended: not now. Kinematic traffic does not
+   coast, and its heard load already pays them; they come when traffic runs `VehicleStep` (stage 6). A
+   train's Davis resistance (a + bv + cv²) would be its own law then, not the road's.
+7. **The generators' gravity (F).** Recommended: yes, with the next regeneration that has another reason,
+   so the maps and the traffic tracks are regenerated once.
+8. **The air brakes' full service (G).** Recommended: keep 6.0. A laden truck is limited by its brakes, not
+   its tyres, and 6 m/s² is about a heavy vehicle's full service stop. If Cody wants that in the law, the
+   capability becomes the lesser of the tyres' and a brake system's figure (`VehicleMechanics` would carry
+   it), and `FullServiceDecel` reads it.
+9. **The aircraft's landing roll.** Recommended: unchanged. It is a procedure's outcome worked out from
+   sourced rolls, the pilot's choice, not a wheel brake's capability.
+
+**What may run beside this.** The renames touch `OpenFPS.Physics/VehicleStep.cs`, a new law file beside
+it, `OpenFPS.Sound/Core/Engine/Driveline.cs`, `OpenFPS.Accessibility/DrivingAids.cs`,
+`OpenFPS.Server/Systems/DrivingSystem.cs` and `RailSystem.cs`, and `OneConstantPerLawTests`; they must not
+run beside other work on the vehicle step, the sound's car or the guard. The physics' type list (P) and the
+surveys' `files.tsv` gain the new law file. About half a session for the renames and the guard; A with its
+listen about another half.
+
 ## 17. Stage 3 as built (2026-10-16): the state, the world view, the vehicle step
 
 Made on Linux, on main `450b0244`, in four commits: the state types and a body's grounding on the wire; one
