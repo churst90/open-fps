@@ -14,6 +14,10 @@ tag (docs/SOUND_LIBRARY_BOUNDARY.md, stage 8 and decision 8) and references the 
   gutters, thresholds, shoulders and ramps no longer come back as a small room 9-15 ms after a close sound. A host does
   nothing; one whose maps have such pieces hears them go from the late field, the tail and far sources' echoes. Benches,
   tables, low walls and roofs stay, and so does a rail with air under it.
+- `WindModel` (`OpenFPS.Physics`, the broadcast wind swung by three sines on a clock) is gone. A host that read it reads
+  `WindField`: `AirSample.Of(weather, at, heightAboveGround, worldSeconds).Velocity`, or `WindField.VelocityAt`, with the
+  weather built from the broadcast as `WindWeather.Steady(WindAir.FromBroadcast(wind, gustiness, worldSeconds,
+  travelEast, travelNorth))`. The field's wind falls off toward the ground by its log law and still gusts at gustiness 0.
 
 ## library/v0.2.0 (2026-10-24)
 

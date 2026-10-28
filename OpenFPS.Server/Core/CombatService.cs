@@ -35,6 +35,10 @@ public sealed partial class CombatService
     /// <summary>Seconds, monotonic: the server's clock (GameServer.Clock). A test sets its own.</summary>
     public Func<double> Clock { get; set; }
 
+    /// <summary>The world time the wind's eddies are read at (WindField.Now), the server's and every client's, so
+    /// a round feels the gust the ears hear at the same place and moment. A test sets its own.</summary>
+    public Func<double> WorldClock { get; set; }
+
     /// <summary>Takes a dead pedestrian off the street, if they are one of the map's walkers (or a driver
     /// out of a parked car): true when somebody is to walk the same way again later, by
     /// <see cref="ReplaceWalker"/> with the dead one's id. Null where nobody walks (a test, a map without
@@ -87,6 +91,7 @@ public sealed partial class CombatService
         _server = server;
         _sessions = sessions;
         Clock = () => server.Clock.Now;
+        WorldClock = () => server.Clock.WorldTime;
     }
 
     private static void Say(Action<IMessage> reply, string text) => reply(new TextEvent { Text = text });
@@ -252,7 +257,7 @@ public sealed partial class CombatService
             if (!InPlainView(self, ride, world, grid, from, c.Point, c.E)) continue;
             target = c.E;
             Vector3 vel = world.Has<Velocity>(c.E) ? world.Get<Velocity>(c.E).Linear : Vector3.Zero;
-            aim = Onto(weapon, from, c.Point, vel, AirOn(session.CurrentMapId).Air, PhysicsConstants.GravityOf(world));
+            aim = Onto(weapon, from, c.Point, vel, AirOn(session.CurrentMapId), PhysicsConstants.GravityOf(world));
             return true;
         }
         return false;
@@ -443,6 +448,11 @@ public sealed partial class CombatService
         public required Vector3 Eye;            // where it is measured from: the scope's eye, or the hip
         public required Vector3 Sight;          // the line of sight, unit
         public required double At;              // server time the state is true at
+        /// <summary>The wind it flies through, and the world time and the shooter's ground it is read from
+        /// (<see cref="WindAt"/>).</summary>
+        public required WindWeather Wind;
+        public required double FiredAtWorld;
+        public required float Ground;
         public int TargetId = -1;               // whom the crosshair was nearest, for the spotter's call
         public int RideId = -1;                 // what the shooter is riding in, which the round leaves
         public bool Called;
@@ -533,8 +543,12 @@ public sealed partial class CombatService
     private void Launch(UserSession session, World world, SpatialGrid<Entity> grid, WeaponDefinition weapon,
                         Vector3 from, Vector3 velocity, Vector3 eye, Vector3 sight, int targetId, AdminGunMode? admin = null)
     {
+        double worldNow = WorldClock();
         var flight = new Flight
         {
+            Wind = WindOn(session.CurrentMapId, worldNow),
+            FiredAtWorld = worldNow,
+            Ground = world.Get<Transform>(session.Entity).Position.Y,
             MapId = session.CurrentMapId,
             Shooter = session,
             ShooterId = session.Entity.Id,
@@ -573,8 +587,8 @@ public sealed partial class CombatService
         }
         if (listeners == null) return;
 
-        var (air, wind) = AirOn(f.MapId);
-        var legs = FlyAhead(f, world, grid, air, wind);
+        var air = AirOn(f.MapId);
+        var legs = FlyAhead(f, world, grid, air);
         foreach (var s in listeners)
         {
             Vector3 ear = world.Get<Transform>(s.Entity).Position + new Vector3(0f, EyeHeight, 0f);
@@ -597,13 +611,32 @@ public sealed partial class CombatService
 
     private int _passSeed = 1;
 
-    /// <summary>The air and the wind on a map now.</summary>
-    private (Air Air, Vector3 Wind) AirOn(string mapId)
+    private OutdoorAir WeatherOn(string mapId)
+        => Weather?.Invoke(mapId) ?? new OutdoorAir(Air.Standard.TemperatureC, 0f, Air.Standard.PressureMb, Vector3.Zero, 0f);
+
+    /// <summary>The air on a map now: its temperature and pressure.</summary>
+    private Air AirOn(string mapId) => WeatherOn(mapId).Air;
+
+    /// <summary>
+    /// The wind a round fired now on a map flies through: the server's wind with the eddy pattern carried as far as
+    /// the server has carried it and broadcasts, read as the fire's spread reads it (FireSystem.WindFor). Steady over
+    /// a flight of at most <see cref="MaxFlightSeconds"/>, in which a front's wind turns by nothing.
+    /// </summary>
+    private WindWeather WindOn(string mapId, double worldNow)
     {
-        var weather = Weather?.Invoke(mapId) ?? new OutdoorAir(Air.Standard.TemperatureC, 0f, Air.Standard.PressureMb, Vector3.Zero, 0f);
-        // Out in the open, where a long shot is taken: the full wind, gusts and all.
-        return (weather.Air, WindModel.Felt(weather.Wind, weather.Gustiness, Clock()));
+        var weather = WeatherOn(mapId);
+        var (east, north) = _server.WorldEnvironment.WindTravel;
+        return WindWeather.Steady(WindAir.FromBroadcast(weather.Wind, weather.Gustiness, worldNow, east, north));
     }
+
+    /// <summary>The wind where a round is now: the one field the ears hear (WindField), at its place, its height
+    /// over the ground its shooter stands on (as the ears are), and the world time it is there.</summary>
+    private static Vector3 WindOn(Flight f, in BulletState s) => WindAt(f.Wind, f.FiredAtWorld, f.Ground, s);
+
+    /// <summary>The wind at a round's place and moment, read once a segment (8 m of a rifle's flight): the
+    /// eddies are 5 to 180 m, and a round crosses the larger ones in a fraction of its flight.</summary>
+    internal static Vector3 WindAt(WindWeather wind, double firedAtWorld, float ground, in BulletState s)
+        => AirSample.Of(wind, s.Position, s.Position.Y - ground, firedAtWorld + s.Seconds).Velocity;
 
     /// <summary>One stretch of a round's flight between ricochets: its samples (times from the shot),
     /// and for a stretch after a ricochet the slug it is, where it left the face, how and when.</summary>
@@ -613,7 +646,7 @@ public sealed partial class CombatService
     /// A round's whole flight, flown ahead against the world as it stands (people carried on at their
     /// walking pace) to where it stops: through glass as the real one goes, with nothing broken or hurt.
     /// </summary>
-    private List<Leg> FlyAhead(Flight f, World world, SpatialGrid<Entity> grid, Air air, Vector3 wind)
+    private List<Leg> FlyAhead(Flight f, World world, SpatialGrid<Entity> grid, Air air)
     {
         var state = f.State;
         float t0 = state.Seconds;
@@ -627,7 +660,7 @@ public sealed partial class CombatService
         while (state.Seconds - t0 < MaxFlightSeconds && state.Position.Y >= PhysicsConstants.MapMinimumY)
         {
             var before = state;
-            Fly(ref state, slug, f.Weapon, SegmentSeconds, air, wind, gravity);
+            Fly(ref state, slug, f.Weapon, SegmentSeconds, air, WindOn(f, state), gravity);
             double segStart = now + (before.Seconds - t0);
             if (FirstHit(f, world, grid, before.Position, state.Position, SegmentSeconds, segStart, now, glass,
                          out var hit, out float along, out bool body, out _))
@@ -808,7 +841,7 @@ public sealed partial class CombatService
         if (_flights.Count == 0) return;
         if (!_maps.TryGetMap(mapId, out var world, out _, out var grid, out var lookup)) return;
         double now = Clock();
-        var (air, wind) = AirOn(mapId);
+        var air = AirOn(mapId);
         float gravity = PhysicsConstants.GravityOf(world);
 
         for (int i = _flights.Count - 1; i >= 0; i--)
@@ -820,7 +853,7 @@ public sealed partial class CombatService
             {
                 float dt = (float)Math.Min(SegmentSeconds, now - f.At);
                 var before = f.State;
-                Fly(ref f.State, f.Slug, f.Weapon, dt, air, wind, gravity);
+                Fly(ref f.State, f.Slug, f.Weapon, dt, air, WindOn(f, f.State), gravity);
                 double segStart = f.At;
                 f.At += dt;
                 done = Segment(f, world, grid, lookup, before, f.State, segStart, dt, now);

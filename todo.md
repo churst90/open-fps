@@ -154,9 +154,10 @@ fingerprint changed too (3a8a8e7b91ab), so the door renders are made again once.
    aids read the scene view; the people's laws are Agents' and read `IPeopleWorld`. Alex's day and the door
    manners are unchanged line for line (`PeopleReplayTests`).
 9. Physics, then (docs/PHYSICS_BOUNDARY.md):
-   - stage 2's leftovers (16.6): one rolling resistance and drag law, one brake law, `WindModel` folded into
-     `WindField` so bullets feel the air the ears do, `VehicleChassisSpec`; the generators' 9.81 at the maps'
-     next regeneration;
+   - stage 2's leftovers (16.6): one rolling resistance and drag law, one brake law (surveyed 2026-10-27, 16.8:
+     the renames under way, nine decisions for Cody), `VehicleChassisSpec`; the generators' 9.81 at the maps'
+     next regeneration. `WindModel` folded into `WindField`: DONE 2026-10-27 (16.7), bullets feel the air the
+     ears do;
    - stage 4, rigid and soft bodies, with geometry stage 6's second half (the vehicle meshes in the Steam Audio
      scene, moved with their bodies, the cost with 40 cars), so each body's shape is made once for collision
      and for the acoustic scene (section 8). Air moved by passing things, leaf litter and impacts that pass on
@@ -708,7 +709,7 @@ Left by the 2026-10-07 housekeeping; none changes sound.
 - `ReachingFrom`'s two branches return the same point; `OccupancyService.Moving` stops getting in
   above 2.0 m/s for a driven car and 1.0 m/s for a map's bus; on tiled maps, confirm how the broadcast
   forgets dynamic things a client knew (Program.cs).
-- `SharedMovementEngine`'s `stepped = true` is never read; `WindModel` and `WindField` overlap (physics stage 2's leftovers, "Next, in order", item 9);
+- `SharedMovementEngine`'s `stepped = true` is never read; `WindModel` and `WindField` overlapped (done 2026-10-27, docs/PHYSICS_BOUNDARY.md 16.7);
   `TransientSound` lacks its APPEND ONLY marker; `PhysicsUtils.GroundMaterial` returns its input.
 - `ElevatorDoor.faceAtFoot` and `PushBarDoor.railHit` are kept only for the random sequence: retire them
   with a render regeneration.

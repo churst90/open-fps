@@ -46,7 +46,6 @@ OpenFPS.Physics.Slug	V
 OpenFPS.Physics.WindField	P
 OpenFPS.Physics.WindAir	V
 OpenFPS.Physics.WindWeather	V
-OpenFPS.Physics.WindModel	P
 OpenFPS.Geometry.SolidContact	G
 OpenFPS.Geometry.BodyShape	G
 OpenFPS.Geometry.WheelRays	G

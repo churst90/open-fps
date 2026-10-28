@@ -117,7 +117,6 @@ RULES = [
     (PH + 'WindField', 'P', 'the moving air: log law, eddies, carry'),
     (PH + 'WindAir', 'V', 'the wind the server sends'),
     (PH + 'WindWeather', 'V', 'one weather\'s wind ramp'),
-    (PH + 'WindModel', 'P', 'the bullets\' second wind law; to be one law with WindField'),
     (EV + 'WorldWeather', 'S', 'one audio world\'s weather: it holds the wind Physics owns'),
     (SO + 'EarWind', 'S', 'the wind at the ears: reads the air'),
     (SO + 'ImpactAcoustics', 'S', 'the sound of an impact from two masses and a closing speed'),

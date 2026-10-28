@@ -28,64 +28,28 @@ public class WeatherAndConvergenceTests
 {
     // ── The gust model ──────────────────────────────────────────────────────────────────────────
     // Gustiness is a scalar on the wire and a waveform at the listener: a two-second swell sampled at the
-    // 1 Hz broadcast aliases into a stutter, so the client synthesizes it and only its amplitude is sent.
-
-    [Fact]
-    public void GustFactorStaysWithinItsBounds()
-    {
-        for (double t = 0; t < 600; t += 0.05)
-        {
-            float g = WindModel.GustFactor(t);
-            Assert.InRange(g, -1.0f, 1.0f);
-        }
-    }
-
-    [Fact]
-    public void GustFactorIsDeterministic()
-    {
-        // Two clients with the same clock hear the same weather, which also makes these assertions reproducible.
-        Assert.Equal(WindModel.GustFactor(12.5), WindModel.GustFactor(12.5));
-        Assert.NotEqual(WindModel.GustFactor(12.5), WindModel.GustFactor(13.5));
-    }
-
-    [Fact]
-    public void NoGustinessLeavesTheSustainedWindUntouched()
-    {
-        var sustained = new Vector3(4, 0, -3);
-        for (double t = 0; t < 30; t += 0.37)
-            Assert.Equal(sustained, WindModel.Felt(sustained, gustiness: 0f, seconds: t));
-    }
+    // 1 Hz broadcast aliases into a stutter, so each head reads the gusts from WindField and only their
+    // amplitude is sent. WindModel, the three sines the server's bullets felt, is gone (PHYSICS_BOUNDARY 16.7):
+    // the field's determinism and its still air are WeatherWindTests' now, and the field has no shelter yet.
 
     [Fact]
     public void GustinessSwingsTheWindBothWaysWithoutReversingIt()
     {
-        var sustained = new Vector3(5, 0, 0);
+        // 5 m/s east at the 10 m reference height, as gusty as the weather goes, read at one place for two hours.
+        var weather = WindWeather.Steady(WindAir.FromBroadcast(new Vector3(5, 0, 0), 1f, 0, 0, 0));
         float min = float.MaxValue, max = float.MinValue;
 
-        for (double t = 0; t < 120; t += 0.02)
+        for (double t = 0; t < 7200; t += 0.5)
         {
-            var felt = WindModel.Felt(sustained, gustiness: 1f, seconds: t);
+            var felt = WindField.VelocityAt(weather, -375f, 10f, 195f, t);
             // A gust makes the wind stronger or weaker; it never blows the other way.
-            Assert.True(felt.X >= 0f, $"wind reversed at t={t}: {felt.X}");
-            Assert.Equal(0f, felt.Z);
+            Assert.True(felt.X > 0f, $"wind reversed at t={t}: {felt.X}");
             min = MathF.Min(min, felt.X);
             max = MathF.Max(max, felt.X);
         }
 
-        Assert.True(max > sustained.X * 1.5f, $"gusts never swelled: peak {max} vs sustained {sustained.X}");
-        Assert.True(min < sustained.X * 0.5f, $"gusts never lulled: trough {min} vs sustained {sustained.X}");
-    }
-
-    [Fact]
-    public void ShelterStillsTheWind()
-    {
-        var sustained = new Vector3(12, 0, 4);
-        Assert.Equal(Vector3.Zero, WindModel.Felt(sustained, 0.8f, 3.0, shelterFactor: 1f));
-
-        float half = WindModel.FeltSpeed(sustained, 0.8f, 3.0, shelterFactor: 0.5f);
-        float open = WindModel.FeltSpeed(sustained, 0.8f, 3.0, shelterFactor: 0f);
-        Assert.True(half < open);
-        Assert.Equal(open * 0.5f, half, 3);
+        Assert.True(max > 5f * 1.6f, $"gusts never swelled: peak {max} vs sustained 5");
+        Assert.True(min < 5f * 0.5f, $"gusts never lulled: trough {min} vs sustained 5");
     }
 
     // ── The weather simulation ──────────────────────────────────────────────────────────────────
