@@ -299,6 +299,7 @@ OpenFPS.Native/SteamAudio/Phonon.cs	lib	Native
 OpenFPS.Native/SteamAudio/PhononAmbisonics.cs	lib	Native	
 OpenFPS.Native/SteamAudio/PhononSim.cs	lib	Native	
 OpenFPS.Physics/BodyConstants.cs	lib	Physics	
+OpenFPS.Physics/BodyWorld.Contacts.cs	lib	Physics	
 OpenFPS.Physics/BodyWorld.cs	lib	Physics	
 OpenFPS.Physics/Brakes.cs	lib	Physics	
 OpenFPS.Physics/BuiltMesh.cs	lib	Physics	
