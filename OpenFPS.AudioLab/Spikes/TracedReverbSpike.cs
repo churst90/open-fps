@@ -69,8 +69,26 @@ public static class TracedReverbSpike
             var g = VehicleCabin.Measure(MachineRegistry.VehicleFor(preset))!.Value;
             return new Vector3(0.3f, g.FloorTop + 1.1f, g.Cz);
         }
+        // Narrow ground under the listener, ear at 1.6 m (the lab's ear is at x 2): a kerb a step from the
+        // feet, a doorway's threshold strip, a ramp walked up, all on a 600 m slab of ground. Nothing may
+        // come back inside 25 ms.
+        List<SteamAudioScene.Box> With(params SteamAudioScene.Box[] extra) { var l = new List<SteamAudioScene.Box> { ground }; l.AddRange(extra); return l; }
+        var tilt = Quaternion.CreateFromAxisAngle(Vector3.UnitX, 15f * MathF.PI / 180f);
+        var kerb = With(new SteamAudioScene.Box(new Vector3(1.4f, 0.075f, 0), new Vector3(0.15f, 0.15f, 40f), q, "Concrete"));
+        var threshold = With(new SteamAudioScene.Box(new Vector3(2f, 0.015f, 0), new Vector3(0.9f, 0.03f, 0.2f), q, "Wood"));
+        var ramp = With(new SteamAudioScene.Box(new Vector3(2f, 0.42f, 0), new Vector3(2f, 0.1f, 3f), tilt, "Concrete"));
+        // Things that stand on the ground and are not it: they must still answer.
+        var bench = With(new SteamAudioScene.Box(new Vector3(1.4f, 0.225f, 0), new Vector3(0.5f, 0.45f, 1.6f), q, "Wood"));
+        var lowWall = With(new SteamAudioScene.Box(new Vector3(1.4f, 0.45f, 0), new Vector3(0.3f, 0.9f, 4f), q, "Brick"));
+        var table = With(new SteamAudioScene.Box(new Vector3(2f, 0.725f, 0), new Vector3(0.8f, 0.05f, 1.5f), q, "Wood"));
         var places = new List<(string, List<SteamAudioScene.Box>, Vector3)>
         {
+            ("kerb, as traced", SteamAudioScene.WithoutOpenGround(kerb), new Vector3(2f, 1.6f, 0f)),
+            ("threshold, as traced", SteamAudioScene.WithoutOpenGround(threshold), new Vector3(2f, 1.6f, 0f)),
+            ("ramp, as traced", SteamAudioScene.WithoutOpenGround(ramp), new Vector3(2f, 1.6f, 0f)),
+            ("bench, in the trace", SteamAudioScene.WithoutOpenGround(bench), new Vector3(2f, 1.6f, 0f)),
+            ("low wall, in the trace", SteamAudioScene.WithoutOpenGround(lowWall), new Vector3(2f, 1.6f, 0f)),
+            ("table, in the trace", SteamAudioScene.WithoutOpenGround(table), new Vector3(2f, 1.6f, 0f)),
             ("open ground", open, new Vector3(2f, 1.6f, 0f)), ("street, 20 m", street, new Vector3(2f, 1.6f, 0f)),
             // What the listener's own trace is given in the game: the same places without their open
             // ground (SteamAudioScene.WithoutOpenGround). Nothing may come back inside 25 ms.
@@ -234,6 +252,15 @@ public static class TracedReverbSpike
                 + string.Join(", ", arrivals.OrderByDescending(a => a.Db).Take(5).OrderBy(a => a.At).Select(a => $"{a.At / 44.1:F1}: {a.Db:F0}")));
             // The listener's trace plays every sound as if it came from the listener's head. Anything it
             // hands back inside 25 ms is a copy of a close sound right behind it: a small room.
+            if (name.Contains("traced") || name.Contains("in the trace"))
+            {
+                // The earliest return above -60 dB re the impulse.
+                int firstAt = -1; double firstDb = 0;
+                for (int j = 0; j < Math.Min(w.Count, 44100 / 2); j++)
+                    if (Math.Abs(w[j]) > 1e-3) { firstAt = j; firstDb = 20 * Math.Log10(Math.Abs(w[j])); break; }
+                Console.WriteLine(firstAt < 0 ? "   earliest return: none above -60 dB in 500 ms"
+                                              : $"   earliest return: {firstAt / 44.1:F1} ms at {firstDb:F0} dB re impulse");
+            }
             if (name.EndsWith("as traced"))
             {
                 double early = 0; for (int j = 0; j < Math.Min(w.Count, 44100 * 25 / 1000); j++) early += w[j] * (double)w[j];
