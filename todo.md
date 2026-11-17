@@ -147,6 +147,9 @@ fingerprint changed too (3a8a8e7b91ab), so the door renders are made again once.
        faults Sean found that open-fps's traffic may share come first, each shown on open-fps's own roads
        before it is fixed; then lane changes and junctions that list their roads and ways; breakdowns,
        flashers and tow trucks last. None of it before the items above.
+       Surveyed 2026-10-27 (`TrafficFaultProbe`): three of Sean's eight are open-fps's (the deadlock breaker lets
+       a car go into a 4 s gap and it re-holds in fits, 43 of 59 releases; bodies overlap inside junctions, 26;
+       holds 1 m short at merges, 294). Cody 2026-11-17: the breaker first, alone, shown before it merges.
 7. Engine package stage 6, Common to the wire: DONE 2026-10-18 (docs/ENGINE_PACKAGES.md, stage 6's built note).
    Left: the Arch reference, which goes with the physics views and constants; and `Scopes` stays in Common unless
    Cody wants a shared game project for it.
