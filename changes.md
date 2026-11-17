@@ -39,7 +39,10 @@ Recent work, newest first. `git log` has the rest.
   The first impact's level and the item's mass and material agree between old and new. No stored stream or render
   holds an item drop (the only drops in them are raindrops), so none moved. Wire hash `33911a144326` (was
   `888f6b8368f9`; the floor restitutions edit Materials, which is hashed), so the server and the Windows client
-  deploy together; the door fingerprint is unchanged (`3a8a8e7b91ab`), so no door render is made again. Ratchets:
+  deploy together. The door fingerprint moved too, from `3a8a8e7b91ab` to `d163818bf3ff`: the door model
+  list hashes all of `AcousticRegistry.cs`, and the floor restitutions are in it. No door model reads them (the
+  render fingerprints pass unchanged), so the doors sound the same, but the shipped door renders are filed under the
+  fingerprint and are made again once. Ratchets:
   engine packages 630 files (two new server systems), 10 crossings; sound boundary 0 crossings, 6,956 layering,
   355 statics, 0 unsorted. Guards: physics 79, HandsService and command classes 531, engine packages and library
   boundary 35. Hints for step 8 in 18.11. Built by DeepSeek through OpenCode.

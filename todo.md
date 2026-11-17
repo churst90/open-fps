@@ -32,7 +32,8 @@ Shipping is outside the order. Push, the VPS and the Windows zip go out together
 each time. Main was pushed 2026-10-24 (8f3c038d, tag `library/v0.2.0`; CI green on all 8 shards). The last deploy
 was 3fc38430512b on 2026-10-08. The wire hash has changed many times since (053dd7700918 now), so a client and a
 server from either side refuse each other at login: restart the server and update the clients first. The door
-fingerprint changed too (3a8a8e7b91ab), so the door renders are made again once.
+fingerprint changed too (d163818bf3ff since the drops' floor restitutions, 2026-11-17), so the door renders are made
+again once.
 
 1. A voice swap leaves an engine carrying its tap's share (Resonance's 3.2): DONE 2026-10-17 (changes.md). The
    engine counts its taps and each takes and gives back its share once; a tap revived mid-fade takes it again; a

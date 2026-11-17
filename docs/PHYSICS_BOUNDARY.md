@@ -2637,7 +2637,9 @@ reads back as set; the body interface's `SetMotionQuality` remains the one to us
 PhysicsBoundary guard). The analytic same-scene result is the same: those tests compare runs, not a stored hash. The
 wire hash moved from 262885684b9c to 888f6b8368f9 with the package reference, and this fix edits Materials (the
 floor restitutions), so it moved again to 33911a144326; the server and the Windows client deploy together. The door
-fingerprint stays 3a8a8e7b91ab.
+fingerprint moved from 3a8a8e7b91ab to d163818bf3ff for the same edit, since the door model list hashes the whole of
+`AcousticRegistry.cs`; no door model reads a restitution from it and the render fingerprints pass unchanged, so the
+doors sound the same, and the shipped door renders are made again once under the new name.
 
 **The server's worlds.** `BodyWorldSystem` (`OpenFPS.Server/Systems/BodyWorldSystem.cs`) gives each loaded map one
 `BodyWorld` at the map's own gravity (`PhysicsConstants.GravityOf`), one `PieceBodies`, and one below-normal-priority
