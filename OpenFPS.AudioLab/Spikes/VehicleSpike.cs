@@ -275,6 +275,129 @@ public static class VehicleSpike
         finally { provider.Dispose(); }
     }
 
+    /// <summary>
+    /// --hard-stop [preset] [label=old|new] [out=DIR]: a 100 km/h approach and then the pedal to the tyres'
+    /// limit, to a stop (16.8 change A). The motion trace and the render are the same driver, so the stop
+    /// time, distance and rpm/gear trace describe the sound in the WAV. Writes the exhaust, intake and
+    /// tyres at the bench's own levels.
+    /// </summary>
+    public static int RunHardStop(string[] args)
+    {
+        string preset = args.FirstOrDefault(a => !a.StartsWith("--") && VehicleProfile.Presets.ContainsKey(a)) ?? "i4_midsize";
+        string label = args.FirstOrDefault(a => a.StartsWith("label="))?[6..] ?? "now";
+        string dir = args.FirstOrDefault(a => a.StartsWith("out="))?[4..] ?? OpenFPS.AudioLab.LabPaths.Output("VEHICLES");
+        Directory.CreateDirectory(dir);
+
+        var v = VehicleProfile.ByName(preset);
+        const float from = 100f / 3.6f;
+        const int sr = VehicleSynth.SampleRate;
+        const float dt = 1f / sr;
+        // How long this preset takes to reach 100 km/h from rest, so the brake order starts there, not
+        // wherever a fixed approach happens to leave it.
+        float approach;
+        {
+            var cal = new Driveline(v);
+            var calEngine = new EngineSynth(v.Engine, sr, 11);
+            var calDriver = new Driver(cal, calEngine);
+            float tc = 0f;
+            foreach (var o in new[] { new DriveOrder(DriverAction.Cranking, 0.6f), new DriveOrder(DriverAction.Idling, 1.5f) })
+                for (int i = 0, n = (int)(o.Seconds * sr); i < n; i++, tc += dt)
+                { calDriver.Apply(o, i * dt, dt); cal.Step(calEngine, dt); }
+            var accel = new DriveOrder(DriverAction.Accelerating, 60f, from);
+            approach = 60f;
+            tc = 0f;
+            for (int i = 0, n = (int)(accel.Seconds * sr); i < n; i++, tc += dt)
+            {
+                calDriver.Apply(accel, i * dt, dt);
+                cal.Step(calEngine, dt);
+                if (cal.Speed >= from) { approach = tc + dt; break; }
+            }
+        }
+        var orders = new List<DriveOrder>
+        {
+            new(DriverAction.Cranking, 0.6f),
+            new(DriverAction.Idling, 1.5f),
+            new(DriverAction.Accelerating, approach, from),
+            new(DriverAction.Braking, 8f),
+            new(DriverAction.Idling, 1.5f),
+        };
+        var lab = new OpenFPS.Sound.Core.LabLevers { FullBrake = true };
+
+        // The motion, as the render's own Driver and Driveline make it (the body and the audio do not
+        // touch the speed), so the trace below is what the WAV hears.
+        const int brakeOrder = 3;
+        var engine = new EngineSynth(v.Engine, sr, 11) { Lab = lab };
+        var dl = new Driveline(v);
+        var driver = new Driver(dl, engine);
+        Console.WriteLine($"\n  HARD STOP {v.Name} ({preset}), from 100 km/h, brake to the tyres' limit ({dl.MaxBrake:F2} m/s²).\n");
+        float t = 0f, startT = 0f, startD = 0f, startSpeed = 0f, stopT = -1f, stopD = 0f, nextTrace = 0f;
+        Console.WriteLine("    t(s)   km/h   gear   rpm  brake");
+        for (int oi = 0; oi < orders.Count; oi++)
+        {
+            var order = orders[oi];
+            int len = (int)(order.Seconds * sr);
+            float phase = 0f;
+            for (int i = 0; i < len; i++, phase += dt, t += dt)
+            {
+                if (oi == brakeOrder && i == 0) { startT = t; startD = dl.Distance; startSpeed = dl.Speed; nextTrace = 0f; }
+                driver.Apply(order, phase, dt);
+                dl.Step(engine, dt);
+                if (oi != brakeOrder) continue;
+                float elapsed = t + dt - startT;
+                if (elapsed >= nextTrace)
+                {
+                    Console.WriteLine($"  {elapsed,6:F2} {dl.Speed * 3.6f,6:F0}   {(dl.Gear == 0 ? "N" : dl.Gear.ToString()),4} {engine.Rpm,6:F0}  {dl.Brake,4:F2}");
+                    nextTrace += 0.25f;
+                }
+                if (stopT < 0f && dl.Speed <= 0f) { stopT = elapsed; stopD = dl.Distance - startD; }
+            }
+        }
+        Console.WriteLine($"  brake from {startSpeed * 3.6f:F1} km/h: stop in {stopT:F3} s over {stopD:F2} m\n");
+
+        Console.WriteLine("  Rendering...");
+        var r = VehicleSynth.Render(v, orders, seed: 11, lab: lab);
+        foreach (var line in r.Log) Console.WriteLine($"    {line}");
+
+        int fromSample = r.OrderStart[brakeOrder];
+        int stopSample = Math.Min(r.Distance.Length, fromSample + (int)MathF.Round(stopT * sr));
+        static (float Peak, float Rms) Level(float[] x, int from, int to)
+        {
+            double sum = 0; float peak = 0f;
+            for (int i = from; i < to; i++) { float a = MathF.Abs(x[i]); if (a > peak) peak = a; sum += (double)x[i] * x[i]; }
+            return (peak, MathF.Sqrt((float)(sum / Math.Max(1, to - from))));
+        }
+        static float Db(float x) => 20f * MathF.Log10(MathF.Max(1e-9f, x));
+        float largest = 0f;
+        foreach (var x in r.Exhaust) largest = MathF.Max(largest, MathF.Abs(x));
+        foreach (var x in r.Intake) largest = MathF.Max(largest, MathF.Abs(x));
+        foreach (var x in r.Tyres) largest = MathF.Max(largest, MathF.Abs(x));
+        var ex = Level(r.Exhaust, fromSample, stopSample);
+        var inn = Level(r.Intake, fromSample, stopSample);
+        var ty = Level(r.Tyres, fromSample, stopSample);
+        Console.WriteLine($"  stop segment {stopSample - fromSample} samples ({stopT:F3} s):");
+        Console.WriteLine($"    exhaust  peak {Db(ex.Peak),6:F1} dBFS  rms {Db(ex.Rms),6:F1} dBFS");
+        Console.WriteLine($"    intake   peak {Db(inn.Peak),6:F1} dBFS  rms {Db(inn.Rms),6:F1} dBFS");
+        Console.WriteLine($"    tyres    peak {Db(ty.Peak),6:F1} dBFS  rms {Db(ty.Rms),6:F1} dBFS");
+        Console.WriteLine($"    largest sample in the whole render {largest:F4} ({(largest < 1f ? "no clipping" : "CLIPS")})");
+
+        // The listen: a second of the approach, the stop, and a second of rest, so the file is the stop
+        // and not the twenty seconds of driving to it.
+        int listenFrom = Math.Max(0, fromSample - sr);
+        int listenTo = Math.Min(r.Exhaust.Length, stopSample + sr);
+        static float[] Slice(float[] x, int from, int to)
+        {
+            var y = new float[Math.Max(0, to - from)];
+            if (y.Length > 0) Array.Copy(x, from, y, 0, y.Length);
+            return y;
+        }
+        string stem = Path.Combine(dir, $"hard-stop-{preset}-{label}");
+        File.WriteAllBytes(stem + "-exhaust.wav", VehicleSynth.ToWav16(Slice(r.Exhaust, listenFrom, listenTo)));
+        File.WriteAllBytes(stem + "-intake.wav", VehicleSynth.ToWav16(Slice(r.Intake, listenFrom, listenTo)));
+        File.WriteAllBytes(stem + "-tyres.wav", VehicleSynth.ToWav16(Slice(r.Tyres, listenFrom, listenTo)));
+        Console.WriteLine($"\n  stop file {(listenTo - listenFrom) / (float)sr:F1} s (1 s approach, the stop, 1 s rest) -> {stem}-exhaust.wav, -intake.wav, -tyres.wav");
+        return 0;
+    }
+
     public static int Run(bool live, bool stationary = false, bool muscle = false, string? preset = null,
                           bool withBody = true, float? coupling = null, bool withShell = true,
                           float? shellLevel = null, string? shellCase = null, float? shellLoss = null,

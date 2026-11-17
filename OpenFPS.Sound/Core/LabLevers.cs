@@ -81,4 +81,8 @@ public sealed class LabLevers
     /// <summary>Every voice stopped outright, as before 2026-10-17 (FmodAudioProvider.StopSound): a step in its
     /// waveform where it ended, rather than the budget's fade.</summary>
     public bool HardStops { get; set; }
+
+    /// <summary>A scripted Driver's Braking order stands on the pedal to the tyres' limit instead of asking
+    /// its own 0.7 of the old 7.5 m/s² (VehicleSpike --hard-stop). Never set in a game.</summary>
+    public bool FullBrake { get; set; }
 }

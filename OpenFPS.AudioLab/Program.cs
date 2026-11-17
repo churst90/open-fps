@@ -55,6 +55,7 @@ string[] usage =
     "  --engine-street [preset ...] [kmh=]           cars down Concrete Row, the buildings answering",
     "  --vehicle[-live] / --vehicle-rev[-live] / --muscle-rev[-live] <preset> [knobs]",
     "                                                a drive in stems, a pass-by, or the stationary rev bench",
+    "  --hard-stop [preset] [label=old|new] [out=DIR]  a 100 km/h stop on the pedal to the tyres' limit",
     "  --ride [preset] [knobs] out=FILE.wav          the vehicle voice through a stop-go ride at a fixed gain",
     "  --shift-trace [preset] [top=]                 what the game's driver does with the gearbox in town",
     "  --tap-balance [preset ...] [parts|front|frontparts|whoosh|pipe|port|turbo|knock|squeal|shifts|cost|nan|audit|placed|seed=N]",
@@ -1370,6 +1371,13 @@ if (args.Contains("--engine-orders"))
     int orderCode = OpenFPS.AudioLab.Spikes.EngineOrderSpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(orderCode);
+}
+
+if (args.Contains("--hard-stop"))
+{
+    int stopCode = OpenFPS.AudioLab.Spikes.VehicleSpike.RunHardStop(args);
+    Log.CloseAndFlush();
+    Environment.Exit(stopCode);
 }
 
 if (args.Contains("--vehicle") || args.Contains("--vehicle-live")

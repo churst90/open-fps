@@ -274,7 +274,9 @@ public sealed class Driver
 
         // ── Driving ─────────────────────────────────────────────────────────────────────────
         _engine.Ignition = true; _engine.Starter = false;
-        _dl.Brake = order.Action == DriverAction.Braking ? 0.7f : 0f;
+        _dl.Brake = order.Action == DriverAction.Braking
+            ? (_engine.Lab.FullBrake ? 1f : 0.7f)
+            : 0f;
         float targetSpeed = order.TargetSpeed;
 
         if (_shiftTimer > 0f)
