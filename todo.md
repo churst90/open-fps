@@ -726,8 +726,11 @@ The open questions for Cody, in one place. A few that belong to one item stay wi
 - Hardening limits in play: chat 6 then one every 2 s; commands 20 then 5/s; editor changes 20 then
   4/s; `/join` 3 then one every 10 s; chat 512 characters, commands 1,024; no cap on model versions.
   Answered 2026-11-17: keep them as they are.
-- MemoryPack's string-length overflow (one packet crashed the server) is not fixed upstream: report it
-  to Cysharp?
+- MemoryPack's string-length overflow (one packet crashed the server): Cody said report it privately
+  (2026-11-17), but Cysharp had already fixed it in 1.22.0 (2026-11-11, PR #477: `GetSpanReference` compares
+  as unsigned and `GetNextSpan` throws on a negative size), so no report. Next: update MemoryPack to 1.22.0 and
+  keep `WireCheck` as our own guard; its new MEMPACK043 warning for `DateTimeOffset` members must not break
+  the 0-warning builds, and the wire hash and stored streams must not move (valid data's format is unchanged).
 - Sound library: CI compares renders by tolerance; 430 KB per stream regeneration. Recommended: yes to both.
   (`ColliderShape` went to `OpenFPS.Geometry` with the namespace rename, 2026-10-17; decision 4, MemoryPack,
   was taken 2026-10-10.)
