@@ -9,9 +9,11 @@
   city's `TrafficFaultProbe`, same seeds and maps, put releases begun into a gap shorter than the car's own
   critical gap at 48 of 59 episodes before and 0 of 6 after, and breaker-caused re-holds at 841 ticks
   before and 0 after; no breaker release was stood again over the line. Junction body overlaps went 26 to
-  21 and holds short at merges 294 to 287; neither is fixed here. The traffic stream moves. `PeopleReplay`
-  moves as well, from 892.2 s, because characters wait for and ride the city's buses: it is not
-  regenerated, and neither is the traffic stream, while Cody decides. The wire hash stays `262885684b9c`.
+  21 and holds short at merges 294 to 287; neither is fixed here. The traffic stream and `PeopleReplay`
+  were regenerated after Cody's answer, in one commit: 2 of the city's 188 traffic movers' tracks changed
+  from 39 s; Alex, the door events and the square's speech moved with walkers crossing in the new gaps
+  (Alex first at 892.2 s, the square at 14.3 s), while haunts, doors and the hour's speech stayed byte for
+  byte. The wire hash stays `262885684b9c`.
 
 Recent work, newest first. `git log` has the rest.
 

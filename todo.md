@@ -159,8 +159,9 @@ fingerprint changed too (3a8a8e7b91ab), so the door renders are made again once.
        for a body in its way. Probe, same seeds and maps: releases begun into a gap shorter than the car's
        own critical gap 48 of 59 episodes -> 0 of 6; breaker-caused re-holds 841 ticks -> 0; overlaps in
        junctions 26 -> 21 and holds short at merges 294 -> 287, neither fixed here. The traffic stream and
-       `PeopleReplay` both move: characters wait for and ride the city's buses, and PeopleReplay first
-       differs at 892.2 s. Neither stream is regenerated until Cody decides.
+       `PeopleReplay` were regenerated after Cody's answer: 2 of 188 traffic movers from 39 s; Alex, the
+       door events and the square's speech moved with walkers crossing in traffic's gaps (Alex first at
+       892.2 s); haunts, doors and the hour's speech did not move.
 7. Engine package stage 6, Common to the wire: DONE 2026-10-18 (docs/ENGINE_PACKAGES.md, stage 6's built note).
    Left: the Arch reference, which goes with the physics views and constants; and `Scopes` stays in Common unless
    Cody wants a shared game project for it.
