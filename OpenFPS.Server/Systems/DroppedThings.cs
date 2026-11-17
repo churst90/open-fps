@@ -22,7 +22,7 @@ public static class DroppedThings
     /// <summary>
     /// The mass a fixed thing (a tile, a door leaf) is taken as in the impact law. The law reads the struck mass
     /// only through the reduced mass, m1 m2 / (m1 + m2); a million kilograms is the planet to within 0.01 % of a
-    /// 100 kg item, where 500 times the item's mass (the old scripted guess) was 0.2 % low at 1 kg and 2 % low at 50.
+    /// 100 kg item, where 500 times the item's mass (the old scripted guess) was 0.2 % low for every item.
     /// </summary>
     public const float FixedMassKg = 1_000_000f;
 
@@ -97,7 +97,7 @@ public static class DroppedThings
     /// One contact's impact through the one impact law (ImpactAcoustics.Between): the moving body is the hitter,
     /// the other the struck thing, at the contact's point and closing speed, both materials from the contact.
     /// <paramref name="struckSize"/> is the struck body's box, or a floor panel's when it is a mesh; a fixed thing
-    /// is mounted and can move a hair in the ring's loss, a loose one rings free. Empty below the law's own
+    /// has its ring held by its mounting (a shorter ring), a loose one rings free. Empty below the law's own
     /// threshold of hearing (<see cref="ImpactAcoustics.MinimumSpeed"/>), which is also its own level floor: a
     /// scuff is not an event.
     /// </summary>

@@ -2625,6 +2625,108 @@ untouched and no system's stream content changed (DrivingReplay and MovementRepl
 - Wire hash 4bd285bc1e17 to 262885684b9c (Physics is hashed), so the server and the Windows client deploy together.
   The door fingerprint does not move.
 
+### 18.11 Step 7 as built (2026-11-17)
+
+Dropped and thrown things are real bodies, and every impact they make is heard from the contact. This is the first
+system that uses the Jolt world, so `BodyWorld`, `PieceBodies` and the contacts are no longer only tested: they run
+on the server, once a tick, on every map. JoltPhysicsSharp went to 2.23.0 first, as Cody decided (18.5): its native
+is still JoltPhysics.Native 1.1.0, the 2.22.0 `BodyCreationSettings.MotionQuality` setter bug is fixed (the value
+reads back as set; the body interface's `SetMotionQuality` remains the one to use), and `BodyWorldTests`,
+`BodyWorldAnalyticTests`, `PieceBodiesTests` and `BodyContactsTests` pass unchanged (72, and 79 with the
+PhysicsBoundary guard). The analytic same-scene result is the same: those tests compare runs, not a stored hash. The
+wire hash moved from 262885684b9c to 888f6b8368f9 with the package reference, so the server and the Windows client
+deploy together; the door fingerprint stays 3a8a8e7b91ab.
+
+**The server's worlds.** `BodyWorldSystem` (`OpenFPS.Server/Systems/BodyWorldSystem.cs`) gives each loaded map one
+`BodyWorld` at the map's own gravity (`PhysicsConstants.GravityOf`), one `PieceBodies`, and one below-normal-priority
+worker. The tick calls `PieceBodies.Follow` on the map's triangle world after `MapManager.SyncGeometry`, so the tiles
+are the BVH's tiles and the door leaves are where `DoorSystem` and `ParentSystem` left them; the worker welds and
+builds a tile's or a leaf's shapes (`PieceBodies.Prepare`), and the tick only registers shapes and adds four bodies a
+call (`PieceBodies.Pump`), rebuilding the broad phase once when a tile's last body is in. Measured on the city's own
+geometry (13 tile pieces, 7 leaf builds, 13 tiles, 514 door leaves, 605 static and kinematic bodies), debug build,
+twelve pinned cores: the pieces were made in 108 ms on the worker; the warm-up took 152 ticks, four bodies each, its
+worst tick 1.63 ms and its mean 0.39 ms; the steady tick with no moving bodies was mean 0.107 ms, p95 0.407 ms, worst
+0.444 ms. The 18 to 72 ms first-add spikes of 18.4 never land in one tick because the tree is built off the tick and
+the adds are four a call. A map is not ready for an item until every tile it has is in and the queue is empty, so a
+drop in a map's first seconds is the old scripted drop, never a fall through a floor still being made.
+
+**The tick with moving things.** On the same city scene the four-step tick cost with 1, 10 and 50 item bodies moving
+was mean 0.363, 0.397 and 0.490 ms (p95 0.436, 0.472 and 0.548; worst 0.446, 0.502 and 3.083 ms; the 3.083 is the
+one tick that added the 50 bodies). On four floor boxes alone, 1, 10 and 50 falling items cost 0.20 to 0.24 ms a tick
+in `DroppedThingsTests` (debug, twelve cores), and 0.26 to 0.29 ms in the lab. A 0.5 kg ball dropped from 1.3 m on
+the city's ground first touched 14 ticks after release, and the tick carrying that first contact was 0.33 to 0.38 ms.
+The tick is 33.3 ms.
+
+**Drop.** `HandsService.Drop` no longer puts the item on the floor and guesses: it clears the hand or back, and the
+item leaves as a dynamic box at its own pose with the holder's `Velocity` (a walk carries into the throw of a drop).
+The box is the item's own declared dimensions when it has a collider, else a cube of its declared mass at its
+material's density: one rule for every item and no table of sizes by name. A 5 kg crowbar is then an 86 mm cube of
+steel, a 3.3 kg rifle a 172 mm cube of wood, a 0.9 kg pistol a 94 mm cube of plastic, and a 0.4 kg torch a 71 mm cube:
+lumps of their stuff, not their shapes, and the honest consequence of every shipped item declaring a mass, a material
+and no size. Friction and restitution come from `ContactMaterial.Of` (kinetic friction, measured restitution, Jolt's
+pair rule). The Transform follows the body while it moves, so a client hears it where it is, and the item's `Velocity`
+is the body's; when Jolt puts the body to sleep (its own half second under its sleep speed, 18.9) the body and its
+shape leave the world and the item lies where it stopped, so pick-up and everything else that reads its Transform is
+unchanged. A corpse is still set down by `BodyFall` (step 9), untouched. The message is unchanged and immediate.
+
+**Impacts.** Every contact that begins makes one impact through `ImpactAcoustics.Between` at the contact's point,
+with the contact's closing speed, the moving body as the hitter and the other thing as struck, both materials from
+the contact (the floor's from the tile's triangle or piece it hit, not `PhysicsUtils.GetGroundHeight`). The threshold
+is the impact law's own: `ImpactAcoustics.MinimumSpeed`, 0.4 m/s, "a scuff, not an event"; at the lightest shipped
+item (a 0.4 kg torch) that is 59 dB at a metre, and `Between` returns no sound below it. A bounce makes a second,
+quieter impact because the body really bounced: in the lab a 0.5 kg glass bottle on concrete made 11 impacts over
+8.27 s, each lower than the one before.
+
+The other `Between` arguments, read rather than copied: the hitter's mass is the item's. The struck mass is the
+other item's when two moving items meet; for a tile or a door leaf it is a million kilograms, which the law's
+reduced mass m1 m2 / (m1 + m2) makes the hitter's own to 0.01 % of a 100 kg item, where the old 500 times the mass
+was 0.2 % low for every item. The struck face is the other item's own box (largest dimension as width, middle as
+height, smallest as thickness), or, for a tile or leaf, the old scripted drop's 2 m by 2 m by 0.2 m slab: a mesh
+body carries no panel size a contact can give. `struckIsFixed` is true for tiles and leaves (their ring is held by
+their mounting) and false for a loose item (it rings free). The old `mass * 500f, 2f, 2f, 0.2f` was a stand-in for
+the planet and a floor panel, and is kept only where a contact has nothing better.
+
+**Throw.** `/throw [left|right|name]`, a text command and its aliases `/hurl` and `/toss`; no key is bound, and a key
+is Cody's to choose. The item leaves the hand along the look, pitch included: the forward is +Z turned by the
+player's own rotation, and `CreateFromYawPitchRoll` takes an increasing pitch toward -Y, so looking up (a negative
+pitch) throws up. The release speed is `DroppedThings.ThrowSpeed`, v = 11.0 m^-0.2: Rod Cross, "Physics of overarm
+throwing", American Journal of Physics 72(3) 305-312 (2004), measured objects from 57 g to 3.4 kg and fitted a power
+law (his five throwers' exponent 0.12 to 0.20 below 0.73 kg, 0.33 to 0.42 above; over 60 times the mass the speed
+fell by only 2.4). This one fit passes through his two measured ends: 19.45 m/s at 0.057 kg and 8.62 at 3.4 kg,
+against his 19.5 and 8.5. A 0.4 kg torch leaves at 13.2 m/s, a 3.3 kg rifle at 8.7, a 5 kg crowbar at 8.0. The
+holder's velocity adds to it. Over the 25 kg carrying limit an item is too heavy to throw and the refusal says so in words. Everything else is a drop: the same body, material, contacts and impacts; if a map's ground is
+not ready the throw becomes the old scripted drop.
+
+**The lab.** AudioLab `--drops` drops a 0.5 kg glass bottle, a 2 kg wooden block and a 5 kg steel crowbar on wood,
+concrete, carpet and metal floors in a four-floor scene, and throws the bottle at concrete and the crowbar at wood.
+Every impact is the contact's through the same `DroppedThings.Impact` the server uses, rendered through the shipped
+hearing's placement (compression 0.45) with `TransientSynth`, and beside each is the old scripted drop of the same
+item, floor and height, one impact at once at sqrt(2gh). 28 files in `~/.cache/openfps-build/drops/renders/`, 14 new
+and 14 old, each with its peak and RMS printed: none clips and none holds a non-finite sample. The glass bottle on
+concrete is 8.27 s with 11 impacts (the first at 0.467 s), peak -14.5 dBFS, RMS -39.3; the old one is 3.00 s with
+one impact at 0.000, peak -14.4, RMS -42.7. The wooden block on wood: one impact at 0.467 s, peak -11.8, against the
+old -11.7. The crowbar on metal: peak -9.9 both, one impact at 0.500 s. A thrown bottle on concrete: one impact at
+0.267 s, peak -14.1, against the old hand-height drop's -14.4; a thrown crowbar on wood: one at 0.367 s, peak -9.6
+against -9.9. The new files hold the fall's silence before the first contact and the bounces after it, which is what
+the old script cannot.
+
+**Tests** (`DroppedThingsTests`, 5): a 5 kg crowbar from the hand's 1.3 m first hits within 5 % of sqrt(2gh), rests
+with its bottom on the `FloorAt` floor and leaves the body world; glass on concrete makes a second, quieter impact;
+looking up throws up and looking down throws down; the release speed is the law and 25 kg and over says too heavy;
+the tick with 1, 10 and 50 moving items is measured. The classes that use `HandsService`, the command catalog and
+the physics tests ran beside them (248 and 282 tests) and the four body/contact classes and the PhysicsBoundary
+guard passed again (79). The engine packages survey's `files.tsv` ratchet gains the two new server systems (629 to
+631 files); the sound boundary's ratchets do not move (0 crossings, 6,956 layering, 355 statics, 0 unsorted).
+
+**Heard.** Only item drops and throws move, because they are real now: the stored streams hold no item drop (the
+only drops in them are raindrops), so no stream, replay or render moved and none was regenerated. A door leaf, a
+vehicle, an approved sound and the door fingerprint are untouched.
+
+**Left for step 8.** Scrape and roll: `ContactStream`'s Continued events now carry the slip speed and impulse that
+only dropped items make, so the first dragged box and rolling barrel can drive scrape and roll sounds. Nothing has
+yet exchanged momentum between an item and a person or a car (step 9 and step 13); a resting item is not a body, so
+a thrown thing passes through one that has already stopped.
+
 ## Decisions (Cody, 2026-10-11)
 
 - Approved as recommended, all ten (section 8), with two changes:

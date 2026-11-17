@@ -185,7 +185,9 @@ fingerprint changed too (3a8a8e7b91ab), so the door renders are made again once.
      (18.7, 18.8); step 4 (analytic tests of `BodyWorld` against closed-form physics, tests only) built
      2026-10-27 (18.9); step 6 (Jolt's contacts into `ContactStream`, ids 2^30 and up) built 2026-10-27, unused
      by any system, wire hash 262885684b9c (18.10); Cody answered 18.5 on 2026-11-17: step 7 (dropped and thrown
-     things) next, with JoltPhysicsSharp 2.23.0 first, then 8, 9 and 10, and doors (11) last by ear;
+     things) next, with JoltPhysicsSharp 2.23.0 first, then 8, 9 and 10, and doors (11) last by ear; step 7
+     (`BodyWorldSystem`, `DroppedThings`, `/drop` and `/throw`) built 2026-11-17, wire hash 888f6b8368f9, its
+     measured costs, renders, tests and what it leaves for step 8 in 18.11. A key for `/throw` is Cody's to choose;
    - stage 5, moving air and loose layers;
    - stage 6, vehicles in full.
 10. A source heard from the whole of itself, steps 5 to 8 (Cody, 2026-10-16: "a river should sound like a flowing

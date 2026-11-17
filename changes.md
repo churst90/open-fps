@@ -17,6 +17,28 @@
 
 Recent work, newest first. `git log` has the rest.
 
+## 2026-11-17
+
+- Physics stage 4 step 7: dropped and thrown things are real bodies, and every impact is heard from the contact
+  (docs/PHYSICS_BOUNDARY.md 18.11). JoltPhysicsSharp 2.23.0 first (the 2.22.0 `MotionQuality` setter bug is fixed).
+  The server keeps one `BodyWorld` a map, with the map's tiles and door leaves through `PieceBodies` (built on a
+  below-normal-priority worker, four bodies added a call on the tick; the city warms in 152 ticks, worst 1.63 ms,
+  and a steady tick is 0.107 ms). `/drop` lets an item go with the holder's velocity as a box of its declared size
+  or of its mass and material density; its Transform follows the body and it leaves the world when Jolt puts it to
+  sleep, so pick-up is unchanged. Each beginning contact at or above `ImpactAcoustics.MinimumSpeed` makes one
+  `ImpactAcoustics.Between` impact, at the closing speed and both materials, the floor's from the tile it hit; a
+  bounce is a second, quieter impact because it really bounced. `/throw` (aliases hurl, toss) throws along the look,
+  pitch included, at Cross's measured power law v = 11.0 m^-0.2 (Am. J. Phys. 72(3) 305-312, 2004); 25 kg and over
+  says too heavy; no key is bound. AudioLab `--drops` renders 12 drops and 2 throws beside the old scripted drop of
+  each (28 files in `~/.cache/openfps-build/drops/renders/`, at the shipped hearing's level, none clipping): the
+  glass bottle on concrete is 8.27 s and 11 impacts against the old one impact, the first impact's level and the
+  item's mass and material agreeing between old and new. No stored stream or render holds an item drop (the only
+  drops in them are raindrops), so none moved. Wire hash `888f6b8368f9` (was `262885684b9c`), so the server and the
+  Windows client deploy together; the door fingerprint is unchanged (`3a8a8e7b91ab`), so no door render is made
+  again. Ratchets: engine packages 630 files (two new server systems), 10 crossings; sound boundary 0 crossings,
+  6,956 layering, 355 statics, 0 unsorted. Guards: physics 79, HandsService and command classes 530, engine
+  packages and library boundary 35. Hints for step 8 in 18.11. Built by DeepSeek through OpenCode.
+
 ## 2026-10-24
 
 - The sound library's second version, tag `library/v0.2.0` (docs/LIBRARY_CHANGES.md): what Resonance asked for in
