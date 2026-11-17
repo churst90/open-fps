@@ -2070,6 +2070,10 @@ shape. The door fingerprint changes for none.
 9. **The aircraft's landing roll.** Recommended: unchanged. It is a procedure's outcome worked out from
    sourced rolls, the pilot's choice, not a wheel brake's capability.
 
+Cody, 2026-11-17, on decision 1: yes. The sound's `MaxBrake` comes from the tyres (`Brakes.Capacity` at standard
+gravity), the `VirtualDriver` keeps every request below 7.5 m/s² as it is, and a hard stop in a car and on a sports
+bike is rendered for him before it merges.
+
 **What may run beside this.** The renames touch `OpenFPS.Physics/VehicleStep.cs`, a new law file beside
 it, `OpenFPS.Sound/Core/Engine/Driveline.cs`, `OpenFPS.Accessibility/DrivingAids.cs`,
 `OpenFPS.Server/Systems/DrivingSystem.cs` and `RailSystem.cs`, and `OneConstantPerLawTests`; they must not
