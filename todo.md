@@ -683,8 +683,9 @@ here are checked to stand on (docs/LISTENING_SPOTS.md).
 The open questions for Cody, in one place. A few that belong to one item stay with it, marked (Cody).
 - Real weather (docs/REAL_WEATHER.md section 12): all seven answered 2026-11-17, with the units, a made-up map's
   static or changing weather and the generic climate ("Decided (Cody, 2026-11-17)").
-- The scope and the push mower (audit P2): should the scope call somebody pushing a push mower a person?
-  Today, as before, it picks out no machine.
+- The scope and the push mower (audit P2): answered 2026-11-17, a person. Whatever declares a walking operator
+  (`SmallMachineSpec.WalkedBehind`, the rule `OtherBodies` already uses for the footsteps) has a person with it,
+  and the scope says so; a machine with no operator is still not picked out.
 - The editor and sound ids (audit P2): should the editor edit trains and woods through their sound ids?
 - A beacon behind a wall (audit P6, "P3b as built"): whether a blip sounds is decided on the hand-rolled path.
   On the simulator's answer, as every other source is heard, which beacons come through which walls would move.
