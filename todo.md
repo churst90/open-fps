@@ -701,7 +701,15 @@ The open questions for Cody, in one place. A few that belong to one item stay wi
   every made-up map, a map's temperature absolute, not an offset (docs/REAL_WEATHER.md).
 - Car fans: real pickups and vans mostly have a belt-driven viscous-clutch fan (not modelled); the car
   fan's 205 Hz hum is 23 dB over its noise; a 3.4 kHz block mode is 12 dB louder from the front.
-- Lightning: a spoken or tone cue at the flash, or only the thunder?
+- Lightning cue at the flash: answered 2026-11-17, a sound at the flash, with its own setting (on by default).
+  Cody: "have that sound mean something, be distinct from any other sound and actually imitate the visual
+  flashing of the lightning because it isn't always just a single clean flash." The cue follows the strike the
+  thunder already comes from (`LightningStrike`): one pulse per return stroke at the model's own stroke count
+  and real interstroke gaps (tens of milliseconds), a dimmer flicker for a cloud flash's long, branching
+  discharge; brightness from the flash's energy; level from distance, as light dims; from the flash's
+  direction, a point for a ground strike and spread along the channel for a cloud flash, so the kind comes out
+  of where the light is, never said. The thunder follows on its real delay. Its timbre is new, shared with no
+  beacon, cue or UI sound; three or four candidates rendered for Cody to choose by ear.
 - The scope hint ("Nobody in view..."): parked by Cody 2026-10-05.
 - The commuter cars at a cruise are mostly tyre noise on one shared tyre, 11-20 dB over their engines
   ("too reverby, all the same", inbox/vehicles-2026-10-05).
