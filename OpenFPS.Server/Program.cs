@@ -1020,6 +1020,12 @@ public class GameServer
                     // Door leaves where they now are in the triangle world, and any static spawned this
                     // tick taken into it (docs/GEOMETRY.md stage 1).
                     _maps.SyncGeometry(entry.Key);
+                    // The map's own bodies (docs/PHYSICS_BOUNDARY.md 18.2 step 7): the geometry as Jolt
+                    // meshes, the dropped and thrown things as dynamic bodies, their impacts heard from
+                    // the contacts. After the doors and the parts, before the stream closes.
+                    _maps.TryGetGeometry(entry.Key, out var bodyGeometry);
+                    BodyWorldSystem.Update(entry.Key, world, bodyGeometry, contacts,
+                                           (id, label, sounds) => EmitWorldAudio(entry.Key, id, label, sounds));
                     _occupancy.Update(world, lookup);
                     contacts.Close();
                     stage.Dispose();
