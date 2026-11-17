@@ -37,16 +37,22 @@ public sealed class Driveline
     /// and a large inertia, whatever the throttle. For measurement only.</summary>
     public float DynoRpm { get; set; }
 
-    /// <summary>Peak braking deceleration, m/s^2.</summary>
-    public float MaxBrake { get; set; } = 7.5f;
+    /// <summary>Peak braking deceleration, m/s^2: the car's own tyres' capability
+    /// (<see cref="Brakes.Capacity"/> at standard gravity), so the heard car and the server's stop as one.</summary>
+    public float MaxBrake { get; }
     /// <summary>What the clutch can pass when fully up, Nm — well above the engine's peak.</summary>
     public float ClutchCapacityNm { get; set; }
+
+    /// <summary>The 7.5 m/s² the drivers' brake requests were tuned against, not a brake: a request below it
+    /// is the same deceleration as before, and the tyres' own <see cref="MaxBrake"/> is what stops the car.</summary>
+    public const float TunedBrakeMps2 = 7.5f;
 
     public Driveline(VehicleProfile v)
     {
         Vehicle = v;
         _gb = v.Gearbox;
         ClutchCapacityNm = v.Engine.PeakTorqueNm * 1.6f;
+        MaxBrake = Brakes.Capacity(v.Tyres.Mechanics, Earth.StandardGravity);
     }
 
     /// <summary>Engine speed the wheels demand in a gear at the current road speed.</summary>
@@ -275,7 +281,7 @@ public sealed class Driver
         // ── Driving ─────────────────────────────────────────────────────────────────────────
         _engine.Ignition = true; _engine.Starter = false;
         _dl.Brake = order.Action == DriverAction.Braking
-            ? (_engine.Lab.FullBrake ? 1f : 0.7f)
+            ? (_engine.Lab.FullBrake ? 1f : 0.7f * Driveline.TunedBrakeMps2 / _dl.MaxBrake)
             : 0f;
         float targetSpeed = order.TargetSpeed;
 
@@ -446,7 +452,7 @@ public sealed class VirtualDriver
             _integral = Math.Clamp(_integral + err * 0.08f * dt, -0.3f, 0.5f);
         float throttle = Math.Clamp(need / available + _integral, 0f, 1f);
         float brake = 0f;
-        if (wantAccel < -0.8f) { brake = Math.Clamp(-wantAccel / 6f, 0f, 1f); throttle = 0f; }
+        if (wantAccel < -0.8f) { brake = Math.Clamp(-wantAccel * Driveline.TunedBrakeMps2 / 6f / _dl.MaxBrake, 0f, 1f); throttle = 0f; }
         _dl.Brake = brake;
 
         float gearRpm = _dl.GearRpm(_dl.Gear);

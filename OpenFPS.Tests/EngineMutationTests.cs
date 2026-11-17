@@ -49,7 +49,8 @@ public class EngineMutationTests
     {
         var (_, dl, driver) = Car();
         driver.Apply(new DriveOrder(DriverAction.Braking, 1f), 0f, Dt);
-        Assert.Equal(0.7f, dl.Brake);
+        // The driver's 0.7 of the old 7.5 m/s², as a share of the tyres' own limit (16.8 change A).
+        Assert.Equal(0.7f * Driveline.TunedBrakeMps2, dl.Brake * dl.MaxBrake, 3);
         Assert.Equal(0, dl.Gear);
 
         driver.Apply(new DriveOrder(DriverAction.Coasting, 1f), 0f, Dt);
