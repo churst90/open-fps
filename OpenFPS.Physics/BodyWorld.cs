@@ -247,9 +247,10 @@ public sealed partial class BodyWorld : IDisposable
 
         var contact = ContactMaterial.Of(material);
         var joltMotion = motion switch { BodyMotion.Static => MotionType.Static, BodyMotion.Kinematic => MotionType.Kinematic, _ => MotionType.Dynamic };
-        // Not BodyCreationSettings.MotionQuality: in 2.22.0 its setter passes the enum by reference to a C function that
+        // Not BodyCreationSettings.MotionQuality: in 2.22.0 its setter passed the enum by reference to a C function that
         // takes it by value, so a body made with it got quality 244 and continuous collision silently did nothing
-        // (docs/PHYSICS_BOUNDARY.md 14.8). The body interface's setter passes it by value.
+        // (docs/PHYSICS_BOUNDARY.md 14.8, 18.11). 2.23.0 reads back the value set; this world asks for no continuous
+        // collision, and the body interface's SetMotionQuality is the setter to use if it ever does.
         using var settings = new BodyCreationSettings(shape, position, orientation, joltMotion, motion == BodyMotion.Static ? NonMoving : Moving)
         {
             Friction = contact.Friction, Restitution = contact.Restitution,
