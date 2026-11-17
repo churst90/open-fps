@@ -714,7 +714,10 @@ The open questions for Cody, in one place. A few that belong to one item stay wi
 - The commuter cars at a cruise are mostly tyre noise on one shared tyre, 11-20 dB over their engines
   ("too reverby, all the same", inbox/vehicles-2026-10-05).
 - The Elm Park fountain's basin overflow: +4.6 dB on its side; not connected.
-- A tap and its plug on one key, or two?
+- A tap and its plug: answered 2026-11-17, two controls. E works the tap alone; the plug is its own action
+  (Shift+E, the knock's key, on a basin rather than a door: what you face decides, and the knock at a door is
+  unchanged). A tap can then run with the plug out, and a basin can be filled and left standing. Retires
+  `PlugWhileRunning` (docs/RUNNING_WATER.md); spoken: "plug in", "plug out".
 - Steam Audio pathing: answered 2026-11-17, remove it. It never ran (`enablePathing: false`), its bake was the
   2026-09 stutter, and OpeningRoutes finds every route from the map's own openings. Remove the pathing option,
   bake and redirect from `SteamAudioSimulator` and its callers; no render or stream may move, since none used it.
