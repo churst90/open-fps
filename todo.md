@@ -692,6 +692,11 @@ The open questions for Cody, in one place. A few that belong to one item stay wi
 - Reflections following a moving talker, and himself: he will check again.
 - Loudness law: anything over about 126 dB peak at 1 m (gunshots, glass, a thin plate) plays at full
   scale out to the 40 m clamp, so 5 m and 20 m sound the same (`Loudness.Place`). Explosions wait on it.
+  Answered 2026-11-17: distance always counts. Every source falls off by its real amount; what lies above full
+  scale is brought down by the mix's own loudness compression (`LevelCompression`), not clamped, so a near shot
+  stays louder than a far one by a compressed share of the real difference; a short limiter at the master
+  catches the sharpest peaks. Gunshots and glass are approved sounds: near and far renders go to Cody before
+  it merges.
 - City temperature: not intended. Answered 2026-11-17: a generic climate (95 °F summers, 25 °F winters) for
   every made-up map, a map's temperature absolute, not an offset (docs/REAL_WEATHER.md).
 - Car fans: real pickups and vans mostly have a belt-driven viscous-clutch fan (not modelled); the car
