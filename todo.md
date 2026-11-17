@@ -686,7 +686,10 @@ The open questions for Cody, in one place. A few that belong to one item stay wi
 - The scope and the push mower (audit P2): answered 2026-11-17, a person. Whatever declares a walking operator
   (`SmallMachineSpec.WalkedBehind`, the rule `OtherBodies` already uses for the footsteps) has a person with it,
   and the scope says so; a machine with no operator is still not picked out.
-- The editor and sound ids (audit P2): should the editor edit trains and woods through their sound ids?
+- The editor and sound ids (audit P2): answered 2026-11-17, yes. `ModelKinds.TryModelOfSound` answers for every
+  kind through the model kind table (each row its `LibraryKind`), so no model is out of the editor's reach by
+  being missed off a list; trains and woods first, then horns, aircraft, gates, sirens and rain as each gets
+  its editing page (docs/SPECIAL_CASES_AUDIT.md, P2 leftovers).
 - A beacon behind a wall (audit P6, "P3b as built"): whether a blip sounds is decided on the hand-rolled path.
   On the simulator's answer, as every other source is heard, which beacons come through which walls would move.
   Try it, by ear?
