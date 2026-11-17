@@ -564,6 +564,9 @@ places, and 4 and 5 make it move and soak in as it really does.
   sentences (`/weather` and the like) use it. It changes only what the player hears and reads: every quantity in
   the engine, the wire, the maps, the stored streams and the logs stays SI as it is ("make sure everything under
   the hood the game engine depends on doesn't change").
+- **When the data stops** (decision 7): yes. The fetched forecast carries on for up to six hours, then the
+  simulation takes over from the last real state with no jump; when the source answers again the weather eases
+  back to the real one. `/weather` says which is in use (live, from the forecast, or simulated since a time).
 
 ## 13. Sources
 
