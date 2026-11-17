@@ -718,7 +718,9 @@ The open questions for Cody, in one place. A few that belong to one item stay wi
 - Steam Audio pathing never runs (`enablePathing: false`); routes come from OpeningRoutes. Turn it on, or
   remove it.
 - Server: `/move NAME` is staff-only, so an owner cannot use it on their own map. Intended?
-- `/savemap` on a generated map (the city, the real places) rewrites the generated file. Refuse it?
+- `/savemap` on a generated map: answered 2026-11-17, refuse it. The command says which generator makes the map
+  and to change that instead; hand-made and player maps save as now. Whether a map is generated comes from the
+  map itself (a mark its generator writes), never a list of map names.
 - Hardening limits in play: chat 6 then one every 2 s; commands 20 then 5/s; editor changes 20 then
   4/s; `/join` 3 then one every 10 s; chat 512 characters, commands 1,024; no cap on model versions.
   Recommended: keep.
