@@ -547,6 +547,9 @@ places, and 4 and 5 make it move and soak in as it really does.
 - **Open-Meteo's free tier** (decision 1): yes, with the attribution in `/weather` and the credits, the source
   behind an interface. "Open FPS is free and will remain so": no ads, no subscriptions, so the non-commercial
   tier fits for good.
+- **The User-Agent and on-demand fetching** (decision 3): yes. The User-Agent names the project and its GitHub
+  page, no person and no server owner; the listed places are refreshed always, other nodes fetched when a frame
+  opens there, which tells the service a neighbourhood about 15 km across, never a player.
 
 ## 13. Sources
 
