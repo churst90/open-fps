@@ -2074,6 +2074,31 @@ Cody, 2026-11-17, on decision 1: yes. The sound's `MaxBrake` comes from the tyre
 gravity), the `VirtualDriver` keeps every request below 7.5 m/s² as it is, and a hard stop in a car and on a sports
 bike is rendered for him before it merges.
 
+Cody, 2026-11-17, on decisions 2 to 9: not now; each is done with the stage that touches it anyway (stage 6 for
+most), aiming at realism. What each becomes then:
+
+- 2, the sound's air: the real air (density from the weather's temperature, pressure and humidity). At stage 6
+  the server works out the load and the sound follows it, so this needs no change of its own.
+- 3, the standstill cut: the two cuts are numerical guards, not physics. Stage 6 models a car at rest held by
+  static friction (brakes and tyres) until a force beats it, against sliding and rolling friction once it moves,
+  and the cuts go.
+- 4, the drivers' braking: kept apart from the car's capability, and stated as each driver's own habit, a share
+  of their car's grip around the published comfortable range (about 2 to 3.5 m/s² for ordinary braking), beside
+  the pace each driver keeps.
+- 5, traffic's grip: one car, one grip: the preset's tyres, then the road surface and its water. Traffic reads it
+  in place of the map's `GripG`.
+- 6, drag and rolling for traffic and the trains: yes once traffic runs `VehicleStep`. Trains get the Davis
+  resistance (a + bv + cv²) with published coefficients per kind of train, and the grade.
+- 7, gravity: 9.80665 at the next regeneration with another reason. Beyond it, a real place's gravity from its
+  latitude (normal gravity, the Somigliana formula: about 9.793 at Magnolia, 9.806 at Albany), since gravity is
+  the world's property.
+- 8, air brakes: the capability is the lesser of the tyres' and the brake system's, the brake system's figure
+  carried by `VehicleMechanics` from the US air-brake stopping standard (FMVSS 121) and the load; 6.0 looks
+  generous for a laden truck (the standard's stops from 60 mph average roughly 3.8 to 4.7 m/s², brake lag
+  included; check its figures before building). `FullServiceDecel` reads it.
+- 9, the landing roll: stays the pilot's procedure. If more detail is wanted, the autobrake's real settings
+  (roughly 1.7 m/s² on low and 3 on medium for the A320 type), easing to taxi speed.
+
 **What may run beside this.** The renames touch `OpenFPS.Physics/VehicleStep.cs`, a new law file beside
 it, `OpenFPS.Sound/Core/Engine/Driveline.cs`, `OpenFPS.Accessibility/DrivingAids.cs`,
 `OpenFPS.Server/Systems/DrivingSystem.cs` and `RailSystem.cs`, and `OneConstantPerLawTests`; they must not
