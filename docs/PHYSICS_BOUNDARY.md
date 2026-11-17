@@ -2715,8 +2715,8 @@ with its bottom on the `FloorAt` floor and leaves the body world; glass on concr
 looking up throws up and looking down throws down; the release speed is the law and 25 kg and over says too heavy;
 the tick with 1, 10 and 50 moving items is measured. The classes that use `HandsService`, the command catalog and
 the physics tests ran beside them (248 and 282 tests) and the four body/contact classes and the PhysicsBoundary
-guard passed again (79). The engine packages survey's `files.tsv` ratchet gains the two new server systems (629 to
-631 files); the sound boundary's ratchets do not move (0 crossings, 6,956 layering, 355 statics, 0 unsorted).
+guard passed again (79). The engine packages survey's `files.tsv` ratchet gains the two new server systems (628 to
+630 files); the sound boundary's ratchets do not move (0 crossings, 6,956 layering, 355 statics, 0 unsorted).
 
 **Heard.** Only item drops and throws move, because they are real now: the stored streams hold no item drop (the
 only drops in them are raindrops), so no stream, replay or render moved and none was regenerated. A door leaf, a
