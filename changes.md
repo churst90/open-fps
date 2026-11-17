@@ -1,5 +1,18 @@
 # Changes
 
+## 2026-11-17
+
+- Traffic's deadlock breaker takes the same gap as any driver giving way: after `GiveWayPatienceSeconds` a
+  car is let go only into a gap at least its own movement's critical headway (`JunctionRules.GapTooShort`),
+  and the separate four-second imminence rule is gone (nothing else used it). A car let go is committed to
+  the junction: it does not take the gap question again, so it stops only for a body in its way. The
+  city's `TrafficFaultProbe`, same seeds and maps, put releases begun into a gap shorter than the car's own
+  critical gap at 48 of 59 episodes before and 0 of 6 after, and breaker-caused re-holds at 841 ticks
+  before and 0 after; no breaker release was stood again over the line. Junction body overlaps went 26 to
+  21 and holds short at merges 294 to 287; neither is fixed here. The traffic stream moves. `PeopleReplay`
+  moves as well, from 892.2 s, because characters wait for and ride the city's buses: it is not
+  regenerated, and neither is the traffic stream, while Cody decides. The wire hash stays `262885684b9c`.
+
 Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-24

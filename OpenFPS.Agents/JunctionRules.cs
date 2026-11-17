@@ -28,7 +28,8 @@ public readonly record struct Movement(RoadNetwork.LaneSegment In, RoadNetwork.L
 /// junction. Who gives way to whom: the priority road over the others (JunctionData.PriorityRoads),
 /// and on the priority road a left turn across the oncoming stream gives way to it. Between two
 /// approaches of the same standing, the one on the right goes first; and if everybody is waiting for
-/// somebody, one of them goes after a while, as drivers do.
+/// somebody, one of them goes after a while, as drivers do, but still only into a gap its own movement
+/// would take. A driver let go that way is committed to the junction.
 ///
 /// The laws alone: who is where round a junction this tick, and who has been let go, is the host's
 /// (VehicleSystem.Junctions), which hands them in.
@@ -38,8 +39,6 @@ public static class JunctionRules
     /// <summary>How far out a vehicle counts as coming to a junction, metres: far enough that the longest
     /// critical gap and the time to cross still cover a vehicle at city speed (7.1 s + 3 s at 14 m/s).</summary>
     public const float LookMetres = 150f;
-    /// <summary>A vehicle this few seconds from the line is arriving, whoever has been waiting longest.</summary>
-    public const float ImminentSeconds = 4f;
     /// <summary>Two vehicles' paths closer than this, centre to centre, have their bodies touching:
     /// two widths of about two metres, and the driven line cutting corners by several tenths of a
     /// metre against the connector it is smoothed from.</summary>

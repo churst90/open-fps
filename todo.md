@@ -154,6 +154,13 @@ fingerprint changed too (3a8a8e7b91ab), so the door renders are made again once.
        Surveyed 2026-10-27 (`TrafficFaultProbe`): three of Sean's eight are open-fps's (the deadlock breaker lets
        a car go into a 4 s gap and it re-holds in fits, 43 of 59 releases; bodies overlap inside junctions, 26;
        holds 1 m short at merges, 294). Cody 2026-11-17: the breaker first, alone, shown before it merges.
+       Done 2026-11-17 (code commit): the breaker lets a car go only into a gap its own movement takes
+       (`JunctionRules.GapTooShort`, its critical headway), and a car let go is committed, so it stops only
+       for a body in its way. Probe, same seeds and maps: releases begun into a gap shorter than the car's
+       own critical gap 48 of 59 episodes -> 0 of 6; breaker-caused re-holds 841 ticks -> 0; overlaps in
+       junctions 26 -> 21 and holds short at merges 294 -> 287, neither fixed here. The traffic stream and
+       `PeopleReplay` both move: characters wait for and ride the city's buses, and PeopleReplay first
+       differs at 892.2 s. Neither stream is regenerated until Cody decides.
 7. Engine package stage 6, Common to the wire: DONE 2026-10-18 (docs/ENGINE_PACKAGES.md, stage 6's built note).
    Left: the Arch reference, which goes with the physics views and constants; and `Scopes` stays in Common unless
    Cody wants a shared game project for it.

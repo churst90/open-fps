@@ -172,7 +172,7 @@ public class TrafficFaultProbe
         public double VehicleSeconds;
         public int Overlaps, OverlapsAtPlacing, OverlapsInJunction, OverlapsOnLane, SpawnOverlapsTick0, SpawnFrontOverLine, SpawnFrontOverGiveWay;
         public int HoldEpisodes, HoldOverLine, HoldOverLine2m, HoldLong, HoldLongOverLine, HoldOnPriority, HoldPriorityBySideBySide, HoldSideBySide;
-        public int BreakerEpisodes, BreakerEpisodesBelowCritical;
+        public int BreakerEpisodes, BreakerEpisodesBelowCritical, BreakerBelowOwnGap, BreakerEpisodesBelowOwnGap;
         public int Releases, ReleasesByBreaker, ReHoldsAfterGap, ReHoldsAfterBreaker, BreakerBelowCritical, StopOverLineAfterRelease;
         public int HardDecelTicks, VeryHardDecelTicks;
         public float MaxDecel;
@@ -189,7 +189,8 @@ public class TrafficFaultProbe
             o.WriteLine($"[3,5] stood still held with the front over the lane's end by > 0.3 m: {HoldOverLine} of {HoldEpisodes} (> 2 m: {HoldOverLine2m}); vehicles 8 m or longer: {HoldLongOverLine} of {HoldLong}");
             o.WriteLine("    by preset (over/held): " + string.Join(", ", HoldByPreset.Select(kv => $"{kv.Key} {HoldOverByPreset.GetValueOrDefault(kv.Key)}/{kv.Value}")));
             o.WriteLine($"[3,4] released from a hold: {Releases} (by the deadlock breaker {ReleasesByBreaker} ticks, in {BreakerEpisodes} episodes); held again before the junction: after a gap {ReHoldsAfterGap}, after the breaker {ReHoldsAfterBreaker} ticks; "
-                      + $"breaker episodes begun with traffic closer than the critical gap: {BreakerEpisodesBelowCritical} of {BreakerEpisodes} (ticks {BreakerBelowCritical}); stood again with front over the line after a release: {StopOverLineAfterRelease}");
+                      + $"breaker episodes begun with traffic closer than the critical gap: {BreakerEpisodesBelowCritical} of {BreakerEpisodes} (ticks {BreakerBelowCritical}); "
+                      + $"episodes begun into a gap shorter than the car's own critical gap: {BreakerEpisodesBelowOwnGap} of {BreakerEpisodes} (ticks {BreakerBelowOwnGap}); stood again with front over the line after a release: {StopOverLineAfterRelease}");
             foreach (var n in Notes.Take(150)) o.WriteLine("  " + n);
         }
     }
@@ -403,19 +404,29 @@ public class TrafficFaultProbe
                             t.ReleasesByBreaker++;
                             bool newEpisode = now - m.LastBreakerAt > 3f;
                             m.LastBreakerAt = now;
-                            // The nearest arrival at the same junction on another lane, seconds.
-                            float soonest = float.MaxValue; string who = "";
+                            // The nearest arrival at the same junction on another lane, seconds; and the
+                            // nearest whose way actually meets this one's, judged by its own critical gap.
+                            float soonest = float.MaxValue, soonestMine = float.MaxValue; string who = "";
+                            var mine = new Movement(s.Seg, s.NextSeg);
+                            bool givesWay = s.To != null && s.To.GivesWay(s.Seg.Road);
+                            float look = givesWay ? life.GiveWayApproachKmh / 3.6f : float.MaxValue;
+                            float mineToLine = (s.SegLen - s.Along)
+                                / MathF.Max(1f, MathF.Min(s.Speed + 0.5f, look < float.MaxValue ? look : s.Speed + 0.5f));
+                            float ownGap = JunctionRules.CriticalGap(life, mine, givesWay) + mineToLine;
                             foreach (var o in snaps)
                             {
                                 if (o == s || o.InJunction || o.To != s.To || o.Seg == s.Seg || o.Speed < 0.5f) continue;
                                 float eta = (o.SegLen - o.Along) / o.Speed;
                                 if (eta < soonest) { soonest = eta; who = o.Name; }
+                                if (eta < soonestMine && JunctionRules.Meet(mine, new Movement(o.Seg, o.NextSeg))) soonestMine = eta;
                             }
                             float critical = life.CriticalGapStraightSeconds;
                             if (soonest < critical) t.BreakerBelowCritical++;
-                            if (newEpisode) { t.BreakerEpisodes++; if (soonest < critical) t.BreakerEpisodesBelowCritical++; }
+                            bool belowOwn = soonestMine < ownGap;
+                            if (belowOwn) t.BreakerBelowOwnGap++;
+                            if (newEpisode) { t.BreakerEpisodes++; if (soonest < critical) t.BreakerEpisodesBelowCritical++; if (belowOwn) t.BreakerEpisodesBelowOwnGap++; }
                             if (newEpisode) t.Notes.Add($"{tag}: BREAKER t {now:F1} s let go {s.Name} ({s.Preset}) at {s.To?.Id}, waited {s.WaitedSeconds:F1} s, nearest arrival {(soonest == float.MaxValue ? "none" : $"{soonest:F1} s ({who})")} against a critical gap of {critical:F1} s, "
-                                      + $"at x {s.Pos.X:F0} east, y {s.Pos.Z:F0} north");
+                                      + $"nearest that meets it {(soonestMine == float.MaxValue ? "none" : $"{soonestMine:F1} s")} against its own {ownGap:F1} s, at x {s.Pos.X:F0} east, y {s.Pos.Z:F0} north");
                         }
                     }
                     // Held again after a release, before it is into the junction.
@@ -426,13 +437,12 @@ public class TrafficFaultProbe
                         {
                             m.ReHolds++;
                             if (m.ReleasedByBreaker) t.ReHoldsAfterBreaker++; else t.ReHoldsAfterGap++;
-                            bool quiet = m.ReleasedByBreaker && now - m.LastBreakerAt < 1f;
                             if (s.FrontOver > 0.3f)
                             {
                                 t.StopOverLineAfterRelease++;
-                                t.Notes.Add($"{tag}: HELD AGAIN OVER LINE t {now:F1} s {s.Name} ({s.Preset}) front {s.FrontOver:F1} m over the end at {s.To?.Id}, speed {s.Speed:F1} m/s, x {s.Pos.X:F0} east, y {s.Pos.Z:F0} north");
+                                t.Notes.Add($"{tag}: HELD AGAIN OVER LINE t {now:F1} s {s.Name} ({s.Preset}) front {s.FrontOver:F1} m over the end at {s.To?.Id}, speed {s.Speed:F1} m/s, after {(m.ReleasedByBreaker ? "the breaker" : "a gap")}, x {s.Pos.X:F0} east, y {s.Pos.Z:F0} north");
                             }
-                            else if (!quiet && t.Notes.Count < 400)
+                            else if (t.Notes.Count < 400)
                                 t.Notes.Add($"{tag}: held again t {now:F1} s {s.Name} ({s.Preset}) at {s.To?.Id}, front {s.FrontOver:F1} m from the end, {s.Speed:F1} m/s, after {(m.ReleasedByBreaker ? "the breaker" : "a gap")}");
                         }
                     }
