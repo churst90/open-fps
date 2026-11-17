@@ -198,6 +198,7 @@ string[] usage =
     "  --physics-parity [map=city] [n=4000] [movers=30] [seed=1]",
     "                                                old physics path against new over standing points, and the cross-side risks",
     "  --jolt-trial [map=city] [place=magnolia_tx]   Jolt Physics in our scenes: cost, stacking, tunnelling, soft bodies, memory",
+    "  --drops [out=DIR] [no-city]                   dropped and thrown things heard from their contacts, old scripted drop beside, and the cost of the server's bodies",
     "  --stair-walk [scene=shapes|city] [sprint] [trace]",
     "                                                up and down real treads, every footfall checked (docs/GEOMETRY.md)",
     "  --enclosure [map= at= walk= step= head= dist=]",
@@ -558,6 +559,10 @@ if (args.Contains("--breath"))
 if (args.Contains("--jolt-trial"))
 {
     Environment.Exit(OpenFPS.AudioLab.JoltTrialSpike.Run(args));
+}
+if (args.Contains("--drops"))
+{
+    Environment.Exit(OpenFPS.AudioLab.Spikes.DropsSpike.Run(args));
 }
 if (args.Contains("--physics-parity"))
 {
