@@ -420,6 +420,7 @@ OpenFPS.Server/Repositories/TeamRepository.cs	game
 OpenFPS.Server/Repositories/UserRepository.cs	game	
 OpenFPS.Server/Services/DiscoveryService.cs	game	
 OpenFPS.Server/Services/SocialService.cs	game	
+OpenFPS.Server/Systems/BodyWorldSystem.cs	game	
 OpenFPS.Server/Systems/CharacterSystem.cs	game	host: steps Agents
 OpenFPS.Server/Systems/ContactStreams.cs	game	
 OpenFPS.Server/Systems/CrossingSystem.cs	game	host: steps Agents
@@ -427,6 +428,7 @@ OpenFPS.Server/Systems/CrowdSystem.cs	game	host: steps Agents
 OpenFPS.Server/Systems/DoorManners.cs	game	host: steps Agents
 OpenFPS.Server/Systems/DoorSystem.cs	game	
 OpenFPS.Server/Systems/DrivingSystem.cs	game	
+OpenFPS.Server/Systems/DroppedThings.cs	game	
 OpenFPS.Server/Systems/FireSystem.cs	game	host: steps Environment
 OpenFPS.Server/Systems/LightningSystem.cs	game	host: steps Environment
 OpenFPS.Server/Systems/MovementSystem.cs	game	
