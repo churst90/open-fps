@@ -550,6 +550,13 @@ places, and 4 and 5 make it move and soak in as it really does.
 - **The User-Agent and on-demand fetching** (decision 3): yes. The User-Agent names the project and its GitHub
   page, no person and no server owner; the listed places are refreshed always, other nodes fetched when a frame
   opens there, which tells the service a neighbourhood about 15 km across, never a player.
+- **Made-up maps** (decision 4): yes. The city, the speedway, player maps and any server's own maps keep
+  simulated weather by default; a map setting may name a real place to follow, off by default. The real world
+  always has its place's real weather, temperature and the rest; there is no setting to turn that off. A map
+  that says nothing of its weather starts sunny, calm and 75 °F (23.9 °C) (Cody: "Default weather should be
+  sunny, wind calm and 75F").
+- **Units.** There is no choice of units yet: temperatures are Celsius and speeds km/h. Cody wants a Celsius or
+  Fahrenheit choice; where it lives is being asked.
 
 ## 13. Sources
 
