@@ -228,23 +228,26 @@ published PVB measurements), MDF's (0.025), and every soft and ground material's
 
 #### Friction and restitution (2026-10-16)
 
-Three columns physics stage 4 will read for every contact (docs/PHYSICS_BOUNDARY.md, stage 4). Nothing reads
-them yet, so nothing heard changed. Each is the material against itself, clean and dry: decision 2 of
-docs/ENGINE_PACKAGES.md section 13 combines a pair by the geometric mean of the two frictions and the larger of
-the two restitutions, so a like-on-like pair gives back the figure measured for it. Pairs the rule gets wrong
-(rubber on asphalt, a tyre on ice: `RoadSurfaces` holds them now, from Wong) go in a short table of measured pairs
-when stage 4 needs it.
+Three columns physics stage 4 reads for every contact (docs/PHYSICS_BOUNDARY.md, stage 4). A body's figures are
+the material against itself, clean and dry. A floor's restitution is a hard ball dropped on it: a floor is not
+struck by another floor, and a hard ball is how floors are tested. That figure is the floor's own loss with the
+ball's small loss in it, and it is used as the floor's value. Pairs combine by the geometric mean of the two
+frictions and the smaller of the two restitutions (changed 2026-11-17; decision 2 of docs/ENGINE_PACKAGES.md
+section 13 said the larger): the energy lost in an impact is lost in both bodies, so a pair cannot rebound better
+than its lossier member against itself. A pair of the same material gives back the figure measured for it. Pairs
+the rule gets wrong (rubber on asphalt, a tyre on ice: `RoadSurfaces` holds them now, from Wong) go in a short
+table of measured pairs when stage 4 needs it.
 
 - `StaticFriction` and `KineticFriction`: coefficients of friction on itself. A range in the source is taken at
   its middle.
 - `Restitution`: the coefficient of restitution on itself at a low speed (a few metres a second), where it does
-  not yet fall with speed.
+  not yet fall with speed; for a floor, a hard ball on it at that speed.
 - An empty cell is null: no measurement was found, and none was guessed. A reader must not take it as zero.
 
 | Material | static | sliding | restitution | source |
 |---|---|---|---|---|
-| Metal | 0.74 | 0.57 | | RM, mild steel on mild steel |
-| Fence | 0.74 | 0.57 | | as Metal: galvanised mild steel, and every other figure of its row is Metal's |
+| Metal | 0.74 | 0.57 | 0.72 | RM, mild steel on mild steel; PAL, a mild steel ball on a mild steel plate, 0.72 at the slow end of 55 to 118 in/s, falling to 0.64 |
+| Fence | 0.74 | 0.57 | 0.72 | as Metal: galvanised mild steel, and every other figure of its row is Metal's |
 | Aluminium | 1.2 | 1.4 | | RM, 1.05 to 1.35 and 1.4: clean aluminium galls, so it slides harder than it starts. RM-E's incline in ordinary air gives 0.57 for the same pair |
 | CastIron | 1.1 | 0.15 | | RM: its graphite lubricates the slide |
 | Copper | 1.0 | | | RM |
@@ -252,9 +255,10 @@ when stage 4 needs it.
 | Titanium | 0.36 | 0.30 | | RM, Ti-6Al-4V on itself, flat on flat |
 | Glass | 0.95 | 0.4 | 0.93 | RM, 0.9 to 1.0 and 0.4; TANG, glass beads onto a glass plate, 0.926 |
 | LaminatedGlass | 0.95 | 0.4 | | as Glass: its faces are float glass. Its restitution is the interlayer's as well, and unmeasured |
-| Concrete | | 0.65 | | RM-C, cement on cement blocks |
+| Concrete | | 0.65 | 0.60 | RM-C, cement on cement blocks; BEN, a steel ball bearing on a concrete floor, 0.597 (the floor's loss, the ball's small) |
 | Brick | | 0.68 | | RM-C gives brick on brick twice, 0.7 and 0.65: the mean |
 | Granite | | 0.6 | | RM-C |
+| Tile | | | 0.82 | Q96, vitrified floor tiles on a concrete bed under a 19 mm steel ball, 0.73 to 0.91: the middle |
 | Wood | 0.38 | | | RM, wood on clean wood 0.25 to 0.5 |
 | Oak | 0.62 | 0.48 | | RM, along the grain (across it 0.54 and 0.32) |
 | Acrylic | 0.8 | | | RM, Plexiglas on Plexiglas |
@@ -267,15 +271,21 @@ when stage 4 needs it.
 | Ice | 0.3 | 0.035 | | ETB, ice on ice at -12 C; the table's ice is near -10 C |
 
 Empty, with no measurement of the material on itself found: StainlessSteel, Brass, Bronze, Marble, Sandstone,
-Tile, Pine, Maple, Plywood, MDF, Plastic, PVC, Polycarbonate, BootRubber, Foam, Leather, Skin, Audience, Carpet,
+Pine, Maple, Plywood, MDF, Plastic, PVC, Polycarbonate, BootRubber, Foam, Leather, Skin, Audience, Carpet,
 Foliage, Fabric, Grass, Asphalt, Snow, Plaster, AcousticTile, GlassWool and Generic; and every restitution but
-glass's. Water is a liquid, and None is no material: they have neither. The soils' figures are a mass of the soil
+Glass's, Metal's (and Fence's), Concrete's and Tile's. Carpet, asphalt, plaster, brick and granite have no
+floor measurement either, and their restitution is the unmeasured fallback (0.1): a dull knock, not a bounce.
+Water is a liquid, and None is no material: they have neither. The soils' figures are a mass of the soil
 sheared on itself (the tangent of its drained friction angle), so they have no separate sliding figure.
 
 Restitution was the harder search. It is not one number for a material: it falls with speed once the contact
 yields (from well under a metre a second for mild steel), and a sphere on a thin plate loses energy to the plate
-(Sondergaard, Chaney and Brennen, J. Appl. Mech. 57 (1990) 694). Published measurements are mostly of a sphere
-on another material (glass on granite, brass or rubber blocks), which the rule cannot use.
+(Sondergaard, Chaney and Brennen, J. Appl. Mech. 57 (1990) 694). Published measurements are mostly of a sphere on
+another material (glass on granite, brass or rubber blocks), so they are not a material's figure against itself.
+For a **floor**, a hard ball on it is the measurement: the floor is the lossier body, the ball's loss is small,
+and the figure is the floor's own; concrete and tile are measured that way, and the figure is used as the floor's
+value. Mild steel is measured against itself (PAL). Carpet, asphalt, plaster, brick, granite and the woods have no
+such measurement here, and are left empty.
 
 Sources, on the lines of `AcousticRegistry.AddContact`:
 
@@ -290,6 +300,14 @@ Sources, on the lines of `AcousticRegistry.AddContact`:
   and Minnesota DOT, Pavement Design (2007).
 - TANG: Tang, Song, Dong and Song, "Measurement of restitution and friction coefficients for granular particles
   and discrete element simulation for the tests of glass beads", Materials 12 (2019) 3170, table 3.
+- PAL: Palazzolo, "Influence of Temperature and Impact Velocity on the Coefficient of Restitution", NASA NTRS
+  19950004401, reporting Groper's mild steel ball on a mild steel plate: 0.72 at the slow end of 55 to 118 in/s,
+  falling to 0.64, at room temperature.
+- BEN: Bennett and Meepagala, "Coefficients of Restitution", The Physics Factbook (2005): a steel ball bearing
+  (0.597), a wooden ball (0.603) and a glass marble (0.658) dropped 92 cm on a concrete floor. The steel ball's
+  0.60 is the floor's own loss with the ball's small loss in it.
+- Q96: Qualicer 96, "Determination of impact resistance by measurement of coefficient of restitution", table 1:
+  vitrified floor tiles on a concrete bed, a 19 mm (3/4 in) steel ball, 0.73 to 0.91; the middle 0.82.
 
 The figures checked at those pages; the original handbooks were not opened. Marks' Standard Handbook for
 Mechanical Engineers (table 3.2.1) is recalled to hold the same metal, glass and oak figures, but was not checked.

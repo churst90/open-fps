@@ -49,24 +49,30 @@ public sealed partial class BodyWorld
     private readonly SortedDictionary<(int Body, int Other), ContactEvent> _live = new();
     private bool _reporting;
 
-    /// <summary>Whether the solver's contacts are collected. Off, the world does exactly what it did before.</summary>
+    /// <summary>Whether the solver's contacts are collected and delivered. Off, the listener still sets the pair's
+    /// restitution, but nothing is collected.</summary>
     public bool ReportContacts
     {
         get => _reporting;
-        set
-        {
-            if (_reporting == value) return;
-            if (value) { _system.OnContactAdded += _onAdded; _system.OnContactPersisted += _onPersisted; }
-            else { _system.OnContactAdded -= _onAdded; _system.OnContactPersisted -= _onPersisted; }
-            _reporting = value;
-        }
+        set => _reporting = value;
     }
 
     private void OnContactAdded(PhysicsSystem system, in Body body1, in Body body2, in ContactManifold manifold, ref ContactSettings settings)
-        => Collect(body1, body2, manifold);
+    {
+        Combine(ref settings, body1, body2);
+        if (_reporting) Collect(body1, body2, manifold);
+    }
 
     private void OnContactPersisted(PhysicsSystem system, in Body body1, in Body body2, in ContactManifold manifold, ref ContactSettings settings)
-        => Collect(body1, body2, manifold);
+    {
+        Combine(ref settings, body1, body2);
+        if (_reporting) Collect(body1, body2, manifold);
+    }
+
+    // Jolt's default pair rule takes the larger of the two restitutions. The table's takes the smaller: the energy
+    // lost is lost in both bodies, so a pair cannot rebound better than its lossier member against itself.
+    private static void Combine(ref ContactSettings settings, in Body body1, in Body body2)
+        => settings.CombinedRestitution = MathF.Min(body1.Restitution, body2.Restitution);
 
     // Runs inside the step, perhaps on a job thread: it only reads the two bodies and appends under a lock.
     private void Collect(Body body1, Body body2, ContactManifold m)

@@ -73,7 +73,8 @@ public class DroppedThingsTests : IDisposable
     {
         using var f = new Fixture(_dir);
         var player = f.Player(new Vector3(0f, f.Floor(0f, 10f), 10f));
-        // Glass on concrete: the table's one measured restitution, 0.93, so it really bounces.
+        // Glass 0.93 on concrete 0.60: the pair takes the lossier, 0.60, so it really bounces, less than glass on
+        // glass would.
         var item = f.Item("Bottle", player, massKg: 0.5f, material: "Glass");
         Assert.True(f.Hands.Take(player, "", out string message), message);
         f.TickParent();
@@ -87,6 +88,47 @@ public class DroppedThingsTests : IDisposable
         float secondKnock = impacts[1].Sounds.First(s => s.Character == SoundCharacter.Knock).LevelDb;
         Assert.True(secondKnock < firstKnock, $"the second impact was {secondKnock:F2} dB against the first's {firstKnock:F2} dB");
         Assert.True(impacts[1].Contact.ClosingSpeed < impacts[0].Contact.ClosingSpeed);
+    }
+
+    [Fact]
+    public void ACarpetBounceIsLowerThanAConcreteOneAndNoBounceRisesHigherThanItsFall()
+    {
+        using var concrete = new Fixture(_dir);
+        var cp = concrete.Player(new Vector3(0f, concrete.Floor(0f, 10f), 10f));
+        var ci = concrete.Item("Bottle", cp, massKg: 0.5f, material: "Glass");
+        Assert.True(concrete.Hands.Take(cp, "", out string message), message);
+        concrete.TickParent();
+        float cHandY = concrete.World.Get<Transform>(ci).Position.Y;
+        float cFloor = concrete.Geometry.FloorAt(0f, 10f, 100f, GeometryLayers.Ground, ref concrete.Any, out _);
+        float cHalf = concrete.World.Get<ColliderComponent>(ci).Size.Y * 0.5f;
+        Assert.True(concrete.Hands.Drop(cp, "", out message, concrete.Heard), message);
+        var cFirst = concrete.RunUntilRest(ci, out _);
+        Assert.NotNull(cFirst);
+        Assert.True(concrete.Imps.Count >= 2, $"{concrete.Imps.Count} contact(s) on concrete");
+        float cSecond = concrete.Imps[1].Contact.ClosingSpeed;
+
+        // The first impact at the same speed on both floors; the concrete bounces, the carpet is the fallback's dull
+        // knock and either does not leave the floor again or comes back far slower.
+        using var carpet = new Fixture(_dir);
+        var pp = carpet.Player(new Vector3(-5f, carpet.Floor(-5f, 35f), 35f));
+        var pi = carpet.Item("Bottle", pp, massKg: 0.5f, material: "Glass");
+        Assert.True(carpet.Hands.Take(pp, "", out message), message);
+        carpet.TickParent();
+        Assert.True(carpet.Hands.Drop(pp, "", out message, carpet.Heard), message);
+        var pFirst = carpet.RunUntilRest(pi, out _);
+        Assert.NotNull(pFirst);
+        Assert.Equal(cFirst!.Value.ClosingSpeed, pFirst!.Value.ClosingSpeed, cFirst.Value.ClosingSpeed * 0.05f);
+        float pSecond = carpet.Imps.Count > 1 ? carpet.Imps[1].Contact.ClosingSpeed : 0f;
+        Assert.True(pSecond < cSecond * 0.8f, $"carpet came back at {pSecond:F2} m/s against concrete's {cSecond:F2}");
+
+        // The concrete bounce's rise, from the flight time between its first two contacts, is under the fall.
+        float airtime = (concrete.Imps[1].Tick - concrete.Imps[0].Tick) * BodyWorld.StepSeconds * BodyWorld.StepsPerTick;
+        float rise = 0.5f * concrete.Gravity * (0.5f * airtime) * (0.5f * airtime);
+        float fall = cHandY - (cFloor + cHalf);
+        Assert.True(rise < fall, $"a bounce rose {rise:F2} m after falling {fall:F2} m");
+        // No contact, first or later, meets the floor faster than the fall did: no bounce put energy in.
+        Assert.All(concrete.Imps, imp => Assert.True(imp.Contact.ClosingSpeed <= cFirst.Value.ClosingSpeed * 1.02f,
+            $"a contact at {imp.Contact.ClosingSpeed:F2} m/s against the fall's {cFirst.Value.ClosingSpeed:F2}"));
     }
 
     // ── Throwing ───────────────────────────────────────────────────────────────────────────────
@@ -172,7 +214,7 @@ public class DroppedThingsTests : IDisposable
 
     // ═══ The rig ═══════════════════════════════════════════════════════════════════════════════
 
-    private sealed record Impact(ContactEvent Contact, List<TransientSound> Sounds);
+    private sealed record Impact(int Tick, ContactEvent Contact, List<TransientSound> Sounds);
 
     private sealed class Fixture : IDisposable
     {
@@ -267,7 +309,7 @@ public class DroppedThingsTests : IDisposable
             var thisTick = _heard.Where(h => h.Tick == tick).SelectMany(h => h.Sounds).ToList();
             foreach (var e in contacts.Events)
                 if (e.Phase == ContactPhase.Began && BodyWorld.IsContactId(e.Body))
-                    Imps.Add(new Impact(e, thisTick));
+                    Imps.Add(new Impact(tick, e, thisTick));
         }
 
         /// <summary>Runs the map's body world until the item is out of it; returns its first contact.</summary>

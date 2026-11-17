@@ -126,10 +126,12 @@ public struct MaterialProperties
     /// this section between its rails. Null for anything solid.</summary>
     public PaleSection? Pales { get; set; }
 
-    // ── What it does at a contact (docs/MATTER.md 2.4, "Friction and restitution"). Nothing reads these yet: physics
-    // stage 4 will, for every contact. Each is the material against itself, clean and dry, so the pair rule (friction
-    // the geometric mean of the two, restitution the larger) gives a measured like-on-like pair back exactly. Null
-    // where no measurement was found: a reader must not take null as zero.
+    // ── What it does at a contact (docs/MATTER.md 2.4, "Friction and restitution"). Physics stage 4 reads these for
+    // every contact. A body's figures are the material against itself, clean and dry; a floor's restitution is a hard
+    // ball dropped on it, because a floor is not struck by another floor. The pair rule is the geometric mean of the
+    // friction and the smaller of the restitutions: the energy lost is lost in both bodies, so a pair cannot rebound
+    // better than its lossier member against itself. Null where no measurement was found: a reader must not take null
+    // as zero.
 
     /// <summary>Coefficient of static friction against itself, clean and dry; null where none was found.</summary>
     public float? StaticFriction { get; set; }
@@ -767,6 +769,14 @@ public static class AcousticRegistry
     ///         (1991); and Minnesota DOT, Pavement Design (2007). A soil sheared on itself: mu = tan(phi), static only.
     ///   TANG  Tang, Song, Dong and Song, "Measurement of restitution and friction coefficients for granular particles...",
     ///         Materials 12 (2019) 3170, doi:10.3390/ma12193170, table 3: glass beads thrown onto a glass plate, 0.926.
+    ///   PAL   Palazzolo, "Influence of Temperature and Impact Velocity on the Coefficient of Restitution", NASA NTRS
+    ///         19950004401, reporting Groper's mild steel ball on a mild steel plate: 0.72 at the slow end of the 55 to
+    ///         118 in/s tested, falling to 0.64, at room temperature.
+    ///   BEN   Bennett and Meepagala, "Coefficients of Restitution", The Physics Factbook (2005): a steel ball bearing
+    ///         (0.597), a wooden ball (0.603) and a glass marble (0.658) dropped 92 cm on a concrete floor. The steel
+    ///         ball's is the floor's own loss with the ball's small loss in it.
+    ///   Q96   Qualicer 96, "Determination of impact resistance by measurement of coefficient of restitution", table 1:
+    ///         vitrified floor tiles on a concrete bed, a 19 mm (3/4 in) steel ball, 0.73 to 0.91; the middle 0.82.
     /// </summary>
     private static void AddContact(Dictionary<string, MaterialProperties> reg)
     {
@@ -778,10 +788,11 @@ public static class AcousticRegistry
             p.Restitution = restitution;
             reg[name] = p;
         }
-        // Metals. Mild steel on mild steel 0.74, sliding 0.57 (RM).
-        Set("Metal", 0.74f, 0.57f);
-        // A palisade is galvanised mild steel, and every other figure of its row is mild steel's (RM as Metal).
-        Set("Fence", 0.74f, 0.57f);
+        // Metals. Mild steel on mild steel 0.74, sliding 0.57 (RM); a mild steel ball on a mild steel plate rebounds at
+        // 0.72 at the slow end (PAL).
+        Set("Metal", 0.74f, 0.57f, 0.72f);
+        // A palisade is galvanised mild steel, and every other figure of its row is mild steel's (RM as Metal; PAL).
+        Set("Fence", 0.74f, 0.57f, 0.72f);
         // Aluminium on aluminium 1.05-1.35, sliding 1.4 (RM): clean aluminium galls, so it slides harder than it starts.
         // RM-E's incline gives 0.57 for the same pair in ordinary air: the spread is real, and the clean figure is kept.
         Set("Aluminium", 1.2f, 1.4f);
@@ -798,12 +809,16 @@ public static class AcousticRegistry
         // 0.926 (TANG). Laminated glass's faces are float glass; its restitution is the interlayer's too, and unmeasured.
         Set("Glass", 0.95f, 0.4f, 0.93f);
         Set("LaminatedGlass", 0.95f, 0.4f);
-        // Cement on cement blocks, sliding 0.65 (RM-C).
-        Set("Concrete", null, 0.65f);
+        // Cement on cement blocks, sliding 0.65 (RM-C). A hard ball on a concrete floor rebounds at 0.60 (BEN); a
+        // floor's own loss, the ball's being small.
+        Set("Concrete", null, 0.65f, 0.60f);
         // Brick on brick, sliding, given twice: 0.7 and 0.65 (RM-C); the mean.
         Set("Brick", null, 0.68f);
         // Granite on granite, sliding 0.6 (RM-C).
         Set("Granite", null, 0.6f);
+        // A vitrified floor tile under a 19 mm steel ball rebounds at 0.73 to 0.91 (Q96); the middle 0.82. A floor's
+        // own loss, as concrete's is, not a tile on a tile.
+        Set("Tile", null, null, 0.82f);
 
         // Wood. Wood on clean wood 0.25-0.5 (RM). Oak on oak along the grain 0.62, sliding 0.48 (RM).
         Set("Wood", 0.38f, null);

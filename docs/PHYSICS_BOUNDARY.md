@@ -2471,7 +2471,8 @@ Jolt is in and the body API stands; no game system uses it, so nothing heard mov
 - Measured: Jolt damps linear motion by 0.05 per second by default, which gave -9.563 m/s^2 instead of -9.807 in
   a fall; it is set to 0. `BodyCreationSettings.MotionQuality` has a broken setter in 2.22.0 and is not used.
   A mesh shape cannot be dynamic (Jolt has none). Unmeasured materials take friction 0.5 and restitution 0.1;
-  Jolt's pair rule (geometric mean of friction, larger restitution) is the table's.
+  Jolt's pair rule (geometric mean of friction, larger restitution) was the table's until step 7, which made
+  restitution the smaller (18.11) and sets it in the contact listener.
 - The PhysicsBoundary guard now fails on any file outside `OpenFPS.Physics` (and the trial spike) that names
   Jolt; a test breaks the rule on purpose and sees it fail.
 - The wire hash moves from 54ce2252ff38 to 59dd0b1e4b31 (the new package reference), so the server and the
@@ -2549,9 +2550,9 @@ Tests only (`BodyWorldAnalyticTests`, 31 cases): `BodyWorld` against closed-form
 not agree with was the step.
 
 - Restitution is exact in speed: a ball leaves at e times the speed it arrived at, 0.50000, 0.80000, 0.93000 and
-  0.20000 to five places over twelve drop heights each, and the pair rule holds (ball 0.8 on floor 0.3, and the
-  reverse, both bounce at 0.8; glass on glass through `ContactMaterial.Of` is 0.93, the table's one measured
-  restitution).
+  0.20000 to five places over twelve drop heights each, and the pair rule held at build time as the larger of the two (ball 0.8 on floor 0.3, and the
+  reverse, both bounced at 0.8; step 7 changed it to the smaller and the test now expects 0.3 both ways); glass on
+  glass through `ContactMaterial.Of` is 0.93.
 - Heights are not exact, by the step. Jolt makes contacts ahead of touching within 2 cm (its default speculative
   distance) and a ball at 6 m/s moves 5 cm a step. A ball that ends a step within 2 cm of the floor is turned back
   there, early; one that was farther goes into the floor (31 mm at 6.3 m/s) and is turned back from there. The
@@ -2634,8 +2635,9 @@ is still JoltPhysics.Native 1.1.0, the 2.22.0 `BodyCreationSettings.MotionQualit
 reads back as set; the body interface's `SetMotionQuality` remains the one to use), and `BodyWorldTests`,
 `BodyWorldAnalyticTests`, `PieceBodiesTests` and `BodyContactsTests` pass unchanged (72, and 79 with the
 PhysicsBoundary guard). The analytic same-scene result is the same: those tests compare runs, not a stored hash. The
-wire hash moved from 262885684b9c to 888f6b8368f9 with the package reference, so the server and the Windows client
-deploy together; the door fingerprint stays 3a8a8e7b91ab.
+wire hash moved from 262885684b9c to 888f6b8368f9 with the package reference, and this fix edits Materials (the
+floor restitutions), so it moved again to 33911a144326; the server and the Windows client deploy together. The door
+fingerprint stays 3a8a8e7b91ab.
 
 **The server's worlds.** `BodyWorldSystem` (`OpenFPS.Server/Systems/BodyWorldSystem.cs`) gives each loaded map one
 `BodyWorld` at the map's own gravity (`PhysicsConstants.GravityOf`), one `PieceBodies`, and one below-normal-priority
@@ -2663,8 +2665,8 @@ The box is the item's own declared dimensions when it has a collider, else a cub
 material's density: one rule for every item and no table of sizes by name. A 5 kg crowbar is then an 86 mm cube of
 steel, a 3.3 kg rifle a 172 mm cube of wood, a 0.9 kg pistol a 94 mm cube of plastic, and a 0.4 kg torch a 71 mm cube:
 lumps of their stuff, not their shapes, and the honest consequence of every shipped item declaring a mass, a material
-and no size. Friction and restitution come from `ContactMaterial.Of` (kinetic friction, measured restitution, Jolt's
-pair rule). The Transform follows the body while it moves, so a client hears it where it is, and the item's `Velocity`
+and no size. Friction and restitution come from `ContactMaterial.Of` (kinetic friction and measured restitution; a pair
+takes the smaller restitution, 18.11). The Transform follows the body while it moves, so a client hears it where it is, and the item's `Velocity`
 is the body's; when Jolt puts the body to sleep (its own half second under its sleep speed, 18.9) the body and its
 shape leave the world and the item lies where it stopped, so pick-up and everything else that reads its Transform is
 unchanged. A corpse is still set down by `BodyFall` (step 9), untouched. The message is unchanged and immediate.
@@ -2674,8 +2676,19 @@ with the contact's closing speed, the moving body as the hitter and the other th
 the contact (the floor's from the tile's triangle or piece it hit, not `PhysicsUtils.GetGroundHeight`). The threshold
 is the impact law's own: `ImpactAcoustics.MinimumSpeed`, 0.4 m/s, "a scuff, not an event"; at the lightest shipped
 item (a 0.4 kg torch) that is 59 dB at a metre, and `Between` returns no sound below it. A bounce makes a second,
-quieter impact because the body really bounced: in the lab a 0.5 kg glass bottle on concrete made 11 impacts over
-8.27 s, each lower than the one before.
+quieter impact because the body really bounced.
+
+The pair's restitution is the smaller of the two, not Jolt's own larger: the energy lost in an impact is lost in
+both bodies, so a pair cannot rebound better than its lossier member against itself (docs/MATTER.md 2.4; the test
+that used to expect the larger now expects the smaller). A body's figure is the material against itself; a floor's
+is a hard ball dropped on it, because a floor is not struck by another floor. Concrete is 0.60 (BEN: a steel ball
+on a concrete floor, 0.597), tile 0.82 (Q96: vitrified floor tiles under a 19 mm steel ball, 0.73 to 0.91, the
+middle), mild steel 0.72 (PAL: mild steel on mild steel, 0.72 at the slow end); wood, carpet, brick, granite,
+asphalt and plaster have no such measurement and take the 0.1 fallback. A 0.5 kg glass bottle (0.93) therefore
+bounces at 0.60 on concrete, 0.72 on metal, and not at all on wood or carpet: in the lab it made four impacts on
+concrete over 4.50 s, one on wood and one on carpet, and six on metal over 5.13 s. The concrete second impact is
+2.0 dB under the first in peak (4.3 dB in the knock's level at a metre) and the third lower again; the fourth is a
+tumbling box meeting a corner a little harder, 1.7 dB over the third and still 2.3 dB under the first.
 
 The other `Between` arguments, read rather than copied: the hitter's mass is the item's. The struck mass is the
 other item's when two moving items meet; for a tile or a door leaf it is a million kilograms, which the law's
@@ -2702,20 +2715,24 @@ concrete, carpet and metal floors in a four-floor scene, and throws the bottle a
 Every impact is the contact's through the same `DroppedThings.Impact` the server uses, rendered through the shipped
 hearing's placement (compression 0.45) with `TransientSynth`, and beside each is the old scripted drop of the same
 item, floor and height, one impact at once at sqrt(2gh). 28 files in `~/.cache/openfps-build/drops/renders/`, 14 new
-and 14 old, each with its peak and RMS printed: none clips and none holds a non-finite sample. The glass bottle on
-concrete is 8.27 s with 11 impacts (the first at 0.467 s), peak -14.5 dBFS, RMS -39.3; the old one is 3.00 s with
-one impact at 0.000, peak -14.4, RMS -42.7. The wooden block on wood: one impact at 0.467 s, peak -11.8, against the
-old -11.7. The crowbar on metal: peak -9.9 both, one impact at 0.500 s. A thrown bottle on concrete: one impact at
-0.267 s, peak -14.1, against the old hand-height drop's -14.4; a thrown crowbar on wood: one at 0.367 s, peak -9.6
+and 14 old, each with its peak and RMS printed and every impact's time, knock level at a metre and its own peak:
+none clips and none holds a non-finite sample. The glass bottle on concrete is 4.50 s with four impacts: 0.467 s at
+-14.5 dBFS (81.6 dB at a metre), 1.067 at -16.5, 1.433 at -18.5 and 1.500 at -16.8; peak -14.5, RMS -40.7. The old
+one is 3.00 s with one impact at 0.000, peak -14.4, RMS -42.7. On wood: one impact at 0.467, -14.5 (RMS -44.9); on
+carpet: one at 0.467, -14.5 (RMS -53.6); on metal: six, 0.467 to 2.133, the first -14.5 and the second -15.8. The
+wooden block on every floor: one impact at 0.467, -11.8. The crowbar on concrete: five, 0.500 to 1.833, -9.9 to
+-17.4; on metal: four, 0.500 to 2.133, -9.9 to -13.8; on wood and carpet: one at -9.9. A thrown bottle on concrete:
+one impact at 0.267, -14.1, against the old hand-height drop's -14.4; a thrown crowbar on wood: one at 0.367, -9.6
 against -9.9. The new files hold the fall's silence before the first contact and the bounces after it, which is what
 the old script cannot.
 
-**Tests** (`DroppedThingsTests`, 5): a 5 kg crowbar from the hand's 1.3 m first hits within 5 % of sqrt(2gh), rests
+**Tests** (`DroppedThingsTests`, 6): a 5 kg crowbar from the hand's 1.3 m first hits within 5 % of sqrt(2gh), rests
 with its bottom on the `FloorAt` floor and leaves the body world; glass on concrete makes a second, quieter impact;
-looking up throws up and looking down throws down; the release speed is the law and 25 kg and over says too heavy;
-the tick with 1, 10 and 50 moving items is measured. The classes that use `HandsService`, the command catalog and
-the physics tests ran beside them (248 and 282 tests) and the four body/contact classes and the PhysicsBoundary
-guard passed again (79). The engine packages survey's `files.tsv` ratchet gains the two new server systems (628 to
+the same bottle on carpet bounces lower than on concrete, its first bounce rises less than the fall it came from,
+and no contact meets the floor faster than the fall did; looking up throws up and looking down throws down; the
+release speed is the law and 25 kg and over says too heavy; the tick with 1, 10 and 50 moving items is measured. The
+classes that use `HandsService`, the command catalog and the physics tests ran beside them (249 and 282 tests) and
+the four body/contact classes and the PhysicsBoundary guard passed again (79). The engine packages survey's `files.tsv` ratchet gains the two new server systems (628 to
 630 files); the sound boundary's ratchets do not move (0 crossings, 6,956 layering, 355 statics, 0 unsorted).
 
 **Heard.** Only item drops and throws move, because they are real now: the stored streams hold no item drop (the

@@ -1529,7 +1529,8 @@ are the likely ones), and otherwise after it; stage 2 follows physics stage 2.
    would hold stuff as well as shape.
 2. **Friction and restitution.** Recommended: one value of each per material, with a published source, combined
    for a pair by a stated rule (friction the geometric mean, restitution the larger, which is what Jolt does by
-   default [recalled]), and a short table of measured pairs where the rule is wrong (rubber on asphalt, ice, the
+   default [recalled]; the restitution became the smaller on 2026-11-17, docs/PHYSICS_BOUNDARY.md 18.11), and a
+   short table of measured pairs where the rule is wrong (rubber on asphalt, ice, the
    tyre surfaces `RoadSurfaces` has now). Alternative: a full table of pairs; about fifty materials make over
    1,300 pairs, and most would have no source.
 3. **Where the catalogue sits.** Recommended: above Sound and Physics, a typed catalogue that hands out their

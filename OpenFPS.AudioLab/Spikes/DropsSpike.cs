@@ -68,7 +68,7 @@ public static class DropsSpike
 
     private static int Render(string outDir, HearingSettings hearing)
     {
-        Console.WriteLine("  file                                      secs   peak   rms  clip  nan  impact(s) at (s)");
+        Console.WriteLine("  file                                      secs   peak   rms  clip  nan  impact(s) at (s:knock dB/peak dBFS)");
         int bad = 0, n = 0;
 
         // One item at a time on each floor, so nothing meets another item and each fall is heard alone.
@@ -82,6 +82,17 @@ public static class DropsSpike
                 string stem = $"{n:00}-new-{Slug(item.Name)}-on-{Slug(material)}";
                 var pcm = Mix(flight.Impacts, hearing, out var times);
                 bad += Write(outDir, stem + ".wav", pcm, times);
+                if (item.Name.Contains("bottle"))
+                {
+                    var knocks = flight.Impacts.Select(i => i.Sounds.Where(x => x.Character == SoundCharacter.Knock)
+                                                                    .Select(x => (float?)x.LevelDb).FirstOrDefault())
+                                               .Where(v => v is not null).Select(v => v!.Value).ToList();
+                    if (knocks.Count >= 2 && knocks[1] >= knocks[0])
+                    {
+                        Console.WriteLine($"  FAIL: {stem}: the second impact is {knocks[1]:F1} dB against the first's {knocks[0]:F1}");
+                        bad++;
+                    }
+                }
 
                 var old = OldScript(item, material, start);
                 string oldStem = $"{n:00}-old-{Slug(item.Name)}-on-{Slug(material)}";
@@ -169,29 +180,39 @@ public static class DropsSpike
         return sounds.Count == 0 ? new List<ImpactAt>() : new List<ImpactAt> { new(0f, sounds) };
     }
 
-    /// <summary>Every impact's transients at their contact times, each at the level the shipped hearing places it.</summary>
-    private static float[] Mix(List<ImpactAt> impacts, HearingSettings hearing, out List<float> times)
+    /// <summary>Every impact's transients at their contact times, each at the level the shipped hearing places it.
+    /// The times also carry the impact's knock level at a metre and the peak of its own transients, dBFS.</summary>
+    private static float[] Mix(List<ImpactAt> impacts, HearingSettings hearing, out List<(float Time, float KnockDb, float PeakDb)> times)
     {
-        times = impacts.Select(i => i.Time).ToList();
         float end = impacts.Count == 0 ? 0.5f : impacts.Max(i => i.Time) + 3f;
         var mix = new float[(int)(end * Rate)];
+        var peaks = new float[impacts.Count];
         int seed = 1;
-        foreach (var impact in impacts)
+        for (int k = 0; k < impacts.Count; k++)
         {
+            var impact = impacts[k];
             int offset = (int)(impact.Time * Rate);
             foreach (var sound in impact.Sounds)
             {
                 var pcm = TransientSynth.Render(sound, seed++);
                 float gain = hearing.Place(sound.LevelDb).Gain;
                 int at = offset + (int)(sound.DelaySeconds * Rate);
-                for (int i = 0; i < pcm.Length && at + i < mix.Length; i++) mix[at + i] += pcm[i] * gain;
+                for (int i = 0; i < pcm.Length && at + i < mix.Length; i++)
+                {
+                    mix[at + i] += pcm[i] * gain;
+                    peaks[k] = MathF.Max(peaks[k], MathF.Abs(pcm[i] * gain));
+                }
             }
         }
+        times = impacts.Select((i, k) => (i.Time,
+            i.Sounds.Where(x => x.Character == SoundCharacter.Knock).Select(x => x.LevelDb)
+                    .DefaultIfEmpty(i.Sounds.Count > 0 ? i.Sounds.Max(x => x.LevelDb) : 0f).First(),
+            20f * MathF.Log10(MathF.Max(1e-9f, peaks[k])))).ToList();
         return mix;
     }
 
     /// <summary>Writes one file, measures it, and prints its line. True when it clips or holds a non-finite sample.</summary>
-    private static int Write(string outDir, string name, float[] pcm, List<float> times)
+    private static int Write(string outDir, string name, float[] pcm, List<(float Time, float KnockDb, float PeakDb)> times)
     {
         float peak = 0f;
         double sum = 0;
@@ -207,7 +228,7 @@ public static class DropsSpike
         float peakDb = 20f * MathF.Log10(MathF.Max(1e-9f, peak));
         float rmsDb = 10f * MathF.Log10(MathF.Max(1e-12f, (float)(sum / Math.Max(1, pcm.Length))));
         File.WriteAllBytes(Path.Combine(outDir, name), WeaponSynth.ToWav16(pcm, Rate));
-        string at = string.Join(", ", times.Select(t => t.ToString("0.000", CultureInfo.InvariantCulture)));
+        string at = string.Join(", ", times.Select(t => $"{t.Time.ToString("0.000", CultureInfo.InvariantCulture)}:{t.KnockDb.ToString("0.0", CultureInfo.InvariantCulture)}/{t.PeakDb.ToString("0.0", CultureInfo.InvariantCulture)}"));
         Console.WriteLine($"  {name,-42} {pcm.Length / (float)Rate,4:F2} {peakDb,6:F1} {rmsDb,6:F1} {clip,4} {nan,3}  {at}");
         return clip > 0 || nan > 0 ? 1 : 0;
     }

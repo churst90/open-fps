@@ -53,8 +53,8 @@ public class BodyWorldAnalyticTests
     [Theory]
     [InlineData(0.93f, 0.93f, 0.93f)]      // the size of glass on glass, the table's one measured restitution (TANG)
     [InlineData(0.5f, 0.5f, 0.5f)]
-    [InlineData(0.8f, 0.3f, 0.8f)]         // Jolt's pair rule is the larger of the two: ball larger
-    [InlineData(0.3f, 0.8f, 0.8f)]         // floor larger
+    [InlineData(0.8f, 0.3f, 0.3f)]         // the table's pair rule is the smaller of the two: the floor lossier
+    [InlineData(0.3f, 0.8f, 0.3f)]         // the ball lossier
     public void BounceHeightsFallByTheSquareOfRestitution(float ballE, float floorE, float e)
     {
         using var w = new BodyWorld();
@@ -62,9 +62,11 @@ public class BodyWorldAnalyticTests
         const float h0 = 2f, radius = 0.1f;
         int ball = w.Add(w.AddSphere(radius), BodyMotion.Dynamic, new Vector3(0f, h0 + radius, 0f), Upright, "Metal", 1f);
         w.SetRestitution(ball, ballE);
-        var apexes = Apexes(w, ball, 3);
-        Assert.Equal(3, apexes.Count);
-        for (int n = 0; n < 3; n++)
+        // A lossier pair stops bouncing sooner: at e 0.3 even the second arrival is under Jolt's restitution speed.
+        int want = e < 0.4f ? 1 : 3;
+        var apexes = Apexes(w, ball, want);
+        Assert.Equal(want, apexes.Count);
+        for (int n = 0; n < apexes.Count; n++)
         {
             float expected = h0 * MathF.Pow(e, 2f * (n + 1));
             float height = apexes[n] - radius;

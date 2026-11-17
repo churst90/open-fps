@@ -137,7 +137,7 @@ public class PieceBodiesTests
         int east = w.Add(w.AddSphere(0.2f), BodyMotion.Dynamic, new Vector3(375f, 1f, 125f), Quaternion.Identity, "Metal", 5f);
         int west = w.Add(w.AddSphere(0.2f), BodyMotion.Dynamic, new Vector3(125f, 1f, 125f), Quaternion.Identity, "Metal", 5f);
         int shapeCount = w.ShapeCount;
-        for (int i = 0; i < 120; i++) w.Step();
+        for (int i = 0; i < 600; i++) w.Step();
         Assert.Equal(0.2f, w.Position(east).Y, Tolerance);
 
         // Streaming takes the east tile out: the world without it.
@@ -148,7 +148,7 @@ public class PieceBodiesTests
         Assert.Equal(shapeCount - 1, w.ShapeCount);
         w.SetPose(east, new Vector3(375f, 1f, 125f), Quaternion.Identity);
         w.SetVelocity(east, Vector3.Zero);
-        for (int i = 0; i < 120; i++) w.Step();
+        for (int i = 0; i < 600; i++) w.Step();
         Assert.True(w.Position(east).Y < -3f, $"the ball stands on a tile that is gone: {w.Position(east)}");
         Assert.Equal(0.2f, w.Position(west).Y, Tolerance);
 
@@ -157,7 +157,7 @@ public class PieceBodiesTests
         Settle(bodies);
         w.SetPose(east, new Vector3(375f, 1f, 125f), Quaternion.Identity);
         w.SetVelocity(east, Vector3.Zero);
-        for (int i = 0; i < 120; i++) w.Step();
+        for (int i = 0; i < 600; i++) w.Step();
         Assert.Equal(0.2f, w.Position(east).Y, Tolerance);
     }
 
@@ -172,13 +172,13 @@ public class PieceBodiesTests
         bodies.Follow(one, p => Prepared(cache, p));
         Settle(bodies);
         int ball = w.Add(w.AddSphere(0.2f), BodyMotion.Dynamic, new Vector3(125f, 1f, 125f), Quaternion.Identity, "Metal", 5f);
-        for (int i = 0; i < 120; i++) w.Step();
+        for (int i = 0; i < 600; i++) w.Step();
         Assert.Equal(0.2f, w.Position(ball).Y, Tolerance);
         bodies.Follow(two, p => Prepared(cache, p));
         Settle(bodies);
         Assert.Equal(1, bodies.TileCount);
         w.SetPose(ball, new Vector3(125f, 1.5f, 125f), Quaternion.Identity);
-        for (int i = 0; i < 120; i++) w.Step();
+        for (int i = 0; i < 600; i++) w.Step();
         Assert.Equal(0.5f + 0.2f, w.Position(ball).Y, Tolerance);
     }
 

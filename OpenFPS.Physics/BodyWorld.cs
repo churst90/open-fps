@@ -28,8 +28,10 @@ public readonly record struct ContactMaterial(float Friction, float Restitution)
     public const float UnmeasuredRestitution = 0.1f;
 
     /// <summary>The material's own values: kinetic friction (a body that is moving is the one that matters), else static,
-    /// and its restitution. Jolt joins two bodies' values as the table's pair rule says: friction the geometric mean,
-    /// restitution the larger.</summary>
+    /// and its restitution. A pair takes the geometric mean of the friction and the smaller of the restitutions
+    /// (docs/MATTER.md 2.4): the energy lost is lost in both bodies, so a pair cannot rebound better than its lossier
+    /// member against itself. Jolt's own combine takes the larger of the restitutions, so
+    /// <see cref="BodyWorld"/> sets the smaller in its contact listener.</summary>
     public static ContactMaterial Of(string? material)
     {
         if (string.IsNullOrEmpty(material)) material = "Generic";
@@ -43,7 +45,7 @@ public readonly record struct ContactMaterial(float Friction, float Restitution)
 /// Rigid bodies, solved (docs/PHYSICS_BOUNDARY.md 18.2, steps 1 and 2): shapes and bodies by our own handles,
 /// poses and velocities in and out as our own types, a step of the world at 120 Hz, and every body read back as a
 /// <see cref="BodyState"/>. Jolt Physics is behind it and nothing outside this project names it (the
-/// PhysicsBoundary guard). No game system uses a world yet.
+/// PhysicsBoundary guard). The server steps one a map (`BodyWorldSystem`); the lab and the tests use it too.
 ///
 /// Gravity is the world's: a value given in, <see cref="Earth.StandardGravity"/> unless told otherwise, never a
 /// constant here. Stepping is on the calling thread alone (no worker threads), so a scene run twice gives the same
@@ -129,6 +131,10 @@ public sealed partial class BodyWorld : IDisposable
         Gravity = gravity;
         _onAdded = OnContactAdded;
         _onPersisted = OnContactPersisted;
+        // The listener is always on: it sets the pair's restitution (the table's smaller, where Jolt's own combine
+        // would take the larger) whether or not contacts are being reported.
+        _system.OnContactAdded += _onAdded;
+        _system.OnContactPersisted += _onPersisted;
     }
 
     /// <summary>Metres per second squared, downward; read from the solver, not remembered.</summary>
@@ -460,6 +466,8 @@ public sealed partial class BodyWorld : IDisposable
         }
         _bodies.Clear();
         _byJolt.Clear();
+        _system.OnContactAdded -= _onAdded;
+        _system.OnContactPersisted -= _onPersisted;
         ReportContacts = false;
         foreach (var shape in _shapes.Values) shape.Dispose();
         _shapes.Clear();

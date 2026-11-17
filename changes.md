@@ -26,18 +26,23 @@ Recent work, newest first. `git log` has the rest.
   and a steady tick is 0.107 ms). `/drop` lets an item go with the holder's velocity as a box of its declared size
   or of its mass and material density; its Transform follows the body and it leaves the world when Jolt puts it to
   sleep, so pick-up is unchanged. Each beginning contact at or above `ImpactAcoustics.MinimumSpeed` makes one
-  `ImpactAcoustics.Between` impact, at the closing speed and both materials, the floor's from the tile it hit; a
-  bounce is a second, quieter impact because it really bounced. `/throw` (aliases hurl, toss) throws along the look,
+  `ImpactAcoustics.Between` impact, at the closing speed and both materials, the floor's from the tile it hit; the
+  pair's restitution is the smaller of the two (Jolt's own combine takes the larger), so a pair cannot rebound
+  better than its lossier member: concrete 0.60, tile 0.82 and mild steel 0.72 now have measured figures, wood and
+  carpet have none and take the 0.1 fallback. A bounce is a second, quieter impact because it really bounced.
+  `/throw` (aliases hurl, toss) throws along the look,
   pitch included, at Cross's measured power law v = 11.0 m^-0.2 (Am. J. Phys. 72(3) 305-312, 2004); 25 kg and over
   says too heavy; no key is bound. AudioLab `--drops` renders 12 drops and 2 throws beside the old scripted drop of
   each (28 files in `~/.cache/openfps-build/drops/renders/`, at the shipped hearing's level, none clipping): the
-  glass bottle on concrete is 8.27 s and 11 impacts against the old one impact, the first impact's level and the
-  item's mass and material agreeing between old and new. No stored stream or render holds an item drop (the only
-  drops in them are raindrops), so none moved. Wire hash `888f6b8368f9` (was `262885684b9c`), so the server and the
-  Windows client deploy together; the door fingerprint is unchanged (`3a8a8e7b91ab`), so no door render is made
-  again. Ratchets: engine packages 630 files (two new server systems), 10 crossings; sound boundary 0 crossings,
-  6,956 layering, 355 statics, 0 unsorted. Guards: physics 79, HandsService and command classes 530, engine
-  packages and library boundary 35. Hints for step 8 in 18.11. Built by DeepSeek through OpenCode.
+  glass bottle on concrete is 4.50 s and four impacts (0.467 s at -14.5 dBFS, 1.067 at -16.5, 1.433 at -18.5,
+  1.500 at -16.8) against the old one impact at 0.000 and -14.4; on wood and carpet it is one impact, on metal six.
+  The first impact's level and the item's mass and material agree between old and new. No stored stream or render
+  holds an item drop (the only drops in them are raindrops), so none moved. Wire hash `33911a144326` (was
+  `888f6b8368f9`; the floor restitutions edit Materials, which is hashed), so the server and the Windows client
+  deploy together; the door fingerprint is unchanged (`3a8a8e7b91ab`), so no door render is made again. Ratchets:
+  engine packages 630 files (two new server systems), 10 crossings; sound boundary 0 crossings, 6,956 layering,
+  355 statics, 0 unsorted. Guards: physics 79, HandsService and command classes 531, engine packages and library
+  boundary 35. Hints for step 8 in 18.11. Built by DeepSeek through OpenCode.
 
 ## 2026-10-24
 
