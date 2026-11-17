@@ -2125,6 +2125,25 @@ Materials, Acoustics, Sound but its `Core/`, Schema, Physics, Environment, Model
 their files moves it. It went from 053dd7700918 to f9e12325a5f2 with no change to the wire, and the server and the
 Windows client go out together. The door fingerprint stays 3a8a8e7b91ab.
 
+**Built: change A, the sound's brake from its tyres (2026-11-17).** `Driveline.MaxBrake` is
+`Brakes.Capacity(VehicleProfile.Tyres.Mechanics, Earth.StandardGravity)`, set in the constructor, not a settable
+number: one Driveline is one car, so every caller gets its own tyres' brake and none can give it another. The old
+7.5 is named once as `Driveline.TunedBrakeMps2`, and is what the drivers' requests were tuned against, not a
+brake: the `VirtualDriver` asks `-wantAccel × 7.5 / 6 / MaxBrake` (clamped 0 to 1) and the lab `Driver` asks
+`0.7 × 7.5 / MaxBrake`, so every request below 7.5 m/s² is the deceleration it was. A full brake is 9.32 m/s² for
+a car's 0.95 g tyre, 10.79 for a sports bike's or the turbo hatch's 1.1 g, 8.34 for the Charger's 0.85 g, 7.35 for
+a truck's, bus's or step van's 0.75 g (2 % below 7.5), 30.40 for a race slick and 41.19 for the formula car's
+4.2 g. The lab's `--hard-stop` renders a 100 km/h stop standing on the pedal: the car stops in 3.502 s over 48.69 m
+before and 2.863 s over 39.87 m after, the sports bike in 3.822 s over 50.56 m before and 2.897 s over 39.88 m
+after, and no render clips (largest sample 0.95). The stored emitter streams (their cars cruise; none brakes) and
+the render fingerprint (its engine cranks, idles and holds the dyno) are unchanged. The wire hash stays
+33911a144326, since `Driveline` is in `Sound/Core/` and no hashed project was edited, and the door fingerprint
+stays 3a8a8e7b91ab. Each `Brake = 1f` site is a hold at rest: `Driver`'s Off, Cranking, Idling, ShuttingDown,
+Holding and Revving, and `VirtualDriver`'s not-running and stopped branches (the last under 0.5 m/s); the lab's
+`--vehicle` script reaches Idling while still rolling after its braking order, so that render now stops harder, as
+the plan allowed for a lab Braking order. `BrakeCapacityTests` holds the per-preset limit, the two drivers'
+requests at 3 and 5.25 m/s², and the bike's closed-form stop.
+
 ## 17. Stage 3 as built (2026-10-16): the state, the world view, the vehicle step
 
 Made on Linux, on main `450b0244`, in four commits: the state types and a body's grounding on the wire; one

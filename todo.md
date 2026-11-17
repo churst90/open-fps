@@ -171,7 +171,10 @@ again once.
    manners are unchanged line for line (`PeopleReplayTests`).
 9. Physics, then (docs/PHYSICS_BOUNDARY.md):
    - stage 2's leftovers (16.6): one rolling resistance and drag law, one brake law (surveyed 2026-10-27, 16.8:
-     the renames DONE 2026-10-27, nothing moved; nine decisions for Cody); `VehicleChassisSpec` went whole to `OpenFPS.Models` with `VehicleSpec` (engine
+     the renames DONE 2026-10-27, nothing moved; nine decisions answered by Cody 2026-11-17; change A, the
+     sound's brake from its tyres, DONE 2026-11-17 (9.32 m/s² for a car, 10.79 the sports bike, 7.35 a truck,
+     30.40 a race slick, 41.19 the formula car; the drivers' requests unchanged below 7.5 m/s²); B to G wait on
+     the stages that touch them); `VehicleChassisSpec` went whole to `OpenFPS.Models` with `VehicleSpec` (engine
      packages stage 2), so nothing is left of it; the generators' 9.81 at the maps'
      next regeneration. `WindModel` folded into `WindField`: DONE 2026-10-27 (16.7), bullets feel the air the
      ears do;

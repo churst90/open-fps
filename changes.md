@@ -2,6 +2,17 @@
 
 ## 2026-11-17
 
+- Physics 16.8 change A: the sound's car brakes at its tyres' limit, not a flat 7.5 m/s² (`Driveline.MaxBrake` from
+  `Brakes.Capacity(profile.Tyres.Mechanics, Earth.StandardGravity)`). The old 7.5 is named once as
+  `Driveline.TunedBrakeMps2`, and the `VirtualDriver`'s and lab `Driver`'s requests are rescaled as shares of the
+  tyres' limit, so every request below 7.5 m/s² is the deceleration it was. A full brake is 9.32 m/s² for a car,
+  10.79 for the sports bike, 7.35 for a truck (−2 %), 30.40 for a race slick and 41.19 for the formula car.
+  AudioLab `--hard-stop` (new) renders a 100 km/h stop on the pedal: the car 3.502 s over 48.69 m before and
+  2.863 s over 39.87 m after; the sports bike 3.822 s over 50.56 m before and 2.897 s over 39.88 m after; none of
+  the four renders clips. No stored stream or render moved (the emitter streams cruise, none brakes; the render
+  fingerprint's engine only cranks, idles and holds the dyno). Wire hash `33911a144326` unchanged; door fingerprint
+  `3a8a8e7b91ab` unchanged. Tests: 75 run, 74 passed, 1 skipped. Renders in `~/.cache/openfps-build/brakes/renders/`.
+
 - Traffic's deadlock breaker takes the same gap as any driver giving way: after `GiveWayPatienceSeconds` a
   car is let go only into a gap at least its own movement's critical headway (`JunctionRules.GapTooShort`),
   and the separate four-second imminence rule is gone (nothing else used it). A car let go is committed to
