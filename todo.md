@@ -690,9 +690,10 @@ The open questions for Cody, in one place. A few that belong to one item stay wi
   kind through the model kind table (each row its `LibraryKind`), so no model is out of the editor's reach by
   being missed off a list; trains and woods first, then horns, aircraft, gates, sirens and rain as each gets
   its editing page (docs/SPECIAL_CASES_AUDIT.md, P2 leftovers).
-- A beacon behind a wall (audit P6, "P3b as built"): whether a blip sounds is decided on the hand-rolled path.
-  On the simulator's answer, as every other source is heard, which beacons come through which walls would move.
-  Try it, by ear?
+- A beacon behind a wall (audit P6, "P3b as built"): answered 2026-11-17, try it by ear. Each blip asks the
+  simulator under `SourceProbeId(sourceId)` and decides on its answer when there is one, the tracer until then,
+  behind `/beacons path new|old` (old the default until Cody approves). Cody compares at the barn (tuned there
+  2026-10-10) and a few other walls; listening spots checked with `--walk-pair`.
 - Reflections following a moving talker, and himself: he will check again.
 - Loudness law: anything over about 126 dB peak at 1 m (gunshots, glass, a thin plate) plays at full
   scale out to the 40 m clamp, so 5 m and 20 m sound the same (`Loudness.Place`). Explosions wait on it.
