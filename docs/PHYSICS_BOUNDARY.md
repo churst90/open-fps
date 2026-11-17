@@ -2416,6 +2416,14 @@ Not measured:
 
 The step rate (120 Hz, four to a tick) was settled in section 11 and is not asked again.
 
+**Cody's answers (2026-11-17).** Dropped and thrown things first (step 7), "then proceed with the rest as you
+see fit unless another piece should come after", so the other four stand as recommended: car strikes person,
+damage, driving, traffic and walkers stay separate steps of his picking (step 13); door leaves as hinged bodies
+come last, after his ear check (step 11); JoltPhysicsSharp goes to 2.23.0, done as the first commit of step 7's
+branch so the drops are not heard on one binding and then another, with every setter read back; people as eleven
+parts (step 9) come after dropped things. The order from here is 7, 8, 9 and 10 (10 may run beside 7 to 9), then
+11 with Cody listening.
+
 ### 18.6 Steps 1 and 2 as built (2026-10-27)
 
 Jolt is in and the body API stands; no game system uses it, so nothing heard moves.
