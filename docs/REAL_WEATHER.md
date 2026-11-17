@@ -567,6 +567,9 @@ places, and 4 and 5 make it move and soak in as it really does.
 - **When the data stops** (decision 7): yes. The fetched forecast carries on for up to six hours, then the
   simulation takes over from the last real state with no jump; when the source answers again the weather eases
   back to the real one. `/weather` says which is in use (live, from the forecast, or simulated since a time).
+- **Real lightning (GLM)** (decision 5) and **the NWS API** (decision 6): later, as recommended. GLM only if the
+  simulated cells from real convection are not enough by ear; NWS for US thunder probability as a refinement.
+  With this, all seven decisions of section 12 are answered.
 
 ## 13. Sources
 
