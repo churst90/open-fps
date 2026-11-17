@@ -56,6 +56,15 @@ public partial class CommandHandler
         Say(reply, message);
     }
 
+    /// <summary>/throw [left|right|name]: throws what you hold where you look; everyone hears it land.</summary>
+    private void HandleThrow(UserSession session, string[] args, Action<IMessage> reply)
+    {
+        var svc = Hands(reply); if (svc == null) return;
+        svc.Throw(session, string.Join(" ", args), out string message,
+                  (id, label, sounds) => _server.EmitWorldAudio(session.CurrentMapId, id, label, sounds));
+        Say(reply, message);
+    }
+
     /// <summary>/stow [name|left|right|all]: slings what you are holding onto your back.</summary>
     private void HandleStow(UserSession session, string[] args, Action<IMessage> reply)
     {

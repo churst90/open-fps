@@ -291,6 +291,11 @@ public partial class CommandHandler
             case "putdown":
                 HandleDrop(session, args, reply);
                 break;
+            case "throw":
+            case "hurl":
+            case "toss":
+                HandleThrow(session, args, reply);
+                break;
             case "stow":
             case "sling":
                 HandleStow(session, args, reply);

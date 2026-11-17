@@ -32,6 +32,7 @@ public static class CommandCatalog
         E("Moving", "detail", "/detail [low|medium|high]", "how far round you a large map is loaded: everything to 150, 300 or 500 metres, buildings and roads to 500, 800 or 1200; medium by default"),
         E("Things", "take", "/take [THING]", "pick up the nearest thing, or the one named", "get", "grab", "pickup"),
         E("Things", "drop", "/drop [THING]", "put down what you hold", "putdown"),
+        E("Things", "throw", "/throw [THING]", "throw what you hold where you look", "hurl", "toss"),
         E("Things", "stow", "/stow [THING]", "sling what you hold onto your back", "sling"),
         E("Things", "draw", "/draw [THING]", "take something off your back into your hands", "equip", "wield", "unsling"),
         E("Things", "hands", "/hands", "what is in your hands"),

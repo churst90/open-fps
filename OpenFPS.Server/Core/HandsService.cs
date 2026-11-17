@@ -9,6 +9,7 @@ using OpenFPS.Geometry;
 using OpenFPS.Sound;
 using OpenFPS.Materials;
 using OpenFPS.Models;
+using OpenFPS.Server.Systems;
 
 namespace OpenFPS.Server.Core;
 
@@ -358,8 +359,9 @@ public class HandsService
     }
 
     /// <summary>
-    /// Puts something down, and it lands: the impact from its mass and material, the floor's material and
-    /// the height it fell from, read off the world (a hand at chest height, or a back).
+    /// Puts something down, and it lands: it leaves the hand as a real body, falls, bounces and comes to rest
+    /// (docs/PHYSICS_BOUNDARY.md 18.2 step 7), its impacts heard from the contacts. A corpse is still set down,
+    /// not dropped (step 9), and a map whose body world is not yet made falls back to the old scripted landing.
     /// </summary>
     public bool Drop(UserSession session, string which, out string message,
                      Action<int, string, IReadOnlyList<TransientSound>>? heard = null)
@@ -390,11 +392,13 @@ public class HandsService
 
         var at = world.Get<Transform>(session.Entity).Position;
         var forward = Vector3.Transform(new Vector3(0, 0, 1), world.Get<Transform>(session.Entity).Rotation);
+        var carry = world.Has<Velocity>(session.Entity) ? world.Get<Velocity>(session.Entity).Linear : Vector3.Zero;
         var names = new List<string>();
 
         foreach (var item in dropping)
         {
-            names.Add(NameOf(world, item));
+            string name = NameOf(world, item);
+            names.Add(name);
             float from = world.Get<Transform>(item).Position.Y;
 
             ClearFromHands(world, session.Entity, item.Id);
@@ -402,25 +406,28 @@ public class HandsService
             if (world.Has<HeldComponent>(item)) world.Remove<HeldComponent>(item);
             if (world.Has<ParentComponent>(item)) world.Remove<ParentComponent>(item);
 
-            var landing = at + forward * 0.6f;
-            float ground = PhysicsUtils.GetGroundHeight(world, grid, landing, out string floor);
-            // No floor under that point is -1000, which sent the item a kilometre under the map; it
-            // lands where you stand instead.
-            if (ground < -900f) { ground = at.Y; floor = ""; }
-            landing.Y = ground;
-
-            ref var t = ref world.Get<Transform>(item);
-            t.Position = landing;
-            t.IsDirty = true;
-            Carried?.Invoke(item.Id);
-
-            if (heard != null && world.Has<Corpse>(item))
+            if (world.Has<Corpse>(item))
             {
                 // A body is set down, not dropped: the legs and then the trunk, from a few hand-widths.
-                heard(item.Id, "a body set down", CombatService.BodyFall(world, grid, landing, lowered: true));
+                var setDown = Land(world, grid, item, at, forward);
+                Carried?.Invoke(item.Id);
+                if (heard != null) heard(item.Id, "a body set down", CombatService.BodyFall(world, grid, setDown, lowered: true));
+                continue;
             }
-            else if (heard != null && world.Has<ItemComponent>(item))
+
+            // Its holder's own velocity carried it out of the hand: walk and let go and it keeps your pace.
+            if (BodyWorldSystem.TryLaunch(world, item, name, carry, out _))
             {
+                Carried?.Invoke(item.Id);
+                continue;
+            }
+
+            // No body world for this map yet (or not an item): the old scripted landing, at once.
+            var landing = Land(world, grid, item, at, forward, out string floor);
+            Carried?.Invoke(item.Id);
+            if (heard != null && world.Has<ItemComponent>(item))
+            {
+                float ground = landing.Y;
                 // It arrives at sqrt(2gh) from where it was held.
                 float fell = MathF.Max(0.05f, from - ground);
                 float speed = MathF.Sqrt(2f * PhysicsConstants.GravityOf(world) * fell);
@@ -428,7 +435,7 @@ public class HandsService
                 var itemMaterial = AcousticRegistry.GetProperties(
                     world.Has<MaterialComponent>(item) ? world.Get<MaterialComponent>(item).Material ?? "Generic" : "Generic");
                 var floorMaterial = AcousticRegistry.GetProperties(string.IsNullOrEmpty(floor) ? "Generic" : floor);
-                heard(item.Id, NameOf(world, item),
+                heard(item.Id, name,
                       ImpactAcoustics.Between(itemMaterial, floorMaterial, landing, speed,
                                               mass, mass * 500f, 2f, 2f, 0.2f));
             }
@@ -437,6 +444,98 @@ public class HandsService
         _maps.RefreshGrid(session.CurrentMapId);
         message = $"You put down the {string.Join(" and the ", names)}.";
         Log.Information("{User} put down {Items}.", session.Username, string.Join(", ", names));
+        return true;
+    }
+
+    /// <summary>
+    /// Where an item comes to lie under the old scripted drop, and the floor's material there: 0.6 m in front of
+    /// the holder, on the ground under that point. The body world does not use it; it is the fallback and the
+    /// corpse's set-down, exactly as they were.
+    /// </summary>
+    private static Vector3 Land(World world, SpatialGrid<Entity> grid, Entity item, Vector3 at, Vector3 forward)
+        => Land(world, grid, item, at, forward, out _);
+
+    private static Vector3 Land(World world, SpatialGrid<Entity> grid, Entity item, Vector3 at, Vector3 forward, out string floor)
+    {
+        var landing = at + forward * 0.6f;
+        float ground = PhysicsUtils.GetGroundHeight(world, grid, landing, out floor);
+        // No floor under that point is -1000, which sent the item a kilometre under the map; it lands where
+        // you stand instead.
+        if (ground < -900f) { ground = at.Y; floor = ""; }
+        landing.Y = ground;
+        ref var t = ref world.Get<Transform>(item);
+        t.Position = landing;
+        t.IsDirty = true;
+        return landing;
+    }
+
+    /// <summary>
+    /// Throws what is in your hands along where you look, pitch included: the item leaves as a body at the speed a
+    /// person throws its mass (DroppedThings.ThrowSpeed, Cross 2004) plus the pace you were walking. Too heavy
+    /// says so in words; a map whose body world is not yet made gets the scripted drop instead.
+    /// </summary>
+    public bool Throw(UserSession session, string which, out string message,
+                      Action<int, string, IReadOnlyList<TransientSound>>? heard = null)
+    {
+        message = "";
+        if (!_maps.TryGetMap(session.CurrentMapId, out var world, out _, out var grid, out var lookup))
+        { message = "The map is not loaded."; return false; }
+        if (session.Entity == Entity.Null || !world.IsAlive(session.Entity))
+        { message = "You are not in the world yet."; return false; }
+
+        var held = InHands(world, session.Entity, lookup, which);
+        if (held.Count == 0)
+        {
+            message = which.Equals("left", StringComparison.OrdinalIgnoreCase) ? "Your left hand is empty."
+                    : which.Equals("right", StringComparison.OrdinalIgnoreCase) ? "Your right hand is empty."
+                    : string.IsNullOrEmpty(which) ? "You are not holding anything."
+                    : $"You are not holding a {which} in a hand.";
+            return false;
+        }
+
+        var item = held[0];
+        string name = NameOf(world, item);
+        float mass = MassOf(world, item);
+        if (!DroppedThings.CanThrow(mass))
+        {
+            message = $"The {name} is {mass:F0} kilograms: too heavy to throw.";
+            return false;
+        }
+        float from = world.Get<Transform>(item).Position.Y;
+
+        ClearFromHands(world, session.Entity, item.Id);
+        if (world.Has<InventoryComponent>(session.Entity)) Bag(world, session.Entity).Remove(item.Id);
+        if (world.Has<HeldComponent>(item)) world.Remove<HeldComponent>(item);
+        if (world.Has<ParentComponent>(item)) world.Remove<ParentComponent>(item);
+
+        var holder = world.Get<Transform>(session.Entity);
+        // +Z turned by the player's own rotation: CreateFromYawPitchRoll takes an increasing pitch toward -Y, so
+        // looking up (a negative pitch) throws up. Both ways are held by DroppedThingsTests.
+        var forward = Vector3.Transform(Vector3.UnitZ, holder.Rotation);
+        var carry = world.Has<Velocity>(session.Entity) ? world.Get<Velocity>(session.Entity).Linear : Vector3.Zero;
+        var velocity = carry + forward * DroppedThings.ThrowSpeed(mass);
+
+        if (!BodyWorldSystem.TryLaunch(world, item, name, velocity, out _))
+        {
+            // Everything else is a drop: no body world, so the old scripted landing and its one impact.
+            var landing = Land(world, grid, item, holder.Position, forward, out string floor);
+            if (heard != null && world.Has<ItemComponent>(item))
+            {
+                float fell = MathF.Max(0.05f, from - landing.Y);
+                float speed = MathF.Sqrt(2f * PhysicsConstants.GravityOf(world) * fell);
+                var itemMaterial = AcousticRegistry.GetProperties(
+                    world.Has<MaterialComponent>(item) ? world.Get<MaterialComponent>(item).Material ?? "Generic" : "Generic");
+                var floorMaterial = AcousticRegistry.GetProperties(string.IsNullOrEmpty(floor) ? "Generic" : floor);
+                heard(item.Id, name,
+                      ImpactAcoustics.Between(itemMaterial, floorMaterial, landing, speed,
+                                              mass, mass * 500f, 2f, 2f, 0.2f));
+            }
+        }
+
+        _maps.RefreshGrid(session.CurrentMapId);
+        Carried?.Invoke(item.Id);
+        message = $"You throw the {name}.";
+        Log.Information("{User} threw {Item} at {Speed:F1} m/s.", session.Username, name, DroppedThings.ThrowSpeed(mass));
         return true;
     }
 
