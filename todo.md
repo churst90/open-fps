@@ -681,11 +681,8 @@ here are checked to stand on (docs/LISTENING_SPOTS.md).
 
 ### Decisions (Cody)
 The open questions for Cody, in one place. A few that belong to one item stay with it, marked (Cody).
-- Real weather (docs/REAL_WEATHER.md section 12), six decisions open, each with a recommendation:
-  Open-Meteo's free tier for a game with no ads; the User-Agent and fetching on demand; made-up maps keep
-  simulated weather (a map may name a real place to follow); real lightning (GLM) later or not; the NWS API
-  not at first; when the data stops, the forecast for six hours, then the simulation. (The clock was
-  decided 2026-10-11: real local time at real places.)
+- Real weather (docs/REAL_WEATHER.md section 12): all seven answered 2026-11-17, with the units, a made-up map's
+  static or changing weather and the generic climate ("Decided (Cody, 2026-11-17)").
 - The scope and the push mower (audit P2): should the scope call somebody pushing a push mower a person?
   Today, as before, it picks out no machine.
 - The editor and sound ids (audit P2): should the editor edit trains and woods through their sound ids?
@@ -695,8 +692,8 @@ The open questions for Cody, in one place. A few that belong to one item stay wi
 - Reflections following a moving talker, and himself: he will check again.
 - Loudness law: anything over about 126 dB peak at 1 m (gunshots, glass, a thin plate) plays at full
   scale out to the 40 m clamp, so 5 m and 20 m sound the same (`Loudness.Place`). Explosions wait on it.
-- City temperature: city.json's 42 is an offset over the seasonal curve, so the city runs 17 C in
-  January and over 50 C in summer, and every stopped car's fan runs. Intended?
+- City temperature: not intended. Answered 2026-11-17: a generic climate (95 °F summers, 25 °F winters) for
+  every made-up map, a map's temperature absolute, not an offset (docs/REAL_WEATHER.md).
 - Car fans: real pickups and vans mostly have a belt-driven viscous-clutch fan (not modelled); the car
   fan's 205 Hz hum is 23 dB over its noise; a 3.4 kHz block mode is 12 dB louder from the front.
 - Lightning: a spoken or tone cue at the flash, or only the thunder?

@@ -570,6 +570,16 @@ places, and 4 and 5 make it move and soak in as it really does.
 - **Real lightning (GLM)** (decision 5) and **the NWS API** (decision 6): later, as recommended. GLM only if the
   simulated cells from real convection are not enough by ear; NWS for US thunder probability as a refinement.
   With this, all seven decisions of section 12 are answered.
+- **A made-up map's climate** (Cody, 2026-11-17, on the city's temperature): "the city, or any user map should
+  use a default weather climate, say 95 in the summer and 25 in the winter as a fixed default generic climate,
+  then if someone wants to use the climate from a real location they can". One generic climate for every map
+  that names none: summer afternoons about 95 °F (35 °C), winter nights about 25 °F (−4 °C), the seasons and the
+  daily swing between; a map may name a real place whose climate normals it uses instead. A map's temperature
+  is then the temperature, never an offset: the city's `Temperature` 42 (an offset of 22 over the seasonal curve,
+  17 °C in January and over 50 °C in summer, every stopped car's fan running) goes, from the generator. Winter
+  nights below freezing bring snow when it precipitates; footsteps today turn to snow only while snow falls
+  (`SoundMappingService`, under 2 °C with precipitation), not from snow lying on the ground, which is its own
+  rule to build.
 
 ## 13. Sources
 
