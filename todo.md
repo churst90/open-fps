@@ -8,6 +8,10 @@ changes.md and Cody's approvals of 2026-10-16 and 17; what was done went to docs
 
 ## Next, in order
 
+Asked of Cody 2026-11-17 and waiting to be built (docs/REAL_WEATHER.md, "Decided (Cody, 2026-11-17)"): the
+player's units (US or Metric, US by default, for what is heard and read only; the engine stays SI), and a
+made-up map's weather as static or changing, the creator's setting, sunny, calm and 75 °F unless set.
+
 The order as of 2026-10-17. Cody's list of 2026-10-08 and where each of its twelve items stands is in
 [docs/CODY_ASKS_2026-10-08.md](docs/CODY_ASKS_2026-10-08.md).
 

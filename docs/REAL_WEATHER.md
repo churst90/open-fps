@@ -555,8 +555,15 @@ places, and 4 and 5 make it move and soak in as it really does.
   always has its place's real weather, temperature and the rest; there is no setting to turn that off. A map
   that says nothing of its weather starts sunny, calm and 75 °F (23.9 °C) (Cody: "Default weather should be
   sunny, wind calm and 75F").
-- **Units.** There is no choice of units yet: temperatures are Celsius and speeds km/h. Cody wants a Celsius or
-  Fahrenheit choice; where it lives is being asked.
+- **Static or changing.** A made-up map's weather is the map's setting, the creator's choice: static (it stays as
+  set until changed by hand, `/weather`) or changing (it starts as set, sunny and calm by default, and the
+  simulation moves it on over time).
+- **Units** (Cody, 2026-11-17). One choice, US or Metric, US by default: US says °F, mph, feet and miles;
+  Metric says °C, km/h, metres and kilometres. It is the player's, kept in the client's settings with the rest
+  and offered in the game settings menu, and sent to the server at login and on change so the server's own
+  sentences (`/weather` and the like) use it. It changes only what the player hears and reads: every quantity in
+  the engine, the wire, the maps, the stored streams and the logs stays SI as it is ("make sure everything under
+  the hood the game engine depends on doesn't change").
 
 ## 13. Sources
 
