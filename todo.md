@@ -717,7 +717,9 @@ The open questions for Cody, in one place. A few that belong to one item stay wi
 - A tap and its plug on one key, or two?
 - Steam Audio pathing never runs (`enablePathing: false`); routes come from OpeningRoutes. Turn it on, or
   remove it.
-- Server: `/move NAME` is staff-only, so an owner cannot use it on their own map. Intended?
+- Server `/move` for map owners: answered 2026-11-17. A map's owner may `/move` themselves by coordinates on a
+  map they own (`MapService.IsOwner`, as `OwnsHere` asks); moving anybody else stays `move-player`, staff only,
+  and everywhere else `/move` stays staff only.
 - `/savemap` on a generated map: answered 2026-11-17, refuse it. The command says which generator makes the map
   and to change that instead; hand-made and player maps save as now. Whether a map is generated comes from the
   map itself (a mark its generator writes), never a list of map names.
