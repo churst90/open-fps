@@ -731,7 +731,8 @@ The open questions for Cody, in one place. A few that belong to one item stay wi
   as unsigned and `GetNextSpan` throws on a negative size), so no report. Next: update MemoryPack to 1.22.0 and
   keep `WireCheck` as our own guard; its new MEMPACK043 warning for `DateTimeOffset` members must not break
   the 0-warning builds, and the wire hash and stored streams must not move (valid data's format is unchanged).
-- Sound library: CI compares renders by tolerance; 430 KB per stream regeneration. Recommended: yes to both.
+- Sound library: CI compares renders by tolerance; 430 KB per stream regeneration. Settled by use: both have run
+  since 2026-10-11 (docs/SOUND_LIBRARY_BOUNDARY.md 13.3 and 13.4, the maths probe's tolerant fallback).
   (`ColliderShape` went to `OpenFPS.Geometry` with the namespace rename, 2026-10-17; decision 4, MemoryPack,
   was taken 2026-10-10.)
 - Streaming: a menu control for `/detail`; tree counts and cost of distant woods (+0.5 core); the cab's
