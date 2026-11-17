@@ -530,7 +530,7 @@ places, and 4 and 5 make it move and soak in as it really does.
 
 - **The world's clock: real local time at real places** ("Yes, real local time at real places for the weather.
   Must be realistic to the area as it is happening"). On the world, the time, date and weather at a place are
-  what they are there now; made-up maps keep their own clock. The other six decisions are open.
+  what they are there now; made-up maps keep their own clock.
 - **Where the sun and the moon are, for the player** (asked the same day). Both are computed from the place's
   latitude and longitude and the real time: the sun by NOAA's solar position equations, the moon by Meeus's
   lunar series (position, phase, illuminated share), each to about a tenth of a degree, more than the ear needs.
@@ -541,6 +541,12 @@ places, and 4 and 5 make it move and soak in as it really does.
   temperature and the wind's daily turn, the dawn chorus and dusk, insects by temperature. It goes with the
   clock in stage 1. The calculations and the sentence are built (`OpenFPS.Astronomy`, docs/SKY.md); the key
   and `/sky` are not.
+
+### Decided (Cody, 2026-11-17)
+
+- **Open-Meteo's free tier** (decision 1): yes, with the attribution in `/weather` and the credits, the source
+  behind an interface. "Open FPS is free and will remain so": no ads, no subscriptions, so the non-commercial
+  tier fits for good.
 
 ## 13. Sources
 
