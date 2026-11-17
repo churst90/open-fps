@@ -715,8 +715,9 @@ The open questions for Cody, in one place. A few that belong to one item stay wi
   ("too reverby, all the same", inbox/vehicles-2026-10-05).
 - The Elm Park fountain's basin overflow: +4.6 dB on its side; not connected.
 - A tap and its plug on one key, or two?
-- Steam Audio pathing never runs (`enablePathing: false`); routes come from OpeningRoutes. Turn it on, or
-  remove it.
+- Steam Audio pathing: answered 2026-11-17, remove it. It never ran (`enablePathing: false`), its bake was the
+  2026-09 stutter, and OpeningRoutes finds every route from the map's own openings. Remove the pathing option,
+  bake and redirect from `SteamAudioSimulator` and its callers; no render or stream may move, since none used it.
 - Server `/move` for map owners: answered 2026-11-17. A map's owner may `/move` themselves by coordinates on a
   map they own (`MapService.IsOwner`, as `OwnsHere` asks); moving anybody else stays `move-player`, staff only,
   and everywhere else `/move` stays staff only.
