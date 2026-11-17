@@ -2137,8 +2137,11 @@ a truck's, bus's or step van's 0.75 g (2 % below 7.5), 30.40 for a race slick an
 before and 2.863 s over 39.87 m after, the sports bike in 3.822 s over 50.56 m before and 2.897 s over 39.88 m
 after, and no render clips (largest sample 0.95). The stored emitter streams (their cars cruise; none brakes) and
 the render fingerprint (its engine cranks, idles and holds the dyno) are unchanged. The wire hash stays
-33911a144326, since `Driveline` is in `Sound/Core/` and no hashed project was edited, and the door fingerprint
-stays 3a8a8e7b91ab. Each `Brake = 1f` site is a hold at rest: `Driver`'s Off, Cranking, Idling, ShuttingDown,
+33911a144326, since `Driveline` is in `Sound/Core/` and no hashed project was edited. The door fingerprint is
+unchanged by this change: it is d163818bf3ff on the branch base, having already moved from 3a8a8e7b91ab at
+69311fb8's edit to `OpenFPS.Materials/AcousticRegistry.cs`, which the door model list hashes (that commit's message
+and changes.md say it stayed; the hash says otherwise). No door model's sound moved, so no door render is made
+again. Each `Brake = 1f` site is a hold at rest: `Driver`'s Off, Cranking, Idling, ShuttingDown,
 Holding and Revving, and `VirtualDriver`'s not-running and stopped branches (the last under 0.5 m/s); the lab's
 `--vehicle` script reaches Idling while still rolling after its braking order, so that render now stops harder, as
 the plan allowed for a lab Braking order. `BrakeCapacityTests` holds the per-preset limit, the two drivers'

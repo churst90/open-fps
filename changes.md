@@ -10,8 +10,11 @@
   AudioLab `--hard-stop` (new) renders a 100 km/h stop on the pedal: the car 3.502 s over 48.69 m before and
   2.863 s over 39.87 m after; the sports bike 3.822 s over 50.56 m before and 2.897 s over 39.88 m after; none of
   the four renders clips. No stored stream or render moved (the emitter streams cruise, none brakes; the render
-  fingerprint's engine only cranks, idles and holds the dyno). Wire hash `33911a144326` unchanged; door fingerprint
-  `3a8a8e7b91ab` unchanged. Tests: 75 run, 74 passed, 1 skipped. Renders in `~/.cache/openfps-build/brakes/renders/`.
+  fingerprint's engine only cranks, idles and holds the dyno). Wire hash `33911a144326` unchanged. The door
+  fingerprint is unchanged by this change: `d163818bf3ff`, which the base already had (it moved from `3a8a8e7b91ab`
+  at `69311fb8`'s edit to `OpenFPS.Materials/AcousticRegistry.cs`, whose text the door model list hashes), so no
+  door render is made again. Tests: 75 run, 74 passed, 1 skipped. Renders in
+  `~/.cache/openfps-build/brakes/renders/`.
 
 - Traffic's deadlock breaker takes the same gap as any driver giving way: after `GiveWayPatienceSeconds` a
   car is let go only into a gap at least its own movement's critical headway (`JunctionRules.GapTooShort`),
