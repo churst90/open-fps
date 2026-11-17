@@ -2,6 +2,24 @@
 
 ## 2026-11-17
 
+- Items declare a shape and a dropped thing rings as what it is (docs/PHYSICS_BOUNDARY.md 18.12). A prefab now
+  gives `ItemShape` (Block, Bar, Tube, Plate, Shell), `ItemSize` and an optional `ItemWallMetres`; the item carries
+  them in appended `ItemComponent` fields, and `DroppedThings.TryBody` makes its body from them (an item that
+  declares nothing keeps the cube). Every shipped item prefab declares one, including the speedway's crowbar and
+  torch, so no generated map changed. The dropped thing rings free by its own law: free-free beam bending for a
+  bar and a tube, the existing plate law for a sheet, breathing and inextensional bending for a cylindrical shell,
+  and the beam's first modes for a compact block; each mode's T60 is the existing `PanelAcoustics.RingSeconds` with
+  no mounting loss. The blow's brightness is the Hertz contact of both materials, the reduced mass and the closing
+  speed (`ImpactAcoustics.Dropped`); the struck thing rings as before. Every non-drop `Between` caller keeps the
+  old law, and a `Ring` or `Knock` with no mode arrays renders byte for byte through the old path. AudioLab
+  `--drops` adds a steel bar, steel pipe, glass bottle, wooden plank and plastic box from 1 m onto concrete and
+  wood, old script beside new, each with peak, RMS, clipped samples, its predicted modes and its measured tail
+  peaks; 20 files in `~/.cache/openfps-build/rings/renders/`, none clipping and all finite. Tests: 10
+  `ItemShapeTests` (the laws, the wire round-trip, the old `Between`, the old renders) and the sound, drop, body,
+  door, glass, fire and footstep classes beside them. No stored stream, spoken line, render fingerprint, drive,
+  rail, walk, people or traffic replay moved. Wire hash `33911a144326` to `dc55222e4e23`, so the server and the
+  Windows client deploy together; the door fingerprint stays `d163818bf3ff` and the door renders pass unchanged.
+
 - Physics 16.8 change A: the sound's car brakes at its tyres' limit, not a flat 7.5 m/s² (`Driveline.MaxBrake` from
   `Brakes.Capacity(profile.Tyres.Mechanics, Earth.StandardGravity)`). The old 7.5 is named once as
   `Driveline.TunedBrakeMps2`, and the `VirtualDriver`'s and lab `Driver`'s requests are rescaled as shares of the

@@ -192,9 +192,11 @@ again once.
      things) next, with JoltPhysicsSharp 2.23.0 first, then 8, 9 and 10, and doors (11) last by ear; step 7
      (`BodyWorldSystem`, `DroppedThings`, `/drop` and `/throw`) built 2026-11-17, wire hash 33911a144326, its
      measured costs, renders, tests and what it leaves for step 8 in 18.11. A key for `/throw` is Cody's to choose;
-     two limits Cody wants fixed later (2026-11-17): an item declares no size, so it falls as a cube of its mass
-     at its material's density and a crowbar cannot clatter end over end (a declared shape per item); and a glass
-     bottle bounces where it would break (breakage from the material and the impact);
+     two limits Cody named on 2026-11-17: an item declared no size, so it fell as a cube of its mass at its
+     material's density and a crowbar could not clatter end over end — DONE for shapes 2026-11-17 (`ItemShape`,
+     `ItemSize`, `ItemWallMetres`, docs/PHYSICS_BOUNDARY.md 18.12; wire hash `dc55222e4e23`), with glass breakage
+     still later; and a glass bottle bounces where it would break (breakage from the material and the impact),
+     still later;
    - stage 5, moving air and loose layers;
    - stage 6, vehicles in full.
 10. A source heard from the whole of itself, steps 5 to 8 (Cody, 2026-10-16: "a river should sound like a flowing

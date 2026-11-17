@@ -7,5 +7,11 @@
   "IsItem": true,
   "ItemWeight": 0.5,
   "Hands": 1,
-  "Premium": true
+  "Premium": true,
+  "ItemShape": "Block",
+  "ItemSize": {
+    "X": 0.15,
+    "Y": 0.08,
+    "Z": 0.02
+  }
 }

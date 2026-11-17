@@ -199,6 +199,9 @@ public class PrefabRepository : PrefabLibrary
                 MassKg = MathF.Max(0.01f, t.ItemWeight ?? 1f),
                 Hands = t.Hands is 2 ? 2 : 1,
                 WeaponId = t.WeaponId ?? "",
+                ShapeKind = t.ItemShape ?? OpenFPS.Acoustics.ItemShapeKind.Unspecified,
+                ShapeSize = t.ItemSize ?? Vector3.Zero,
+                ShapeWallMetres = MathF.Max(0f, t.ItemWallMetres ?? 0f),
             });
         }
 

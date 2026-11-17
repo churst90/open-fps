@@ -42,6 +42,7 @@ OpenFPS.Acoustics/EarlyReflections.cs	Acoustics
 OpenFPS.Acoustics/Enclosure.cs	Acoustics	
 OpenFPS.Acoustics/GroundAnswer.cs	Acoustics	
 OpenFPS.Acoustics/ImageSource.cs	Acoustics	
+OpenFPS.Acoustics/ItemModes.cs	Acoustics	
 OpenFPS.Acoustics/LayeredFaces.cs	Acoustics	
 OpenFPS.Acoustics/Localisation.cs	Acoustics	
 OpenFPS.Acoustics/Opening.cs	Acoustics	

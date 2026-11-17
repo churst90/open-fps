@@ -1,5 +1,6 @@
 using System.Numerics;
 using Arch.Core;
+using OpenFPS.Acoustics;
 using OpenFPS.Common.Components;
 using OpenFPS.Materials;
 using OpenFPS.Physics;
@@ -37,33 +38,62 @@ public static class DroppedThings
     public const float MinimumSideMetres = 0.02f;
 
     /// <summary>
-    /// An item's body: a box of the dimensions it declares (its collider, when it has one), else a cube of its
-    /// declared mass at its material's density. Mass and material are what it carries for being carried and heard
-    /// (ItemComponent, MaterialComponent). False for something that is not an item at all.
+    /// An item's body: a box of the dimensions it declares (its collider, when it has one), else its declared
+    /// shape, else a cube of its declared mass at its material's density. Mass and material are what it carries for
+    /// being carried and heard (ItemComponent, MaterialComponent). False for something that is not an item at all.
     /// </summary>
     public static bool TryBody(World world, Entity item, out Vector3 size, out float massKg, out string material)
     {
-        size = default;
+        if (!TryBody(world, item, out ItemShape shape, out massKg, out material)) { size = default; return false; }
+        size = shape.Size;
+        return true;
+    }
+
+    /// <summary>
+    /// As <see cref="TryBody(World, Entity, out Vector3, out float, out string)"/>, with the shape the item rings
+    /// as (docs/PHYSICS_BOUNDARY.md 18.12) rather than only its box. An item that declares nothing is the same
+    /// cube it was before, as a <see cref="ItemShapeKind.Block"/>.
+    /// </summary>
+    public static bool TryBody(World world, Entity item, out ItemShape shape, out float massKg, out string material)
+    {
+        shape = default;
         massKg = 1f;
         material = "Generic";
         if (!world.Has<ItemComponent>(item)) return false;
-        massKg = MathF.Max(0.01f, world.Get<ItemComponent>(item).MassKg);
+        var itemComponent = world.Get<ItemComponent>(item);
+        massKg = MathF.Max(0.01f, itemComponent.MassKg);
         material = world.Has<MaterialComponent>(item) ? world.Get<MaterialComponent>(item).Material ?? "Generic" : "Generic";
 
         if (world.Has<ColliderComponent>(item))
         {
             var declared = world.Get<ColliderComponent>(item).Size;
-            if (declared.X > 0f && declared.Y > 0f && declared.Z > 0f) { size = declared; return true; }
+            if (declared.X > 0f && declared.Y > 0f && declared.Z > 0f)
+            {
+                shape = new ItemShape(ItemShapeKind.Block, declared);
+                return true;
+            }
+        }
+
+        var shapeSize = itemComponent.ShapeSize;
+        if (itemComponent.ShapeKind != ItemShapeKind.Unspecified
+            && shapeSize.X > 0f && shapeSize.Y > 0f && shapeSize.Z > 0f)
+        {
+            shape = new ItemShape(itemComponent.ShapeKind, shapeSize, MathF.Max(0f, itemComponent.ShapeWallMetres));
+            return true;
         }
 
         // No dimensions of its own: a cube of its mass at its material's density. One rule for every item, not a
-        // table of sizes by name; a crowbar is then a lump of steel of the crowbar's weight, not a metre of bar.
+        // table of sizes by name; an item that declares a shape above is the exception its data asks for.
         float density = AcousticRegistry.GetProperties(material).DensityKgM3;
         if (!(density > 0f)) density = AcousticRegistry.GetProperties("Generic").DensityKgM3;
-        float side = MathF.Cbrt(massKg / density);
-        size = new Vector3(MathF.Max(MinimumSideMetres, side));
+        float side = MathF.Max(MinimumSideMetres, MathF.Cbrt(massKg / density));
+        shape = ItemShape.Cube(side);
         return true;
     }
+
+    /// <summary>An item's shape without its body's mass and material, for callers that already have those.</summary>
+    public static ItemShape ShapeOf(World world, Entity item)
+        => TryBody(world, item, out ItemShape shape, out _, out _) ? shape : default;
 
     /// <summary>
     /// The speed a person releases a thrown object at, metres a second, by its mass: v = 11.0 m^-0.2.
@@ -94,21 +124,21 @@ public static class DroppedThings
     }
 
     /// <summary>
-    /// One contact's impact through the one impact law (ImpactAcoustics.Between): the moving body is the hitter,
-    /// the other the struck thing, at the contact's point and closing speed, both materials from the contact.
-    /// <paramref name="struckSize"/> is the struck body's box, or a floor panel's when it is a mesh; a fixed thing
-    /// has its ring held by its mounting (a shorter ring), a loose one rings free. Empty below the law's own
-    /// threshold of hearing (<see cref="ImpactAcoustics.MinimumSpeed"/>), which is also its own level floor: a
-    /// scuff is not an event.
+    /// One contact's impact through the drop law (ImpactAcoustics.Dropped): the moving body is the hitter, the
+    /// other the struck thing, at the contact's point and closing speed, both materials from the contact, and
+    /// both shapes: the hitter rings free by its own, the struck thing by the face it presents. A fixed thing has
+    /// its ring held by its mounting (a shorter ring), a loose one rings free. Empty below the law's own threshold
+    /// of hearing (<see cref="ImpactAcoustics.MinimumSpeed"/>), which is also its own level floor: a scuff is not
+    /// an event.
     /// </summary>
     public static List<TransientSound> Impact(ContactEvent contact, float hitterMassKg, float struckMassKg,
-                                              Vector3 struckSize, bool struckFixed)
+                                              ItemShape hitterShape, ItemShape struckShape, bool struckFixed)
     {
         if (contact.ClosingSpeed < ImpactAcoustics.MinimumSpeed) return new List<TransientSound>();
         var hitter = AcousticRegistry.GetProperties(contact.Surface);
         var struck = AcousticRegistry.GetProperties(contact.OtherSurface);
-        var face = Face(struckSize);
-        return ImpactAcoustics.Between(hitter, struck, contact.Point, contact.ClosingSpeed,
+        var face = Face(struckShape.Size);
+        return ImpactAcoustics.Dropped(hitter, struck, hitterShape, contact.Point, contact.ClosingSpeed,
                                        hitterMassKg, struckMassKg, face.Width, face.Height, face.Thickness, struckFixed);
     }
 }

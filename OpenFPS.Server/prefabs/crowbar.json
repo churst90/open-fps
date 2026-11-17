@@ -6,5 +6,11 @@
   "Type": "Item",
   "IsItem": true,
   "ItemWeight": 5,
-  "Hands": 1
+  "Hands": 1,
+  "ItemShape": "Bar",
+  "ItemSize": {
+    "X": 1.0,
+    "Y": 0.025,
+    "Z": 0.025
+  }
 }

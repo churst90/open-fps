@@ -30,6 +30,10 @@ public static class TransientSynth
 
         switch (sound.Character)
         {
+            case SoundCharacter.Ring when sound.ModeRatios is { Length: > 0 } ratios
+                                      && sound.ModeDecaySeconds is { } decays && decays.Length == ratios.Length:
+                RenderModedRing(buffer, hz, sound.Noisiness, ratios, decays, rng);
+                break;
             case SoundCharacter.Ring: RenderRing(buffer, hz, seconds, sound.Noisiness, rng); break;
             case SoundCharacter.Hiss: RenderHiss(buffer, hz, rng); break;
             case SoundCharacter.Scrape: RenderScrape(buffer, hz, rng); break;
@@ -107,6 +111,40 @@ public static class TransientSynth
                 phases[p] += twoPiOverSr * hz * partials[p];
             }
             if (noisiness > 0f) v += (float)(rng.NextDouble() * 2.0 - 1.0) * noisiness * MathF.Exp(-k * i * 8f);
+            buffer[i] = v;
+        }
+    }
+
+    /// <summary>
+    /// A ring of a shape's own modes: each partial at its own ratio and its own T60. An impulse gives every
+    /// normalised mode the same initial velocity, so they start together and only their losses part them; the
+    /// old three-partial ring above is untouched for every sound that carries no modes.
+    /// </summary>
+    private static void RenderModedRing(float[] buffer, float hz, float noisiness,
+                                        float[] ratios, float[] decays, Random rng)
+    {
+        int count = Math.Min(ratios.Length, 24);
+        var phases = new float[count];
+        var ks = new float[count];
+        for (int p = 0; p < count; p++)
+        {
+            phases[p] = (float)(rng.NextDouble() * Math.Tau);
+            ks[p] = 6.9f / (Math.Clamp(decays[p], 0.005f, MaxSeconds) * SampleRate);
+        }
+
+        float noiseK = ks[0];
+        float twoPiOverSr = MathF.Tau / SampleRate;
+        for (int i = 0; i < buffer.Length; i++)
+        {
+            float v = 0f;
+            for (int p = 0; p < count; p++)
+            {
+                float f = hz * ratios[p];
+                if (f <= 0f || f > SampleRate * 0.45f) continue;
+                v += MathF.Sin(phases[p]) * MathF.Exp(-ks[p] * i);
+                phases[p] += twoPiOverSr * f;
+            }
+            if (noisiness > 0f) v += (float)(rng.NextDouble() * 2.0 - 1.0) * noisiness * MathF.Exp(-noiseK * i * 8f);
             buffer[i] = v;
         }
     }

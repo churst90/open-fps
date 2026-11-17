@@ -436,8 +436,8 @@ public class HandsService
                     world.Has<MaterialComponent>(item) ? world.Get<MaterialComponent>(item).Material ?? "Generic" : "Generic");
                 var floorMaterial = AcousticRegistry.GetProperties(string.IsNullOrEmpty(floor) ? "Generic" : floor);
                 heard(item.Id, name,
-                      ImpactAcoustics.Between(itemMaterial, floorMaterial, landing, speed,
-                                              mass, mass * 500f, 2f, 2f, 0.2f));
+                      ImpactAcoustics.Dropped(itemMaterial, floorMaterial, DroppedThings.ShapeOf(world, item),
+                                              landing, speed, mass, mass * 500f, 2f, 2f, 0.2f));
             }
         }
 
@@ -527,8 +527,8 @@ public class HandsService
                     world.Has<MaterialComponent>(item) ? world.Get<MaterialComponent>(item).Material ?? "Generic" : "Generic");
                 var floorMaterial = AcousticRegistry.GetProperties(string.IsNullOrEmpty(floor) ? "Generic" : floor);
                 heard(item.Id, name,
-                      ImpactAcoustics.Between(itemMaterial, floorMaterial, landing, speed,
-                                              mass, mass * 500f, 2f, 2f, 0.2f));
+                      ImpactAcoustics.Dropped(itemMaterial, floorMaterial, DroppedThings.ShapeOf(world, item),
+                                              landing, speed, mass, mass * 500f, 2f, 2f, 0.2f));
             }
         }
 

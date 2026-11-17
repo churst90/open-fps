@@ -85,6 +85,17 @@ public partial struct TransientSound
     /// </summary>
     public Vector3 FaceNormal { get; set; }
 
+    /// <summary>
+    /// A shaped ring's own partials as ratios to <see cref="Hz"/>, lowest first; null or empty for the three
+    /// fixed partials a <see cref="SoundCharacter.Ring"/> has always had (1, 2.39, 4.11). The modes are the
+    /// shape's laws, worked out on the server where it is struck, never per frame.
+    /// </summary>
+    public float[]? ModeRatios { get; set; }
+
+    /// <summary>Each mode's own seconds to fall 60 dB, parallel to <see cref="ModeRatios"/>: the material's loss
+    /// at that mode's note through PanelAcoustics.RingSeconds, so a high mode dies before the fundamental.</summary>
+    public float[]? ModeDecaySeconds { get; set; }
+
     public TransientSound() { }
 
     /// <summary>Where a <see cref="FaceNormal"/> sound is for a listener: off the panel on their side.

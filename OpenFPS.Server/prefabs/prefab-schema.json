@@ -145,6 +145,20 @@
       "exclusiveMinimum": 0,
       "description": "What the item weighs, kilograms. Not bookkeeping: it is what you hear when it lands."
     },
+    "ItemShape": {
+      "type": "string",
+      "enum": ["Block", "Bar", "Tube", "Plate", "Shell"],
+      "description": "The shape it is when dropped, by name: a compact block, a solid bar or rod, a tube or pipe, a thin sheet, or a cylindrical shell (a bottle, a can). Omit for the old cube of its mass at its material's density."
+    },
+    "ItemSize": {
+      "$ref": "#/definitions/vector3",
+      "description": "The shape's full outer extents in metres, in the item's own axes. Required with ItemShape. The laws sort them, so a bar is as long as its longest side."
+    },
+    "ItemWallMetres": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "A tube's or a shell's wall, metres. Omit to work it out from ItemWeight and the material's density; only meaningful for Tube and Shell."
+    },
     "Premium": {
       "type": "boolean",
       "description": "A premium item, hard to come by: only somebody with the give-premium permission can give one (the teleporter). Only meaningful on an item."

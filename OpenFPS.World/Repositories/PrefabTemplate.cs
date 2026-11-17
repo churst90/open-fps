@@ -97,6 +97,18 @@ public class PrefabTemplate
     /// <summary>The weapon this is, if it is one: a key into the weapon registry.</summary>
     public string? WeaponId { get; set; }
 
+    /// <summary>The shape it is when dropped, by NAME (Block, Bar, Tube, Plate, Shell; docs/PHYSICS_BOUNDARY.md
+    /// 18.12). Omit for the old cube of its mass at its material's density.</summary>
+    public OpenFPS.Acoustics.ItemShapeKind? ItemShape { get; set; }
+
+    /// <summary>The shape's full outer extents, metres, in the item's own axes. Required with
+    /// <see cref="ItemShape"/>: a shape with no size is a name, not a thing.</summary>
+    public Vector3? ItemSize { get; set; }
+
+    /// <summary>A tube's or a shell's wall, metres. Omit to work it out from <see cref="ItemWeight"/> and the
+    /// material's density; only meaningful for Tube and Shell.</summary>
+    public float? ItemWallMetres { get; set; }
+
     /// <summary>A premium item: hard to come by, so only somebody with the give-premium permission can
     /// give one (the teleporter). Ordinary items are given by developers. Only meaningful on an item.</summary>
     public bool Premium { get; set; }

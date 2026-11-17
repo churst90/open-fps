@@ -2768,6 +2768,91 @@ only dropped items make, so the first dragged box and rolling barrel can drive s
 yet exchanged momentum between an item and a person or a car (step 9 and step 13); a resting item is not a body, so
 a thrown thing passes through one that has already stopped.
 
+### 18.12 Item shapes and the rings of dropped things (2026-11-17)
+
+Cody heard the drops and said wood, glass and metal all sounded like variations on a thunk: only the floor rang,
+the blow took its pitch from the softer material, and the ring had one fixed set of partials. An item now
+declares a shape, the dropped thing rings free by it, and the blow's brightness is the contact's.
+
+**The data.** `ItemShapeKind` and `ItemShape` (`OpenFPS.Acoustics/ItemModes.cs`) name a block, a solid bar or rod,
+a tube or pipe, a sheet or plate, or a cylindrical shell (a bottle, a can). A prefab gives `ItemShape` by name,
+`ItemSize` as its full outer extents in metres, and optionally `ItemWallMetres`; the
+`ItemComponent.ShapeKind`, `.ShapeSize` and `.ShapeWallMetres` fields are appended, so the positional wire is
+still an append. A hollow shape with no wall declared takes the wall its declared mass makes at the material's
+density. An item that declares nothing is the old cube of its mass at its density, as a `Block`; a
+`ColliderComponent` still wins for the body's box. The shipped items declare: crowbar `Bar` 1 x 0.025 x 0.025 m;
+sword `Bar` 0.85 x 0.04 x 0.007; torch `Bar` 0.2 x 0.035 x 0.035; Glock 17 `Block` 0.2 x 0.13 x 0.03; AKM `Bar`
+0.88 x 0.10 x 0.06; M700 `Bar` 1.1 x 0.105 x 0.06; admin gun `Bar` 0.9 x 0.08 x 0.06; teleporter `Block` 0.15 x
+0.08 x 0.02. The speedway's crowbar and torch take their shapes from those prefabs, so no generated map changed.
+A corpse, a belongings bag and any other item made without a shape keep the cube.
+
+**The laws.** A bar's free-free bending note is f_n = (beta_n L)^2 / (2 pi L^2) sqrt(E I / (rho A)), the section's
+I = b h^3 / 12 and A = b h; beta_n L is 4.7300, 7.8532, 10.9956, 14.1372 (Rayleigh, The Theory of Sound, Vol. I,
+2nd ed., section 170; Blevins, Formulas for Natural Frequency and Mode Shape, 1979, Table 8-1). A tube uses the
+same law with I = pi (Ro^4 - Ri^4) / 4 and A = pi (Ro^2 - Ri^2). A sheet uses the plate law `PanelAcoustics.RingHz`
+already has, 0.4755 t sqrt(E / rho) (m^2 / a^2 + n^2 / b^2) (Leissa, Vibration of Plates, NASA SP-160, 1969,
+chapter 4). A cylindrical shell has its breathing mode c_p / (2 pi a), c_p = sqrt(E / (rho (1 - nu^2))), and its
+inextensional bending modes (1 / (2 pi a^2)) sqrt(D / (rho h)) n (n^2 - 1) / sqrt(n^2 + 1), D = E h^3 /
+(12 (1 - nu^2)) (Rayleigh, The Theory of Sound, Vol. II, section 233; Love, A Treatise on the Mathematical Theory
+of Elasticity, 4th ed., section 285). A compact block takes the same free-free bending law from its own three sides,
+its first modes: it is the fallback shape and has no closed-form first mode. Each mode's T60 is the existing
+`PanelAcoustics.RingSeconds`, 2.2 / (loss factor x frequency), with no mounting loss, so steel rings for seconds,
+glass high and long, and wood dies fast.
+
+The blow is the contact's: Hertz's contact time t = 2.87 (m*^2 / (R E*^2 v))^(1/5), with m* the reduced mass,
+1 / E* = (1 - nu1^2) / E1 + (1 - nu2^2) / E2 and v the closing speed (Johnson, Contact Mechanics, 1985, section
+11.4). The contact radius R is half the item's smallest outer dimension: a face meets its floor on its edges.
+The blow's note is 1 / t (Footsteps' corner, "the impact has little above 1/tau"), clamped 45 to 8000 Hz. The two
+materials are both in E*, and both masses in m*, so steel on concrete is a short bright crack and wood on concrete
+a longer, duller one.
+
+**What changed and what did not.** `ImpactAcoustics.Dropped` is the drop and throw law: the Hertz knock, the
+dropped thing's own ring with its mode ratios and per-mode T60s appended to `TransientSound`, and the struck
+thing's ring exactly as `ImpactAcoustics.Between` has always made it. `DroppedThings.Impact`, `BodyWorldSystem`
+and the old scripted landing in `HandsService` call it; every other `Between` caller (WallBumps, DrivingSystem's
+crashes, CombatService's falls, FireSynth's table and the AudioLab's old bump) keeps the old law untouched. A
+`Ring` with no mode arrays renders through the old three-partial path, and a `Knock` through the old path, byte for
+byte; the guard test compares both against a copy of the old synthesiser. The body world now makes an item's box
+from its declared shape, so a crowbar falls as a metre of bar rather than an 86 mm cube.
+
+**Renders.** AudioLab `--drops` (out `~/.cache/openfps-build/rings/renders/`) now adds a steel bar (1 m, 25 mm
+square), a steel pipe (1 m, 40 mm outer, 3 mm wall), an empty glass bottle (0.28 m), a wooden plank (1 x 0.1 x
+0.025 m) and a plastic box, each from one metre onto concrete and onto wood, the new render beside the old
+script's. All 20 shape files are below full scale, hold only finite samples and clip 0 samples. Peak / RMS dBFS,
+predicted modes and the strongest tail peaks (the synth's +/-3 % strike jitter puts the measured peak within about
+3 %):
+
+| item, floor | peak / RMS | predicted | measured tail |
+|---|---|---|---|
+| steel bar, concrete | -9.4 / -30.3 | 130, 358, 701, 1159 Hz | 131, 363, 711, 1178 (floor 172) |
+| steel bar, wood | -10.3 / -33.0 | 130, 358, 701, 1159 | 133, 363, 711, 1178 (floor 194) |
+| steel pipe, concrete | -7.7 / -31.3 | 236, 650, 1275, 2107 | 241, 660, 1297, 2142 (floor 171) |
+| steel pipe, wood | -9.2 / -34.2 | 236, 650, 1275, 2107 | 241, 660, 1297, 2142 (floor 194) |
+| glass bottle, concrete | -11.4 / -37.7 | 1188, 3360, 6442, 10418 | 1208, 3326, 6380, 10316 (floor 171, 1176) |
+| glass bottle, wood | -12.6 / -41.1 | 1188, 3360, 6442, 10418 | 1208, 3415, 6547, 10586 (floor 194) |
+| wooden plank, concrete | -12.4 / -39.8 | 106, 291, 571, 944 | 106, 295, 582 (floor 165, 185, 398) |
+| wooden plank, wood | -10.8 / -40.7 | 106, 291, 571, 944 | 106, 295, 579 (floor 172, 194, 215) |
+| plastic box, concrete | -10.5 / -42.5 | 7748 | 7825 (floor 161, 401, 677; 7919 sideband) |
+| plastic box, wood | -10.3 / -43.9 | 7748 | 7843 (floor 196, 466, 800; 7919 sideband) |
+
+The steel bar's first four notes are the beam's roots; the pipe's are 1.8 times the bar's because a tube spends its
+mass at a larger radius. The bottle's are the shell's bending modes; its breathing mode is at 23 kHz, above what
+the ring carries. The plank's 944 Hz mode is below the strongest six in its short tail. The floor's own ring near
+170 to 200 Hz is beside the item's modes, as it should be: both things ring.
+
+**Tests.** `ItemShapeTests` (10): the beam's free-free ratios; steel ringing longer than wood; a free ring longer
+than a mounted one; a tube above a bar of the same length and mass; steel on concrete a shorter contact than wood;
+a drop taking its brightness from both materials and carrying its own modes; the shape crossing the wire through
+MemoryPack; every shipped item declaring a shape and the cube fallback; every non-drop `Between` caller matching
+the old law over 9,800 combinations; and the old Ring and Knock rendering byte for byte. The classes that use the
+sound, the drops, the bodies, the doors, the glass, the fire and the feet ran beside them, and the stored emitter
+streams, spoken lines, render fingerprint, drives, rail, walks, people and traffic replays stayed byte for byte.
+
+**Wire.** The wire hash moved from `33911a144326` to `dc55222e4e23` (Common's appended item fields, Acoustics'
+new file, and Sound's `TransientSound` and `ImpactAcoustics`), so the server and the Windows client deploy
+together. The door fingerprint is still `d163818bf3ff`: `AcousticRegistry.cs` and the door model files did not
+move, and the door render fingerprints pass unchanged.
+
 ## Decisions (Cody, 2026-10-11)
 
 - Approved as recommended, all ten (section 8), with two changes:

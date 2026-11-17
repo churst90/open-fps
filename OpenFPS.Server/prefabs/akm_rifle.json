@@ -7,5 +7,11 @@
   "IsItem": true,
   "ItemWeight": 3.3,
   "Hands": 2,
-  "WeaponId": "akm"
+  "WeaponId": "akm",
+  "ItemShape": "Bar",
+  "ItemSize": {
+    "X": 0.88,
+    "Y": 0.1,
+    "Z": 0.06
+  }
 }

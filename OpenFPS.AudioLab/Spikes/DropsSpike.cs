@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
+using OpenFPS.Acoustics;
 using OpenFPS.Common;
 using OpenFPS.Geometry;
 using OpenFPS.Materials;
@@ -20,10 +21,13 @@ namespace OpenFPS.AudioLab.Spikes;
 /// Dropped and thrown things as real bodies (docs/PHYSICS_BOUNDARY.md 18.2 step 7, 18.11): three items of
 /// different mass and material — a glass bottle, a wooden block, a steel crowbar — let go over four floors
 /// (wood, concrete, carpet, metal), and two of them thrown, all stepped in a <see cref="BodyWorld"/> and every
-/// impact heard through the same contact and the same <see cref="ImpactAcoustics.Between"/> the server uses. Each
+/// impact heard through the same contact and the same <see cref="ImpactAcoustics.Dropped"/> the server uses. Each
 /// drop is rendered to a WAV beside the old scripted drop of the same item, floor and height, at game level (the
-/// shipped hearing's placement), and every file's peak and RMS is printed. <c>cost</c> (or always, after) also
-/// prices the server's warm-up and a tick with 1, 10 and 50 moving items on the city's own tiles.
+/// shipped hearing's placement), and every file's peak and RMS is printed. The shapes section (18.12) adds a steel
+/// bar, a steel pipe, a glass bottle, a wooden plank and a plastic box, each dropped from one metre onto concrete
+/// and wood, and prints each new render's strongest tail peaks beside the notes its shape's law predicts.
+/// <c>cost</c> (or always, after) also prices the server's warm-up and a tick with 1, 10 and 50 moving items on the
+/// city's own tiles.
 /// </summary>
 public static class DropsSpike
 {
@@ -34,12 +38,25 @@ public static class DropsSpike
         ("Wood", -9f), ("Concrete", -3f), ("Carpet", 3f), ("Metal", 9f),
     };
 
-    private static readonly (string Name, float MassKg, string Material, Vector3 Size)[] Items =
+    private static readonly (string Name, float MassKg, string Material, ItemShape Shape)[] Items =
     {
-        ("glass bottle", 0.5f, "Glass", new Vector3(0.08f, 0.28f, 0.08f)),
-        ("wooden block", 2f, "Wood", new Vector3(0.2f, 0.2f, 0.2f)),
-        ("steel crowbar", 5f, "Metal", new Vector3(0.03f, 0.03f, 0.9f)),
+        ("glass bottle", 0.5f, "Glass", new ItemShape(ItemShapeKind.Shell, new Vector3(0.08f, 0.28f, 0.08f))),
+        ("wooden block", 2f, "Wood", new ItemShape(ItemShapeKind.Block, new Vector3(0.2f, 0.2f, 0.2f))),
+        ("steel crowbar", 5f, "Metal", new ItemShape(ItemShapeKind.Bar, new Vector3(0.03f, 0.03f, 0.9f))),
     };
+
+    /// <summary>The shapes Cody asked to hear (docs/PHYSICS_BOUNDARY.md 18.12): a bar, a pipe, a bottle, a plank and
+    /// a box, each dropped from one metre onto concrete and onto a wood floor, old script beside new.</summary>
+    private static readonly (string Name, float MassKg, string Material, ItemShape Shape)[] RingItems =
+    {
+        ("steel bar", 4.9f, "Metal", new ItemShape(ItemShapeKind.Bar, new Vector3(1f, 0.025f, 0.025f))),
+        ("steel pipe", 2.74f, "Metal", new ItemShape(ItemShapeKind.Tube, new Vector3(1f, 0.04f, 0.04f), 0.003f)),
+        ("glass bottle", 0.5f, "Glass", new ItemShape(ItemShapeKind.Shell, new Vector3(0.08f, 0.28f, 0.08f))),
+        ("wooden plank", 1.63f, "Wood", new ItemShape(ItemShapeKind.Bar, new Vector3(1f, 0.1f, 0.025f))),
+        ("plastic box", 1f, "Plastic", new ItemShape(ItemShapeKind.Block, new Vector3(0.2f, 0.2f, 0.2f))),
+    };
+
+    private static readonly string[] RingFloors = { "Concrete", "Wood" };
 
     /// <summary>Where the hand is: the item's middle, a metre and a third above the floor.</summary>
     private const float HandMetres = 1.3f;
@@ -60,6 +77,7 @@ public static class DropsSpike
         Console.WriteLine($"Drops: game level, compression {hearing.Compression:F2}; writing to {outDir}\n");
 
         var files = Render(outDir, hearing);
+        files += RenderRings(outDir, hearing);
         Cost(args);
         return files;
     }
@@ -124,6 +142,103 @@ public static class DropsSpike
         return bad == 0 ? 0 : 1;
     }
 
+    /// <summary>
+    /// The shapes Cody asked for: each dropped from one metre onto concrete and onto wood, the new render beside the
+    /// old script's, with the tail's strongest spectral peaks beside the notes the item's law predicts. The peak/RMS
+    /// /clip line comes from <see cref="Write"/>; this adds the mode check.
+    /// </summary>
+    private static int RenderRings(string outDir, HearingSettings hearing)
+    {
+        Console.WriteLine("\nShapes: one metre onto concrete and wood, old script beside new");
+        Console.WriteLine("  file                                      secs   peak   rms  clip  nan  impact(s) at (s:knock dB/peak dBFS)");
+        int bad = 0, n = 100;
+        foreach (string material in RingFloors)
+        {
+            float x = FloorX(material);
+            foreach (var item in RingItems)
+            {
+                n++;
+                var start = new Vector3(x, 1f + item.Shape.Size.Y * 0.5f, 0f);
+                var flight = Fly(item, start, Vector3.Zero, material);
+                string stem = $"{n:00}-new-{Slug(item.Name)}-from-1m-on-{Slug(material)}";
+                var pcm = Mix(flight.Impacts, hearing, out var times);
+                bad += Write(outDir, stem + ".wav", pcm, times);
+
+                var old = OldScript(item, material, start);
+                string oldStem = $"{n:00}-old-{Slug(item.Name)}-from-1m-on-{Slug(material)}";
+                var oldPcm = Mix(old, hearing, out var oldTimes);
+                bad += Write(outDir, oldStem + ".wav", oldPcm, oldTimes);
+
+                var modes = ItemModes.Free(AcousticRegistry.GetProperties(item.Material), item.Shape, item.MassKg);
+                string predicted = modes.Count == 0 ? "none"
+                    : string.Join(", ", modes.Select(m => $"{m.Hz:F0} Hz"));
+                float blow = flight.Impacts.Count > 0 ? flight.Impacts[0].Time : 0f;
+                float longest = modes.Count > 0 ? modes.Max(m => m.Seconds) : 0.05f;
+                float from = blow + Math.Clamp(longest * 0.1f, 0.005f, 0.05f);
+                float window = Math.Clamp(longest * 1.5f, 0.1f, 0.5f);
+                var peaks = TailPeaks(pcm, from, window, 6);
+                string measured = peaks.Count == 0 ? "none"
+                    : string.Join(", ", peaks.Select(f => $"{f:F0} Hz"));
+                Console.WriteLine($"      {stem}: predicted {predicted}; tail peaks {measured}");
+            }
+        }
+        Console.WriteLine(bad == 0
+            ? "\nEvery shape file is below full scale and holds only finite samples."
+            : $"\n{bad} shape file(s) clip or hold a non-finite sample.");
+        return bad == 0 ? 0 : 1;
+    }
+
+    private static float FloorX(string material)
+    {
+        foreach (var (name, x) in Floors) if (name == material) return x;
+        return 0f;
+    }
+
+    /// <summary>
+    /// The strongest local maxima in a stretch of the render, 40 Hz to 12 kHz, by a Hann-windowed FFT: the tail's
+    /// partials as heard, to set beside the item's predicted modes. Peaks within 20 Hz of a stronger one are the
+    /// same partial's leakage and are not listed twice.
+    /// </summary>
+    private static List<float> TailPeaks(float[] pcm, float fromSeconds, float windowSeconds, int count)
+    {
+        int start = Math.Max(0, (int)(fromSeconds * Rate));
+        int n = 1;
+        while (n < windowSeconds * Rate) n <<= 1;
+        var buffer = new System.Numerics.Complex[n];
+        int take = Math.Min(n, Math.Max(0, pcm.Length - start));
+        for (int i = 0; i < take; i++)
+        {
+            float w = 0.5f - 0.5f * MathF.Cos(MathF.Tau * i / (n - 1));
+            buffer[i] = new System.Numerics.Complex(pcm[start + i] * w, 0);
+        }
+        Spectrum.Fft(buffer);
+
+        int lowBin = Math.Max(1, (int)(40f * n / Rate));
+        int highBin = Math.Min(n / 2 - 1, (int)(12000f * n / Rate));
+        var found = new List<(float Hz, double Power)>();
+        for (int k = lowBin + 1; k < highBin; k++)
+        {
+            double a = buffer[k - 1].Real * buffer[k - 1].Real + buffer[k - 1].Imaginary * buffer[k - 1].Imaginary;
+            double b = buffer[k].Real * buffer[k].Real + buffer[k].Imaginary * buffer[k].Imaginary;
+            double c = buffer[k + 1].Real * buffer[k + 1].Real + buffer[k + 1].Imaginary * buffer[k + 1].Imaginary;
+            if (!(b > a && b >= c)) continue;
+            // Parabolic interpolation of the log magnitude: the bin grid is about 3 Hz, the ear's not.
+            double offset = 0.5 * (a - c) / Math.Max(1e-30, a - 2 * b + c);
+            double hz = (k + Math.Clamp(offset, -0.5, 0.5)) * (double)Rate / n;
+            if (hz < 40 || hz > 12000) continue;
+            found.Add(((float)hz, b));
+        }
+        found.Sort((x, y) => y.Power.CompareTo(x.Power));
+        var peaks = new List<float>(count);
+        foreach (var (hz, _) in found)
+        {
+            if (peaks.Any(p => MathF.Abs(p - hz) < 20f)) continue;
+            peaks.Add(hz);
+            if (peaks.Count >= count) break;
+        }
+        return peaks;
+    }
+
     private sealed record ImpactAt(float Time, List<TransientSound> Sounds);
     private sealed record Flight(List<ImpactAt> Impacts, int Ticks, float Seconds);
 
@@ -132,7 +247,7 @@ public static class DropsSpike
     /// mass, and its contacts read as the server reads them. The floor is struck as the game's tile panel: the
     /// server's floors are mesh tiles and carry no panel size of their own.
     /// </summary>
-    private static Flight Fly((string Name, float MassKg, string Material, Vector3 Size) item, Vector3 start, Vector3 velocity,
+    private static Flight Fly((string Name, float MassKg, string Material, ItemShape Shape) item, Vector3 start, Vector3 velocity,
                               string floorMaterial)
     {
         using var world = new BodyWorld();
@@ -143,7 +258,7 @@ public static class DropsSpike
         }
         var contacts = new ContactStream();
         world.ReportContacts = true;
-        int bodyShape = world.AddBox(item.Size * 0.5f);
+        int bodyShape = world.AddBox(item.Shape.Size * 0.5f);
         int body = world.Add(bodyShape, BodyMotion.Dynamic, start, Quaternion.Identity, item.Material, item.MassKg);
         world.SetVelocity(body, velocity);
 
@@ -158,7 +273,8 @@ public static class DropsSpike
             foreach (var contact in contacts.Events)
             {
                 if (contact.Phase != ContactPhase.Began || contact.Body != BodyWorld.ContactId(body)) continue;
-                var sounds = DroppedThings.Impact(contact, item.MassKg, DroppedThings.FixedMassKg, FloorPanel, struckFixed: true);
+                var sounds = DroppedThings.Impact(contact, item.MassKg, DroppedThings.FixedMassKg,
+                                                  item.Shape, new ItemShape(ItemShapeKind.Block, FloorPanel), struckFixed: true);
                 if (sounds.Count > 0) impacts.Add(new ImpactAt(time, sounds));
             }
             if (world.State(body).Sleeping) break;
@@ -169,7 +285,7 @@ public static class DropsSpike
     }
 
     /// <summary>The old scripted drop exactly: one impact at once, at sqrt(2gh), mass m into 500 m of floor, a 2 m square 0.2 m thick.</summary>
-    private static List<ImpactAt> OldScript((string Name, float MassKg, string Material, Vector3 Size) item, string floorMaterial, Vector3 from)
+    private static List<ImpactAt> OldScript((string Name, float MassKg, string Material, ItemShape Shape) item, string floorMaterial, Vector3 from)
     {
         float fall = MathF.Max(0.05f, from.Y);
         float speed = MathF.Sqrt(2f * Earth.StandardGravity * fall);

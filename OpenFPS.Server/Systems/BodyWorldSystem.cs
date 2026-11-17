@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using Arch.Core;
+using OpenFPS.Acoustics;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Geometry;
@@ -85,7 +86,7 @@ public static class BodyWorldSystem
         public int Body;
         public int Shape;
         public string Name = "";
-        public Vector3 Size;
+        public ItemShape ItemShape;
     }
 
     private sealed class MapBodies : IDisposable
@@ -169,11 +170,11 @@ public static class BodyWorldSystem
         public bool Launch(World world, Entity item, string name, Vector3 velocity, out string why)
         {
             why = "";
-            if (!DroppedThings.TryBody(world, item, out var size, out float mass, out string material))
+            if (!DroppedThings.TryBody(world, item, out ItemShape itemShape, out float mass, out string material))
             { why = "not an item"; return false; }
             var t = world.Get<Transform>(item);
             var rotation = t.Rotation.LengthSquared() < 1e-6f ? Quaternion.Identity : t.Rotation;
-            int shape = _world.AddBox(size * 0.5f);
+            int shape = _world.AddBox(itemShape.Size * 0.5f);
             int body;
             try
             {
@@ -185,7 +186,7 @@ public static class BodyWorldSystem
                 throw;
             }
             _world.SetVelocity(body, velocity);
-            _flights[body] = new Flight { Item = item, Body = body, Shape = shape, Name = name, Size = size };
+            _flights[body] = new Flight { Item = item, Body = body, Shape = shape, Name = name, ItemShape = itemShape };
             return true;
         }
 
@@ -243,12 +244,13 @@ public static class BodyWorldSystem
                 bool otherIsItem = BodyWorld.IsContactId(contact.Other)
                                    && _flights.TryGetValue(BodyWorld.BodyOfContactId(contact.Other), out other);
                 float struckMass = otherIsItem ? _world.Mass(other!.Body) : DroppedThings.FixedMassKg;
-                var struckSize = otherIsItem
-                    ? other!.Size
-                    : new Vector3(DroppedThings.FloorPanelWidthMetres, DroppedThings.FloorPanelHeightMetres,
-                                  DroppedThings.FloorPanelThicknessMetres);
-                var sounds = DroppedThings.Impact(contact, _world.Mass(flight.Body), struckMass, struckSize,
-                                                  struckFixed: !otherIsItem);
+                var struckShape = otherIsItem
+                    ? other!.ItemShape
+                    : new ItemShape(ItemShapeKind.Block,
+                                    new Vector3(DroppedThings.FloorPanelWidthMetres, DroppedThings.FloorPanelHeightMetres,
+                                                DroppedThings.FloorPanelThicknessMetres));
+                var sounds = DroppedThings.Impact(contact, _world.Mass(flight.Body), struckMass,
+                                                  flight.ItemShape, struckShape, struckFixed: !otherIsItem);
                 if (sounds.Count > 0) heard(flight.Item.Id, flight.Name, sounds);
             }
         }

@@ -7,5 +7,11 @@
   "IsItem": true,
   "ItemWeight": 0.9,
   "Hands": 1,
-  "WeaponId": "glock"
+  "WeaponId": "glock",
+  "ItemShape": "Block",
+  "ItemSize": {
+    "X": 0.2,
+    "Y": 0.13,
+    "Z": 0.03
+  }
 }

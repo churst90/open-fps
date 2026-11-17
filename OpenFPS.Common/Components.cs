@@ -780,6 +780,19 @@ public partial struct ItemComponent
     /// <summary>The weapon this is, or empty: a key into <see cref="OpenFPS.Sound.WeaponRegistry"/>.</summary>
     public string WeaponId { get; set; }
 
+    // APPEND ONLY below this line: components serialise positionally.
+
+    /// <summary>The shape it is when dropped (docs/PHYSICS_BOUNDARY.md 18.12), or Unspecified for the old
+    /// cube of its mass at its material's density.</summary>
+    public ItemShapeKind ShapeKind { get; set; }
+
+    /// <summary>The shape's full outer extents, metres, in the item's own axes; zero when it declares none.</summary>
+    public Vector3 ShapeSize { get; set; }
+
+    /// <summary>A tube's or a shell's wall, metres; zero to work it out from <see cref="MassKg"/> and the
+    /// material's density.</summary>
+    public float ShapeWallMetres { get; set; }
+
     public ItemComponent() { MassKg = 1f; Hands = 1; WeaponId = ""; }
 }
 

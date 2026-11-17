@@ -71,6 +71,91 @@ public static class ImpactAcoustics
         }
         return sounds;
     }
+
+    /// <summary>
+    /// The sound of one dropped or thrown thing meeting another (docs/PHYSICS_BOUNDARY.md 18.12): the blow's length
+    /// and brightness from the Hertz contact of the pair, the dropped thing's own ring by its declared shape, and
+    /// the struck thing's ring as <see cref="Between"/> has always made it. The two rings are separate sounds
+    /// because they are two things, each free to ring as what it is; <paramref name="struckWidth"/>,
+    /// <paramref name="struckHeight"/> and <paramref name="struckThickness"/> are the struck face, as before.
+    /// </summary>
+    public static List<TransientSound> Dropped(MaterialProperties hitter, MaterialProperties struck, ItemShape hitterShape,
+                                               Vector3 where, float closingSpeed,
+                                               float hitterMassKg, float struckMassKg,
+                                               float struckWidth, float struckHeight, float struckThickness,
+                                               bool struckIsFixed = true)
+    {
+        var sounds = new List<TransientSound>(3);
+        if (closingSpeed < MinimumSpeed) return sounds;
+
+        float joules = PanelAcoustics.ImpactJoules(hitterMassKg, struckMassKg, closingSpeed);
+        float db = PanelAcoustics.ImpactDb(joules);
+
+        // Hertz: how long the two are in contact, and so what the blow has above 1/tau (ItemModes.ContactSeconds).
+        float contact = ItemModes.ContactSeconds(hitter, struck, hitterMassKg, struckMassKg,
+                                                 hitterShape.ContactRadiusMetres, closingSpeed);
+        var softer = hitter.YoungsModulusGPa <= struck.YoungsModulusGPa ? hitter : struck;
+        float softness = 1f / (1f + MathF.Max(0f, softer.YoungsModulusGPa));
+        float reduced = PanelAcoustics.ImpactJoules(hitterMassKg, struckMassKg, 1f) * 2f;
+        float lengthScale = MathF.Pow(MathF.Max(0.02f, reduced), 0.18f);
+        sounds.Add(new TransientSound
+        {
+            Character = SoundCharacter.Knock,
+            DelaySeconds = 0f,
+            Position = where,
+            LevelDb = db,
+            Hz = ItemModes.ContactHz(contact),
+            DecaySeconds = Math.Clamp((0.02f + softness * 0.25f) * lengthScale, 0.02f, 0.6f),
+            Noisiness = 0.85f,
+        });
+
+        // The dropped thing itself, free: its shape's own modes, each with the material's T60 at that note.
+        var modes = ItemModes.Free(hitter, hitterShape, hitterMassKg);
+        if (modes.Count > 0)
+        {
+            var ratios = new float[modes.Count];
+            var decays = new float[modes.Count];
+            float longest = modes[0].Seconds;
+            for (int i = 0; i < modes.Count; i++)
+            {
+                ratios[i] = modes[i].Hz / modes[0].Hz;
+                decays[i] = modes[i].Seconds;
+                longest = MathF.Max(longest, modes[i].Seconds);
+            }
+            sounds.Add(new TransientSound
+            {
+                Character = SoundCharacter.Ring,
+                DelaySeconds = 0.003f,
+                Position = where,
+                LevelDb = db - 5f,
+                Hz = modes[0].Hz,
+                DecaySeconds = longest,
+                Noisiness = 0.12f,
+                ModeRatios = ratios,
+                ModeDecaySeconds = decays,
+            });
+        }
+
+        // Then the struck thing rings, exactly as Between rings it: only its face is known here.
+        float hz = PanelAcoustics.RingHz(struck, struckWidth, struckHeight, struckThickness);
+        if (hz > 0f)
+        {
+            float mounting = struckIsFixed ? PanelAcoustics.MountedLoss : 0f;
+            float seconds = PanelAcoustics.RingSeconds(struck, hz, mounting);
+            if (PanelAcoustics.RingsAudibly(struck, hz, mounting))
+                sounds.Add(new TransientSound
+                {
+                    Character = SoundCharacter.Ring,
+                    DelaySeconds = 0.003f,
+                    Position = where,
+                    LevelDb = db - 5f,
+                    Hz = hz,
+                    DecaySeconds = seconds,
+                    Noisiness = 0.12f,
+                });
+        }
+        return sounds;
+    }
 }
 
 /// <summary>

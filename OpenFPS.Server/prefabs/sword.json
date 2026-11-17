@@ -5,5 +5,11 @@
   "Material": "Metal",
   "Type": "Item",
   "IsItem": true,
-  "ItemWeight": 2
+  "ItemWeight": 2,
+  "ItemShape": "Bar",
+  "ItemSize": {
+    "X": 0.85,
+    "Y": 0.04,
+    "Z": 0.007
+  }
 }

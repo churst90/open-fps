@@ -102,6 +102,8 @@ public class EnvironmentWireBytesTests
     private static class Expected
     {
         public const string Weather = "81a57a8e95894b8e1901579e8a9c947c2b15f9ce79204dd73c23fffbd351757d";
-        public const string Strikes = "f815ca8ee0076e2ede76ae61309a19e6c4a9e50bfe03ab93b76045fa9a13f69a";
+        // Moved 2026-11-17 with the mode ratios and per-mode lengths appended to TransientSound (docs/PHYSICS_BOUNDARY.md
+        // 18.12); the lightning's own fields are unchanged.
+        public const string Strikes = "601c870bfcb759e883e495c6bf90c3e3e4254637cc9f8fb1811b57034a65cf0b";
     }
 }

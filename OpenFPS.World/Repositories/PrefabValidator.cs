@@ -119,6 +119,27 @@ public static class PrefabValidator
         if (t.ItemWeight is <= 0)
             r.Errors.Add($"ItemWeight {t.ItemWeight} must be greater than 0.");
 
+        if (t.ItemShape.HasValue && !t.IsItem)
+            r.Errors.Add("ItemShape is set but IsItem is false, so no item carries the shape.");
+        if (t.ItemShape.HasValue && !t.ItemSize.HasValue)
+            r.Errors.Add($"ItemShape is {t.ItemShape} but ItemSize is not set: a shape needs its outer extents.");
+        if (t.ItemSize.HasValue)
+        {
+            var s = t.ItemSize.Value;
+            if (!t.ItemShape.HasValue) r.Errors.Add("ItemSize is set but ItemShape is not: say what shape those extents are.");
+            if (s.X <= 0 || s.Y <= 0 || s.Z <= 0)
+                r.Errors.Add($"ItemSize {Fmt(s)} has a non-positive extent.");
+        }
+        if (t.ItemWallMetres.HasValue)
+        {
+            if (t.ItemShape is not (OpenFPS.Acoustics.ItemShapeKind.Tube or OpenFPS.Acoustics.ItemShapeKind.Shell))
+                r.Errors.Add("ItemWallMetres is set on a shape with no wall: only Tube and Shell have one.");
+            else if (t.ItemWallMetres <= 0)
+                r.Errors.Add($"ItemWallMetres {t.ItemWallMetres} must be greater than 0 (omit it to derive the wall from the mass).");
+            else if (t.ItemSize is { } s && t.ItemWallMetres >= MathF.Min(s.X, MathF.Min(s.Y, s.Z)) / 2f)
+                r.Errors.Add($"ItemWallMetres {t.ItemWallMetres} is not a thin wall in ItemSize {Fmt(s)}.");
+        }
+
         // --- Acoustics ------------------------------------------------------------------------------
         Unit(r, "TransmissionLow", t.TransmissionLow);
         Unit(r, "TransmissionMid", t.TransmissionMid);

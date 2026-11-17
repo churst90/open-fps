@@ -69,7 +69,7 @@ shape of it.
 | Glazing | `Glazing` (`Annealed`, `Tempered`, `Laminated`): required on anything of glass, refused on anything else; how a shot pane breaks | read from the prefab by the server (`GlassKind`) |
 | Health | `MaxHealth` | `HealthComponent` |
 | Crowd | `CrowdPeople`, `CrowdReactRadiusMetres` | `CrowdComponent` |
-| Item | `IsItem`, `ItemWeight`, `Hands`, `WeaponId`, `Premium` | `ItemComponent` |
+| Item | `IsItem`, `ItemWeight`, `Hands`, `WeaponId`, `Premium`, `ItemShape`, `ItemSize`, `ItemWallMetres` | `ItemComponent` |
 | Acoustics | `Transmission{Low,Mid,High}`, `Absorption`, `Scattering`, `ShellThickness`, `LeafMetres`, `StudSpacingMetres`, `FaceMask` / `MissingFaces` | `AcousticComponent` |
 | Physics | `Mass`, `Friction`, `Restitution`, `Drag` | `PhysicsPropertyComponent` |
 | Emitter | `HasEmitter` + `SoundId`, `StartSoundId`, `StopSoundId`, `Volume`, `Range`, `MinDistance`, `Mode`, `EmitterDirection`, `EmitterOffset`, `Cone*`, `RepeatIntervalSeconds` | `SoundEmitterComponent` |
