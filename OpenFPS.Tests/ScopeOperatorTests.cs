@@ -78,4 +78,15 @@ public class ScopeOperatorTests
         Assert.Equal(new[] { "person" }, people.Select(p => p.Name));
         Assert.Empty(MapTracker.Gather(world, Vector3.Zero, TrackCategory.Vehicles, -1));
     }
+
+    /// <summary>The bump meets the collider, and a push mower's box is the machine: walking into one is
+    /// still the machine struck (StruckThings), not the soft contact of two bodies.</summary>
+    [Fact]
+    public void WalkingIntoAPushMowerStrikesTheMachine()
+    {
+        var mower = EntityAcoustics.BodyOf(Body(1, "Mower, garden 2", "machine:mower_push", new Vector3(0f, 0f, 2f)));
+        var c = new BodyContact(1, new Vector3(0, 0, -1), PhysicsConstants.WalkSpeed, PhysicsConstants.WalkSpeed, new Vector3(0, 0, 1.4f));
+        var bump = Assert.Single(WallBumps.Sound(mower, c, WallBumps.TouchPoint(mower, c), running: false));
+        Assert.True(StruckThings.TryParseKey(bump.SynthKey, out _), bump.SynthKey ?? "no struck key");
+    }
 }

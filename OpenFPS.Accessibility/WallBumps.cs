@@ -1,6 +1,7 @@
 using System.Numerics;
 using OpenFPS.Acoustics;
 using OpenFPS.Materials;
+using OpenFPS.Models;
 using OpenFPS.Physics;
 using OpenFPS.Sound;
 
@@ -173,7 +174,7 @@ public sealed class WallBumps
     /// </summary>
     public static List<TransientSound> Sound(in AcousticBody struck, BodyContact c, Vector3 where, bool running, int seed = 0)
     {
-        if (Sightline.IsPerson(struck)) return PersonSound(struck, c, where, running);
+        if (MetAsBody(struck)) return PersonSound(struck, c, where, running);
         var strike = StrikeOf(struck, c, where, running, seed, out _);
         return new List<TransientSound>
         {
@@ -220,6 +221,13 @@ public sealed class WallBumps
     }
 
     /// <summary>
+    /// Whether a bump meets a person's own body. The collider is what is struck: a machine somebody walks behind
+    /// is a person to the scope (SightKinds), but its box is the machine, so it is struck as a thing.
+    /// </summary>
+    static bool MetAsBody(in AcousticBody struck)
+        => Sightline.IsPerson(struck) && ModelKindTable.BodyOf(struck.SoundId) == null;
+
+    /// <summary>
     /// Walking into a person: the impact model every collision used before the struck things (ImpactAcoustics), a
     /// body (Skin) against them, weighing what a person weighs.
     /// </summary>
@@ -241,7 +249,7 @@ public sealed class WallBumps
 
         float density = props.DensityKgM3 > 0f ? props.DensityKgM3 : 500f;
         // A person is not their collision box full of flesh (680 kg): they weigh what a person weighs.
-        float massKg = Sightline.IsPerson(struck)
+        float massKg = MetAsBody(struck)
             ? BodyConstants.PersonMassKg
             : Math.Clamp(size.X * size.Y * size.Z * density, 1f, 1e6f);
         float closing = (running ? RunningPace : WalkingPace) * Math.Clamp(c.Intent, 0f, 1f);

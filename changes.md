@@ -32,7 +32,9 @@
   conditioner) is still not picked out. The scope aims at the entity's chest as for any person (nothing
   declares an operator offset, and the footsteps already come from the machine's own body) and calls it
   "person"; the people tracker lists it under People, not Vehicles. The city's mowers have `Named` false, so
-  their machine name is not spoken. No sound, render or stored stream moved; the wire hash stays
+  their machine name is not spoken. Walking into one is still the machine struck (StruckThings), not
+  the soft contact of two bodies: the bump meets the collider, and the collider is the mower. No sound,
+  render or stored stream moved; the wire hash stays
   76462a50fa10 and the door fingerprint d163818bf3ff.
 
 ## 2026-11-17
