@@ -137,13 +137,14 @@ public class ModelKindTableTests
         ModelBody.Rolls => 0,
         ModelBody.Flies => 1,
         ModelBody.Rails => 2,
-        null when type == EntityType.NPC => 3,
+        null or ModelBody.Walks when type == EntityType.NPC => 3,
         _ => -1,
     };
 
     /// <summary>
-    /// On every body the shipped maps put down, the table's body gives the footsteps and the scope's
-    /// answer the two prefix lists gave, the push mower included: footsteps, and not a person in the scope.
+    /// On every body the shipped maps put down, the table's body gives the footsteps the old list gave,
+    /// and the scope's answer too, except the push mower: Cody's decision of 2026-11-17 made a machine
+    /// somebody walks behind a person to the scope, where the old list said it was not picked out.
     /// </summary>
     [Fact]
     public void TheBodiesAgreeWithTheListsTheyReplacedOnEveryShippedBody()
@@ -152,9 +153,14 @@ public class ModelKindTableTests
         Assert.Contains(bodies, b => b.SoundId.Equals("machine:mower_push", StringComparison.OrdinalIgnoreCase));
         foreach (var b in bodies)
         {
-            bool legs = ModelKindTable.BodyOf(b.SoundId) is not { } body || body == ModelBody.Walks;
+            var model = ModelKindTable.BodyOf(b.SoundId);
+            bool legs = model is not { } body || body == ModelBody.Walks;
             Assert.True(HadLegs(b.SoundId, b.IsSynth) == legs, $"{b.SoundId} on {b.Where}: legs {legs}, were {!legs}");
-            Assert.True(OldSight(b.SoundId, b.Type) == NewSight(b.SoundId, b.Type), $"{b.SoundId} on {b.Where}: the scope's answer changed");
+            // A machine somebody walks behind is a person to the scope (Cody, 2026-11-17); every other
+            // body answers what the old list answered.
+            bool walked = model == ModelBody.Walks && b.Type == EntityType.NPC;
+            Assert.True(walked ? NewSight(b.SoundId, b.Type) == 3 : OldSight(b.SoundId, b.Type) == NewSight(b.SoundId, b.Type),
+                        $"{b.SoundId} on {b.Where}: the scope's answer changed");
         }
     }
 

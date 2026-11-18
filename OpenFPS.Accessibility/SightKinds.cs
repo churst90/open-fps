@@ -21,9 +21,10 @@ public static class SightKinds
         if (model == ModelBody.Flies) return SightKind.Aircraft;
         if (model == ModelBody.Rails) return SightKind.Train;
         if (body.Kind == BodyKind.Player) return SightKind.Player;
-        // A walker is an NPC with no model in it. A machine is not picked out, the push mower included,
-        // though its body walks (docs/SPECIAL_CASES_AUDIT.md, P2: the open choice).
-        if (body.Kind == BodyKind.Npc && model == null) return SightKind.Person;
+        // A walker is an NPC with no model in it, or a machine whose body walks because somebody walks
+        // behind it (SmallMachineSpec.WalkedBehind, the rule OtherBodies gives the footsteps): Cody's
+        // decision of 2026-11-17 (docs/SPECIAL_CASES_AUDIT.md, P2). A machine nobody walks is not picked out.
+        if (body.Kind == BodyKind.Npc && (model == null || model == ModelBody.Walks)) return SightKind.Person;
         return null;
     }
 
