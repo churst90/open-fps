@@ -2,6 +2,12 @@
 
 ## 2026-11-18
 
+- The deadlock breaker of 2026-11-17 is reverted, with the traffic and people streams it regenerated. On CI,
+  CrosswalkTests found a turning vehicle's corner passing 10 to 30 cm from somebody at the kerb end of a
+  crossing, closer than the test allows; nobody was driven over. Walkers at a kerb look only at the traffic
+  whose lane crosses their strip, so a vehicle turning past its end was not theirs to wait for. The breaker
+  returns as its own traffic item, with walkers giving way to a body that will sweep the crossing's end.
+
 - The sound library's third version, tag `library/v0.3.0` (docs/LIBRARY_CHANGES.md): everything the library gained
   since `library/v0.2.0`, for Resonance to take. Rigid bodies on Jolt (`BodyWorld`, `PieceBodies`, contacts into
   `ContactStream`), swept queries against the geometry, restitution set by the lossier body with measured floors, a

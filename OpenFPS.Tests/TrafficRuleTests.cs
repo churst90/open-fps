@@ -500,79 +500,8 @@ public class TrafficRuleTests : IDisposable
     }
 
     /// <summary>
-    /// A driver let go by the breaker takes only the gap its own movement would take, not a shorter
-    /// one: B gives way on the side road while a mail truck stands 8 s in the middle, and E, on the
-    /// priority road, is six and a half seconds from its line when the truck leaves. B waits for E,
-    /// where the old four-second rule let it go into E's gap and then held it again over the line.
-    /// </summary>
-    [Fact]
-    public void The_breaker_takes_no_shorter_gap_than_a_driver_giving_way_would()
-    {
-        // E starts 175 m round its lap, so it is at speed and six and a half seconds from its line
-        // when F leaves the middle.
-        var e = Car("E", South);
-        e.StartOffsetMetres = -175f;
-        var s = Build(new() { Car("B", East), Car("F", North, preset: "mail_truck"), e },
-                      priority: new() { "ns" },
-                      stops: new() { new RoadStopData { Name = "middle", Position = P(0f, 1.75f), Kind = "stop", DwellSeconds = 8f, ForPreset = "mail_truck" } });
-        bool fOut = false, eGone = false;
-        float eGapAtFOut = float.NaN, bMovedEarly = float.NaN;
-        var w = Run(s, 45f, () =>
-        {
-            var b = s.Car("B");
-            var car = s.Car("E");
-            if (!fOut && s.Car("F").Position.Z > 8f)
-            {
-                fOut = true;
-                eGapAtFOut = (car.Position.Z - 8f) / MathF.Max(0.5f, car.Speed);
-            }
-            if (car.Position.Z < -8f) eGone = true;
-            if (fOut && !eGone && float.IsNaN(bMovedEarly) && b.Speed > 0.2f) bMovedEarly = s.Time;
-        });
-        _o.WriteLine($"F out of the middle at {w.OutAt("F"):F1} s with E {eGapAtFOut:F1} s from its line; B moved early at {bMovedEarly:F1} s; {w}");
-        Assert.False(float.IsNaN(w.OutAt("E")), $"E never got through: {w}");
-        Assert.True(float.IsNaN(bMovedEarly) || bMovedEarly >= w.InAt("E"), $"B was let go into E's short gap at {bMovedEarly:F1} s: {w}");
-        Assert.True(w.InAt("B") > w.OutAt("E"), $"B went in while E was still coming or in the middle: {w}");
-        Assert.True(w.Closest > JunctionRules.BodyClearanceMetres, $"they met: {w}");
-    }
-
-    /// <summary>
-    /// Once the breaker has let a car go it carries on: it does not stop again for the cars still
-    /// waiting at the lines, and none may stand in the junction. Here nobody else is in its way.
-    /// </summary>
-    [Fact]
-    public void A_car_let_go_by_the_breaker_carries_on()
-    {
-        var s = Build(new() { Car("A", North), Car("B", East), Car("C", West), Car("D", South) });
-        var names = new[] { "A", "B", "C", "D" };
-        var stood = new HashSet<string>();
-        var moved = new HashSet<string>();
-        var stoppedAgain = new Dictionary<string, float>();
-        var w = Run(s, 50f, () =>
-        {
-            foreach (var n in names)
-            {
-                var c = s.Car(n);
-                if (MathF.Max(MathF.Abs(c.Position.X), MathF.Abs(c.Position.Z)) > 30f) continue;
-                if (!stood.Contains(n)) { if (c.Speed < 0.05f) stood.Add(n); continue; }
-                if (!moved.Contains(n)) { if (c.Speed > 0.1f) moved.Add(n); continue; }
-                if (!stoppedAgain.ContainsKey(n) && c.Speed < 0.05f) stoppedAgain[n] = s.Time;
-            }
-        });
-        foreach (var n in names)
-        {
-            Assert.True(stood.Contains(n), $"{n} never came to the line: {w}");
-            Assert.False(float.IsNaN(w.OutAt(n)), $"{n} never got through: {w}");
-            Assert.True(moved.Contains(n), $"{n} was never let go: {w}");
-        }
-        Assert.True(stoppedAgain.Count == 0,
-                    $"let go and stopped again: {string.Join(", ", stoppedAgain.Select(kv => $"{kv.Key} at {kv.Value:F1} s"))}; {w}");
-    }
-
-    /// <summary>
     /// Four cars arriving at once where everybody gives way all wait; after the patience one goes, and
-    /// no two whose ways meet are in the middle at once (docs/MUTATION_2026-10-01.md, item 10). Cars on
-    /// opposite lanes of one road pass, so being in the middle together is not the fault: meeting is.
+    /// never two are in the middle at once (docs/MUTATION_2026-10-01.md, item 10).
     /// </summary>
     [Theory]
     [InlineData("i4_economy")]
@@ -604,7 +533,9 @@ public class TrafficRuleTests : IDisposable
         _o.WriteLine($"all standing at {allStood:F1} s, the first moved again at {firstMoved:F1} s");
         Assert.True(firstMoved - allStood > new StreetLifeData().GiveWayPatienceSeconds - 0.5f,
                     $"all standing at {allStood:F1} s, the first moved again at {firstMoved:F1} s: {w}");
-        Assert.True(w.Closest > JunctionRules.BodyClearanceMetres,
-                    $"two came within a body's width in the middle: {w}");
+        foreach (var a in names)
+            foreach (var b in names)
+                if (a != b && w.InAt(a) <= w.InAt(b))
+                    Assert.True(w.InAt(b) > w.OutAt(a), $"{b} came in at {w.InAt(b):F1} s with {a} in the junction until {w.OutAt(a):F1} s: {w}");
     }
 }

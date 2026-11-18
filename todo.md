@@ -164,6 +164,12 @@ again once.
        `PeopleReplay` were regenerated after Cody's answer: 2 of 188 traffic movers from 39 s; Alex, the
        door events and the square's speech moved with walkers crossing in traffic's gaps (Alex first at
        892.2 s); haunts, doors and the hour's speech did not move.
+       Reverted 2026-11-18 (Cody), with its streams: on CI, CrosswalkTests found a turning vehicle's corner
+       10 to 30 cm from a walker at the kerb end of a crossing (Parcel van, Elm Street, 0.5 m/s, at -293.0
+       -91.6; Mid-size 16 standing at -3.7 122.9), inside the test's 20-25 cm clearance. A walker at the kerb
+       looks only at the traffic whose lane crosses its strip, not at a vehicle turning past the strip's end.
+       The breaker comes back as its own item with that rule: a walker gives way to a body that will sweep
+       the end of its crossing.
 7. Engine package stage 6, Common to the wire: DONE 2026-10-18 (docs/ENGINE_PACKAGES.md, stage 6's built note).
    Left: the Arch reference, which goes with the physics views and constants; and `Scopes` stays in Common unless
    Cody wants a shared game project for it.

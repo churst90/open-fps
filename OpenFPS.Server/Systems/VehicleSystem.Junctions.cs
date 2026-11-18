@@ -89,10 +89,6 @@ public sealed partial class VehicleSystem
         if (toLine - (atLine - holdAt) > stopping) return (float.MaxValue, look);
 
         var here = Slot(v.MapId, j);
-        // Let go by the breaker and still short of the junction: committed to it, as a driver halfway
-        // out is. It does not take the gap question again, and stops only for a body in its way
-        // (docs/MUTATION_2026-10-01.md, item 10).
-        bool letGo = here.LetGo == v;
         bool wait = false;
         foreach (var (o, m) in here.Inside)
             if (o != v && Conflict(v.MapId, mine, m)) { wait = true; break; }
@@ -103,7 +99,7 @@ public sealed partial class VehicleSystem
                 if (o != v && m.In != mine.In && !o.Holding && JunctionRules.Committed(o.Speed, o.Brake, oToLine) && Conflict(v.MapId, mine, m)
                     && (!JunctionRules.Committed(v.Speed, v.Brake, toLine) || oToLine < toLine || (oToLine == toLine && o.Entity.Id < v.Entity.Id)))
                 { wait = true; break; }
-        if (!wait && !letGo)
+        if (!wait)
             foreach (var (o, m, oToLine) in here.Coming)
             {
                 if (o == v || m.In == mine.In || !Conflict(v.MapId, mine, m)) continue;
@@ -119,14 +115,11 @@ public sealed partial class VehicleSystem
         {
             if (v.WaitingAt != j.Id) { v.WaitingAt = j.Id; v.WaitedSeconds = 0f; }
             v.WaitedSeconds += dt;
-            // ...but not in front of somebody whose gap it would not take: the give-way line's own law,
-            // so a driver is never let go into a gap shorter than its critical headway. Cars that are
-            // themselves waiting (speed below 0.5) take no part: that is the deadlock, and it breaks.
+            // ...but not in front of somebody about to arrive: that is not a deadlock, it is traffic.
             if (v.WaitedSeconds > life.GiveWayPatienceSeconds && (here.LetGo == null || here.LetGo == v)
                 && !here.Inside.Any(x => x.V != v && Conflict(v.MapId, mine, x.M))
                 && !here.Coming.Any(x => x.V != v && x.M.In != mine.In && x.V.Speed > 0.5f
-                                         && Conflict(v.MapId, mine, x.M)
-                                         && JunctionRules.GapTooShort(life, mine, givesWay, toLine, v.Speed, look, x.ToLine, x.V.Speed)))
+                                         && x.ToLine / x.V.Speed < JunctionRules.ImminentSeconds && Conflict(v.MapId, mine, x.M)))
             {
                 wait = false;
                 here.LetGo = v;

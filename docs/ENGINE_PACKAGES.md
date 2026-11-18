@@ -1050,7 +1050,7 @@ A session is one working session of an agent, as in docs/GEOMETRY.md.
     | Type | What it holds | From |
     |---|---|---|
     | `CarFollowing` | the IDM gap and its ACC blend (`Allowed`, `Acc`); the rain's caution from a map's `RoadWater`, null for none | `VehicleSystem.Following.cs` |
-    | `JunctionRules` | `Movement`; the look and the body clearance; `Committed`, `Rank`, `CriticalGap`, who gives way to whom (`GivesWayTo`), a gap too short to take (`GapTooShort`), `FromTheRight`, whether two ways meet (`Meet`) | `VehicleSystem.Junctions.cs` (the cache of meetings by map stays the host's) |
+    | `JunctionRules` | `Movement`; the look, the imminence and the body clearance; `Committed`, `Rank`, `CriticalGap`, who gives way to whom (`GivesWayTo`), a gap too short to take (`GapTooShort`), `FromTheRight`, whether two ways meet (`Meet`) | `VehicleSystem.Junctions.cs` (the cache of meetings by map stays the host's) |
     | `CrossingRules` | the kerb and stand-off distances; a carriageway's stretch of a walker's line; the gap a walker needs; a body's reach; a turn taken; a driver letting somebody across; where it stands and how hard it brakes once stopping | `VehicleSystem.Crosswalks.cs` |
     | `RouteRules` | a route's tour on the road network handed in (`Build`), the lanes' limits, the stops, where on its tour a vehicle is from its line and lap (`WhereOnLane`, `ShortOfTheLine`) | `VehicleSystem.Routes.cs` |
     | `StreetEvents` | an event's chance, a pick at random over what the host finds eligible, the hard stop, a burst of gunfire, the shot and the horn as the sounds they are from a position handed in | `VehicleSystem.StreetLife.cs` |
