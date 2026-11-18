@@ -196,9 +196,14 @@ again once.
      material's density and a crowbar could not clatter end over end — DONE for shapes 2026-11-17 (`ItemShape`,
      `ItemSize`, `ItemWallMetres`, docs/PHYSICS_BOUNDARY.md 18.12; wire hash `dc55222e4e23`), and its resonance
      then got its radiation, the blow's spectrum and the landing surface's support loss (18.13; wire hash
-     `91d439b602bb`), with glass breakage still later; and a glass bottle bounces where it would break (breakage
-     from the material and the impact),
-     still later;
+     `91d439b602bb`). Cody 2026-11-18: "not perfect" but better than the original. Round 1 was bells (four
+     equal free modes for seconds); round 2 measured too far the other way: the steel's resonance is gone 30 dB in
+     about 0.13 s where a crowbar on concrete clangs longer, the floor's own low ring now leads every drop in the
+     first 150 ms so the items differ by only a few dB above 1 kHz, and the plastic box is a solid block (one
+     7.7 kHz mode) where a real one is hollow walls. Each is for later, by the law that sets it (the support loss
+     of a body touching at a few points, the floor ring's share against the dropped thing's, a hollow box of plate
+     walls), never a gain set to taste. A glass bottle still bounces where it would break (breakage from the
+     material and the impact), still later;
    - stage 5, moving air and loose layers;
    - stage 6, vehicles in full.
 10. A source heard from the whole of itself, steps 5 to 8 (Cody, 2026-10-16: "a river should sound like a flowing
