@@ -1,5 +1,4 @@
 using System.Numerics;
-using System.Runtime.InteropServices;
 using OpenFPS.Geometry;
 using OpenFPS.Native.SteamAudio;
 using PV = OpenFPS.Native.SteamAudio.Phonon.IPLVector3;
@@ -28,18 +27,6 @@ public sealed class SteamAudioSimulator : IDisposable
         /// <summary>Result to assume with no source or scene: unoccluded.</summary>
         public static readonly DirectResult Clear = new(1f, 1f, 1f, 1f);
     }
-
-    /// <summary>Pathing arrival result for one source.</summary>
-    /// <param name="Found">Whether a path was found.</param>
-    /// <param name="WorldDirection">The game-world direction the sound comes from after routing through
-    /// openings.</param>
-    /// <param name="Energy">The SH omni term: 0 is no path, and the caller keeps the direct line.</param>
-    /// <param name="EqLow">What the route takes per band (Steam Audio's pathing eq): the level of a sound
-    /// that has to find its way round, where the direct stage only knows it is blocked.</param>
-    /// <param name="EqMid">As <paramref name="EqLow"/>, mid band.</param>
-    /// <param name="EqHigh">As <paramref name="EqLow"/>, high band.</param>
-    public readonly record struct PathResult(bool Found, Vector3 WorldDirection, float Energy,
-                                             float EqLow = 0f, float EqMid = 0f, float EqHigh = 0f);
 
     /// <summary>The direct result as the engine's acoustic parameters: <see cref="Occlusion"/> the
     /// fraction blocked (0 clear), EqLow/Mid/High per-band clarity (1 clear). The caller still clamps
@@ -76,41 +63,16 @@ public sealed class SteamAudioSimulator : IDisposable
     public static float ReverbDecayMs(ReverbResult r, float minMs = 100f, float maxMs = 20000f)
         => Math.Clamp(r.Max * 1000f, minMs, maxMs);
 
-    private delegate void ProgressCallback(float progress, IntPtr userData);
-    // Kept alive so native code can't call a collected delegate during a (synchronous) bake.
-    private static readonly ProgressCallback _bakeProgress = (p, u) => { };
-
     private readonly IntPtr _context;
     private readonly int _maxSources;
-    private readonly int _flags;        // any combination of DIRECT | PATHING | REFLECTIONS
+    private readonly int _flags;        // any combination of DIRECT | REFLECTIONS
     private readonly bool _direct;
-    private readonly bool _pathing;
     private readonly bool _reflections;
 
     private IntPtr _simulator;
     private readonly Stack<IntPtr> _freeSources = new();
     private readonly List<IntPtr> _allSources = new();
     private Vector3 _listener;
-
-    // Pathing probe state (only when _pathing): made by the first bake (BeginProbeBake), re-baked on map change.
-    private IntPtr _probeArray;
-    private IntPtr _probeBatch;
-    private Phonon.IPLBakedDataIdentifier _pathId;
-
-    /// <summary>Steam Audio's order-1 pathing SH (ACN: w, m=-1, m=0, m=+1) as a unit game-world arrival
-    /// direction: normalize(-sh[1], sh[2], +sh[3]) in the mirrored world, measured from the simulator and
-    /// held by SteamAudioMappingTests. <paramref name="w"/> is not needed for the direction.</summary>
-    public static Vector3 PathingWorldDirection(float w, float shYm1, float shZm0, float shXp1)
-    {
-        // Ambisonic X is Steam Audio's ahead, which is its -z; the game's z runs the other way
-        // (Phonon.World), so the game's z component is +X.
-        var d = new Vector3(-shYm1, shZm0, Phonon.WorldZ(-shXp1));
-        float len = d.Length();
-        return len > 1e-6f ? d / len : Vector3.Zero;
-    }
-
-    /// <summary>Whether any source staged pathing inputs since the last <see cref="Run"/>. See Run.</summary>
-    private bool _pathingStaged;
 
     /// <summary>Total pooled sources (0 until the first <see cref="SetScene"/>).</summary>
     public int Capacity => _allSources.Count;
@@ -119,17 +81,15 @@ public sealed class SteamAudioSimulator : IDisposable
     /// <summary>True once the simulator was created successfully.</summary>
     public bool IsValid => _simulator != IntPtr.Zero;
 
-    public SteamAudioSimulator(IntPtr context, int maxSources = 64, bool enablePathing = false,
+    public SteamAudioSimulator(IntPtr context, int maxSources = 64,
         bool enableReflections = false, bool enableDirect = true, int samplingRate = 0, int frameSize = 1024)
     {
         if (samplingRate <= 0) samplingRate = OpenFPS.Audio.Fmod.MixerQuality.DefaultRate;   // 0: the default mixer's
         _context = context;
         _maxSources = maxSources;
         _direct = enableDirect;
-        _pathing = enablePathing;
         _reflections = enableReflections;
         _flags = (enableDirect ? Phonon.IPL_SIMULATIONFLAGS_DIRECT : 0)
-               | (enablePathing ? Phonon.IPL_SIMULATIONFLAGS_PATHING : 0)
                | (enableReflections ? Phonon.IPL_SIMULATIONFLAGS_REFLECTIONS : 0);
 
         var s = new Phonon.IPLSimulationSettings
@@ -152,10 +112,6 @@ public sealed class SteamAudioSimulator : IDisposable
     {
         if (!IsValid || scene is null || !scene.IsBuilt) return;
         Phonon.iplSimulatorSetScene(_simulator, scene.Handle);
-
-        // No pathing bake here (BeginProbeBake): inline it took a hundred seconds on a large map, during
-        // which every source played unoccluded. Nothing that takes longer than a frame may gate the
-        // direct stage.
         Phonon.iplSimulatorCommit(_simulator);
 
         if (_allSources.Count == 0)
@@ -171,119 +127,6 @@ public sealed class SteamAudioSimulator : IDisposable
             Phonon.iplSimulatorCommit(_simulator);
         }
     }
-
-    /// <summary>
-    /// Starts the pathing bake on a thread of its own and returns at once: it is map-sized work, and
-    /// until it is done <see cref="PathingReady"/> is false and every source gets its direct result.
-    /// The batch is handed over by <see cref="CommitPendingProbes"/> on the owning thread: the simulator
-    /// is single-threaded, and the bake thread only reads the scene.
-    /// </summary>
-    public void BeginProbeBake(SteamAudioScene scene)
-    {
-        if (!IsValid || !_pathing || scene is null || !scene.IsBuilt) return;
-        if (_bakeThread is { IsAlive: true }) return;
-        _bakeThread = new Thread(() =>
-        {
-            try { BuildOrRebakeProbes(scene); }
-            catch (Exception ex) { Console.WriteLine($"[SteamAudio] Pathing bake failed; pathing stays off: {ex.Message}"); }
-        })
-        {
-            IsBackground = true,
-            Name = "SaPathingBake",
-            // Below everything with a deadline: at a map load nobody is waiting for this.
-            Priority = ThreadPriority.Lowest,
-        };
-        _bakeThread.Start(); OpenFPS.Audio.Core.Shutdown.Started(_bakeThread);
-    }
-
-    private Thread? _bakeThread;
-
-    /// <summary>True while the pathing bake is still reading the scene it was given.</summary>
-    public bool Baking => _bakeThread is { IsAlive: true };
-    private IntPtr _bakedBatchPending;
-
-    /// <summary>
-    /// Hands a finished bake to the simulator. Call from the thread that owns the simulator, between
-    /// runs. Returns true on the tick that pathing actually comes alive, so the caller can say so.
-    /// </summary>
-    public bool CommitPendingProbes()
-    {
-        IntPtr batch = Interlocked.Exchange(ref _bakedBatchPending, IntPtr.Zero);
-        if (batch == IntPtr.Zero) return false;
-        Phonon.iplSimulatorAddProbeBatch(_simulator, batch);
-        Phonon.iplSimulatorCommit(_simulator);
-        _probeBatch = batch;
-        return true;
-    }
-
-    /// <summary>
-    /// Probes to generate at most, whatever the map's size: the bake grows worse than linearly in the
-    /// probe count, and 720 x 420 m at a fixed 2 m is seventy-five thousand. A big map gets coarser
-    /// spacing instead of an unbounded bake.
-    /// </summary>
-    private const int MaxProbes = 8192;
-    private const float MinProbeSpacing = 2.0f;
-
-    /// <summary>Generates floor probes over the scene bounds and bakes the visibility graph between them
-    /// (pathing finds nothing without it). Built once; re-baked against the new scene on map change
-    /// without moving the probes. UNIFORMFLOOR needs floors wound normal-up, or it places no probes and
-    /// pathing quietly does nothing.</summary>
-    private void BuildOrRebakeProbes(SteamAudioScene scene)
-    {
-        _pathId = new Phonon.IPLBakedDataIdentifier
-        {
-            type = Phonon.IPL_BAKEDDATATYPE_PATHING,
-            variation = Phonon.IPL_BAKEDDATAVARIATION_DYNAMIC,
-            endpointInfluence = new Phonon.IPLSphere { center = new PV { x = 0, y = 0, z = 0 }, radius = 100000f },
-        };
-
-        IntPtr batch = _probeBatch;
-        bool isNewBatch = batch == IntPtr.Zero;
-        int probes = 0;
-        float spacing = MinProbeSpacing;
-
-        if (isNewBatch)
-        {
-            Vector3 min = scene.BoundsMin, max = scene.BoundsMax;
-            if (!(max.X > min.X)) return; // empty / invalid bounds -> no probes
-            Phonon.iplProbeArrayCreate(_context, out _probeArray);
-            float area = MathF.Max(1f, (max.X - min.X) * (max.Z - min.Z));
-            spacing = MathF.Max(MinProbeSpacing, MathF.Sqrt(area / MaxProbes));
-            var genP = new Phonon.IPLProbeGenerationParams
-            {
-                type = Phonon.IPL_PROBEGENERATIONTYPE_UNIFORMFLOOR, spacing = spacing, height = 1.5f,
-            };
-            // The scene's bounds are the game's; the probe volume is in Steam Audio's world (Phonon.World).
-            float zA = Phonon.World(min).z, zB = Phonon.World(max).z;
-            SetBoxTransform(ref genP.transform, min.X, max.X, min.Y - 0.5f, max.Y, MathF.Min(zA, zB), MathF.Max(zA, zB));
-            Phonon.iplProbeArrayGenerateProbes(_probeArray, scene.Handle, ref genP);
-            probes = Phonon.iplProbeArrayGetNumProbes(_probeArray);
-            if (probes == 0)
-            { Phonon.iplProbeArrayRelease(ref _probeArray); _probeArray = IntPtr.Zero; return; }
-
-            Phonon.iplProbeBatchCreate(_context, out batch);
-            Phonon.iplProbeBatchAddProbeArray(batch, _probeArray);
-            Phonon.iplProbeBatchCommit(batch);
-        }
-
-        var bakeP = new Phonon.IPLPathBakeParams
-        {
-            scene = scene.Handle, probeBatch = batch, identifier = _pathId,
-            numSamples = 4, radius = 0.5f, threshold = 0.1f, visRange = 16.0f, pathRange = 100.0f, numThreads = 1,
-        };
-        long start = System.Diagnostics.Stopwatch.GetTimestamp();
-        Phonon.iplPathBakerBake(_context, ref bakeP, Marshal.GetFunctionPointerForDelegate(_bakeProgress), IntPtr.Zero);
-        double seconds = (System.Diagnostics.Stopwatch.GetTimestamp() - start) / (double)System.Diagnostics.Stopwatch.Frequency;
-        Console.WriteLine($"[SteamAudio] Pathing bake finished: {probes} probe(s) at {spacing:F1} m spacing in {seconds:F1} s. "
-                        + "Occlusion was live from the first tick; only the direction hint for an occluded source was waiting on this.");
-
-        // Published, not attached: only the simulator's own thread may add to it (CommitPendingProbes).
-        // A re-bake of a batch it already holds has nothing to hand over.
-        if (isNewBatch) Interlocked.Exchange(ref _bakedBatchPending, batch);
-    }
-
-    /// <summary>True when pathing is enabled and a baked probe batch exists (so pathing can find routes).</summary>
-    public bool PathingReady => _pathing && _probeBatch != IntPtr.Zero;
 
     /// <summary>Borrows a source handle from the pool, or <see cref="IntPtr.Zero"/> if exhausted (the
     /// caller then treats that voice as <see cref="DirectResult.Clear"/> rather than failing).</summary>
@@ -309,17 +152,13 @@ public sealed class SteamAudioSimulator : IDisposable
     public void SetListener(Vector3 worldPos) => _listener = worldPos;
 
     /// <summary>Stages one source's inputs (world position) for the next <see cref="Run"/>. Call once per
-    /// active source per tick, before <see cref="Run"/>. Includes pathing inputs when pathing is enabled.</summary>
+    /// active source per tick, before <see cref="Run"/>.</summary>
     public void SetSourceInputs(IntPtr source, Vector3 worldPos, float occlusionRadius = 0.5f)
     {
         if (source == IntPtr.Zero) return;
-        // A source claims the pathing stage only once there are probes: a source's flags persist until
-        // it is staged again, and the pathing run dereferences the batch of every source that claims it.
-        // Staged before the bake finished, a source would claim it with a null batch.
-        int flags = PathingReady ? _flags : _flags & ~Phonon.IPL_SIMULATIONFLAGS_PATHING;
         var inputs = new Phonon.IPLSimulationInputs
         {
-            flags = flags,
+            flags = _flags,
             directFlags = _direct ? (Phonon.IPL_DIRECTSIMULATIONFLAGS_OCCLUSION | Phonon.IPL_DIRECTSIMULATIONFLAGS_TRANSMISSION) : 0,
             source = Coord(worldPos),
             occlusionType = Phonon.IPL_OCCLUSIONTYPE_VOLUMETRIC,
@@ -335,18 +174,7 @@ public sealed class SteamAudioSimulator : IDisposable
         {
             inputs.reverbScale0 = 1f; inputs.reverbScale1 = 1f; inputs.reverbScale2 = 1f;
         }
-        if (PathingReady)
-        {
-            inputs.pathingProbes = _probeBatch;
-            inputs.bakedDataIdentifier = _pathId;
-            inputs.visRadius = 1.0f;
-            inputs.visThreshold = 0.1f;
-            inputs.visRange = 50.0f;
-            inputs.pathingOrder = 1;
-            inputs.findAlternatePaths = 1;
-            _pathingStaged = true;
-        }
-        Phonon.iplSourceSetInputs(source, flags, ref inputs);
+        Phonon.iplSourceSetInputs(source, _flags, ref inputs);
     }
 
     // --- Ray budget ------------------------------------------------------------------------------------
@@ -399,11 +227,7 @@ public sealed class SteamAudioSimulator : IDisposable
         long start = System.Diagnostics.Stopwatch.GetTimestamp();
         Phonon.iplSimulatorSetSharedInputs(_simulator, _flags, ref shared);
         if (_direct) Phonon.iplSimulatorRunDirect(_simulator);
-        // Only when a source was staged with a probe batch: otherwise the pathing run is a null
-        // dereference inside Steam Audio, a dead process rather than an exception.
-        if (PathingReady && _pathingStaged) Phonon.iplSimulatorRunPathing(_simulator);
         if (_reflections) Phonon.iplSimulatorRunReflections(_simulator);
-        _pathingStaged = false;
         long elapsed = System.Diagnostics.Stopwatch.GetTimestamp() - start;
 
         double ms = elapsed * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
@@ -442,36 +266,8 @@ public sealed class SteamAudioSimulator : IDisposable
         origin = Phonon.World(origin),
     };
 
-    // Row-major affine transform mapping the unit cube [0,1]^3 onto the given world box (for probe volume).
-    private static unsafe void SetBoxTransform(ref Phonon.IPLMatrix4x4 m, float minX, float maxX, float minY, float maxY, float minZ, float maxZ)
-    {
-        for (int i = 0; i < 16; i++) m.elements[i] = 0;
-        m.elements[0] = maxX - minX; m.elements[3] = minX;
-        m.elements[5] = maxY - minY; m.elements[7] = minY;
-        m.elements[10] = maxZ - minZ; m.elements[11] = minZ;
-        m.elements[15] = 1f;
-    }
-
     public void Dispose()
     {
-        // The bake reads the scene and writes a probe batch: releasing either under it is a native
-        // use-after-free, so wait for it, bounded, and past the wait abandon the batch rather than free
-        // something still being written.
-        var bake = _bakeThread;
-        if (bake is { IsAlive: true } && !bake.Join(TimeSpan.FromSeconds(5)))
-        {
-            Console.WriteLine("[SteamAudio] Pathing bake did not finish within 5 s of shutdown; leaving its probes to the process exit.");
-            _bakedBatchPending = IntPtr.Zero;
-            _probeBatch = IntPtr.Zero;
-            _probeArray = IntPtr.Zero;
-        }
-        _bakeThread = null;
-        if (_bakedBatchPending != IntPtr.Zero)
-        {
-            IntPtr pending = Interlocked.Exchange(ref _bakedBatchPending, IntPtr.Zero);
-            if (pending != IntPtr.Zero && pending != _probeBatch) Phonon.iplProbeBatchRelease(ref pending);
-        }
-
         for (int i = 0; i < _allSources.Count; i++)
         {
             IntPtr s = _allSources[i];
@@ -479,9 +275,6 @@ public sealed class SteamAudioSimulator : IDisposable
         }
         _allSources.Clear();
         _freeSources.Clear();
-        if (_probeBatch != IntPtr.Zero) Phonon.iplProbeBatchRelease(ref _probeBatch);
-        if (_probeArray != IntPtr.Zero) Phonon.iplProbeArrayRelease(ref _probeArray);
-        _probeBatch = IntPtr.Zero; _probeArray = IntPtr.Zero;
         if (_simulator != IntPtr.Zero) Phonon.iplSimulatorRelease(ref _simulator);
         _simulator = IntPtr.Zero;
     }

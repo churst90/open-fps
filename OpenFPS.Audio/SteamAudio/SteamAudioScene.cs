@@ -11,7 +11,7 @@ namespace OpenFPS.Audio.SteamAudio;
 
 /// <summary>
 /// Builds and owns a Steam Audio <c>IPLScene</c> from the game's solid box colliders, for occlusion,
-/// transmission, reflections and pathing: each box 8 vertices and 12 triangles with a material from
+/// transmission and reflections: each box 8 vertices and 12 triangles with a material from
 /// <see cref="AcousticRegistry"/>.
 /// </summary>
 public sealed class SteamAudioScene : IDisposable
@@ -78,29 +78,20 @@ public sealed class SteamAudioScene : IDisposable
     /// </summary>
     internal void Revoke() { if (_borrowed) _scene = IntPtr.Zero; }
 
-    /// <summary>The boxes a borrowed scene now holds, for <see cref="Solids"/> and the bounds.</summary>
+    /// <summary>The boxes a borrowed scene now holds, for <see cref="Solids"/>.</summary>
     internal void SetGeometry(IReadOnlyList<Box> boxes)
     {
         var solids = new List<EarlyReflections.Solid>(boxes.Count);
-        var min = new Vector3(float.MaxValue); var max = new Vector3(float.MinValue);
         foreach (var b in boxes)
         {
             if (b.Size.X <= 0 || b.Size.Y <= 0 || b.Size.Z <= 0) continue;
             solids.Add(new EarlyReflections.Solid(b.Center, b.Size, b.Rotation, b.Material));
-            var (lo, hi) = WorldExtents(b);
-            min = Vector3.Min(min, lo); max = Vector3.Max(max, hi);
         }
         Solids = solids;
-        if (solids.Count > 0) { BoundsMin = min; BoundsMax = max; }
     }
 
     public IntPtr Handle => _scene;
     public bool IsBuilt => _scene != IntPtr.Zero;
-
-    /// <summary>World-space AABB of all built geometry in the game's frame (valid after <see cref="Build"/>).
-    /// Used to size the probe volume for pathing. Zero-sized when the scene is empty.</summary>
-    public Vector3 BoundsMin { get; private set; }
-    public Vector3 BoundsMax { get; private set; }
 
     /// <summary>The boxes the scene was built from, as the reflection search takes them
     /// (EarlyReflections): the listener's trace works out from them which of its early energy the
@@ -309,19 +300,17 @@ public sealed class SteamAudioScene : IDisposable
             if (b.Size.X > 0 && b.Size.Y > 0 && b.Size.Z > 0) solids.Add(new EarlyReflections.Solid(b.Center, b.Size, b.Rotation, b.Material));
         Solids = solids;
 
-        _mesh = AddMesh(_scene, boxes, out var bmin, out var bmax, terrains);
-        if (_mesh != IntPtr.Zero) { BoundsMin = bmin; BoundsMax = bmax; }
+        _mesh = AddMesh(_scene, boxes, terrains);
         Phonon.iplSceneCommit(_scene);
     }
 
     /// <summary>
     /// The boxes as one static mesh, added to <paramref name="scene"/> (not committed); zero if there are
-    /// none. Vertices in Steam Audio's frame. The bounds are in the game's.
+    /// none. Vertices in Steam Audio's frame.
     /// </summary>
-    internal static IntPtr AddMesh(IntPtr scene, IReadOnlyList<Box> boxes, out Vector3 boundsMin, out Vector3 boundsMax,
+    internal static IntPtr AddMesh(IntPtr scene, IReadOnlyList<Box> boxes,
                                    IReadOnlyList<OpenFPS.Geometry.SolidSpec>? terrains = null)
     {
-        boundsMin = boundsMax = Vector3.Zero;
         IntPtr mesh = IntPtr.Zero;
         var verts = new List<PV>();
         var tris = new List<Phonon.IPLTriangle>();
@@ -355,18 +344,6 @@ public sealed class SteamAudioScene : IDisposable
         var tArr = tris.ToArray();
         var miArr = triMat.ToArray();
         var mArr = materials.ToArray();
-
-        var min = new Vector3(float.MaxValue);
-        var max = new Vector3(float.MinValue);
-        // In the game's frame: the vertices are already in Steam Audio's, and the probe bake converts
-        // these bounds itself (SteamAudioSimulator.BuildOrRebakeProbes).
-        foreach (var v in vArr)
-        {
-            var g = new Vector3(v.x, v.y, Phonon.WorldZ(v.z));
-            min = Vector3.Min(min, g);
-            max = Vector3.Max(max, g);
-        }
-        boundsMin = min; boundsMax = max;
 
         var hV = GCHandle.Alloc(vArr, GCHandleType.Pinned);
         var hT = GCHandle.Alloc(tArr, GCHandleType.Pinned);

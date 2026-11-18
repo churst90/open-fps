@@ -1,4 +1,3 @@
-using System.Numerics;
 using OpenFPS.Audio.SteamAudio;
 
 namespace OpenFPS.Tests;
@@ -6,30 +5,6 @@ namespace OpenFPS.Tests;
 /// <summary>The pure Steam Audio mapping logic, without the native libraries.</summary>
 public class SteamAudioMappingTests
 {
-    // --- Pathing SH -> world arrival direction (convention measured from the simulator) ---
-    // Raw order-1 SH (ACN): [0]=W, [1]=m-1, [2]=m0, [3]=m+1; the signs are measured calibration data.
-    // Phonon.World negates z (Steam Audio's forward is -z), so an arrival from the game's +z has the
-    // other sign of m+1; the x rows are untouched.
-    [Theory]
-    [InlineData(0f, 0f, 0.081f, 0f, 0f, 1f)]    // +z arrival (game): m+1 positive in the mirrored world
-    [InlineData(0f, 0f, -0.081f, 0f, 0f, -1f)]  // -z arrival
-    [InlineData(-0.081f, 0f, 0f, 1f, 0f, 0f)]   // +x arrival
-    [InlineData(0.081f, 0f, 0f, -1f, 0f, 0f)]   // -x arrival
-    public void PathingWorldDirection_MapsShToExpectedAxis(float sh1, float sh2, float sh3,
-        float ex, float ey, float ez)
-    {
-        var d = SteamAudioSimulator.PathingWorldDirection(0.047f, sh1, sh2, sh3);
-        var expected = new Vector3(ex, ey, ez);
-        Assert.True(Vector3.Dot(d, expected) > 0.99f, $"got {d}, expected ~{expected}");
-        Assert.True(System.Math.Abs(d.Length() - 1f) < 1e-3f, "direction should be unit length");
-    }
-
-    [Fact]
-    public void PathingWorldDirection_ZeroSh_ReturnsZero()
-    {
-        Assert.Equal(Vector3.Zero, SteamAudioSimulator.PathingWorldDirection(0f, 0f, 0f, 0f));
-    }
-
     // --- Direct result -> engine acoustic params ---
 
     [Fact]

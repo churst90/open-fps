@@ -104,7 +104,7 @@ public static class TileScenesSpike
 
         (SteamAudioSimulator.DirectResult[] Direct, SteamAudioSimulator.ReverbResult[] Reverb, double Ms) Measure(IntPtr ctx, SteamAudioScene scene)
         {
-            using var sim = new SteamAudioSimulator(ctx, sourceCount, enablePathing: false, enableReflections: true);
+            using var sim = new SteamAudioSimulator(ctx, sourceCount, enableReflections: true);
             sim.SetScene(scene);
             var src = at.Select(_ => sim.AcquireSource()).ToArray();
             sim.SetListener(listener);

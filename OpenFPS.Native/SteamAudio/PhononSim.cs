@@ -3,8 +3,8 @@ using System.Runtime.InteropServices;
 namespace OpenFPS.Native.SteamAudio;
 
 /// <summary>
-/// P/Invoke bindings for the Steam Audio (phonon) simulation API: scene, meshes, simulator, sources,
-/// effects and probes. Struct layouts are transcribed from phonon.h 4.8.1 and must match the C ABI
+/// P/Invoke bindings for the Steam Audio (phonon) simulation API: scene, meshes, simulator, sources
+/// and effects. Struct layouts are transcribed from phonon.h 4.8.1 and must match the C ABI
 /// exactly: a wrong field or order corrupts native memory. Steam Audio is -z forward; every world
 /// coordinate goes through <see cref="World"/>.
 /// </summary>
@@ -18,7 +18,6 @@ internal static partial class Phonon
 
     public const int IPL_SIMULATIONFLAGS_DIRECT = 1 << 0;
     public const int IPL_SIMULATIONFLAGS_REFLECTIONS = 1 << 1;
-    public const int IPL_SIMULATIONFLAGS_PATHING = 1 << 2;
 
     public const int IPL_DIRECTSIMULATIONFLAGS_DISTANCEATTENUATION = 1 << 0;
     public const int IPL_DIRECTSIMULATIONFLAGS_AIRABSORPTION = 1 << 1;
@@ -32,16 +31,6 @@ internal static partial class Phonon
     public const int IPL_REFLECTIONEFFECTTYPE_CONVOLUTION = 0;
     public const int IPL_REFLECTIONEFFECTTYPE_PARAMETRIC = 1;
     public const int IPL_REFLECTIONEFFECTTYPE_HYBRID = 2;
-
-    public const int IPL_PROBEGENERATIONTYPE_CENTROID = 0;
-    public const int IPL_PROBEGENERATIONTYPE_UNIFORMFLOOR = 1;
-
-    public const int IPL_BAKEDDATATYPE_REFLECTIONS = 0;
-    public const int IPL_BAKEDDATATYPE_PATHING = 1;
-    public const int IPL_BAKEDDATAVARIATION_REVERB = 0;
-    public const int IPL_BAKEDDATAVARIATION_STATICSOURCE = 1;
-    public const int IPL_BAKEDDATAVARIATION_STATICLISTENER = 2;
-    public const int IPL_BAKEDDATAVARIATION_DYNAMIC = 3;
 
     // --- geometry / coordinate structs ---
     [StructLayout(LayoutKind.Sequential)]
@@ -109,6 +98,7 @@ internal static partial class Phonon
     [StructLayout(LayoutKind.Sequential)]
     public struct IPLSphere { public IPLVector3 center; public float radius; }
 
+    // Kept because IPLSimulationInputs carries one: its layout must match phonon.h 4.8.1.
     [StructLayout(LayoutKind.Sequential)]
     public struct IPLBakedDataIdentifier { public int type, variation; public IPLSphere endpointInfluence; }
 
@@ -126,14 +116,14 @@ internal static partial class Phonon
         public int numOcclusionSamples;
         public float reverbScale0, reverbScale1, reverbScale2;
         public float hybridReverbTransitionTime, hybridReverbOverlapPercent;
-        public int baked;
-        public IPLBakedDataIdentifier bakedDataIdentifier;
-        public IntPtr pathingProbes;
-        public float visRadius, visThreshold, visRange;
-        public int pathingOrder;
-        public int enableValidation, findAlternatePaths;
+        public int baked;               // stays for the layout: phonon.h has it here
+        public IPLBakedDataIdentifier bakedDataIdentifier;  // stays for the layout
+        public IntPtr pathingProbes;    // stays for the layout: pathing is unused here
+        public float visRadius, visThreshold, visRange;     // stays for the layout
+        public int pathingOrder;        // stays for the layout
+        public int enableValidation, findAlternatePaths;    // stays for the layout
         public int numTransmissionRays;
-        public IntPtr deviationModel;
+        public IntPtr deviationModel;   // stays for the layout
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -144,7 +134,7 @@ internal static partial class Phonon
         public float duration;
         public int order;
         public float irradianceMinDistance;
-        public IntPtr pathingVisCallback, pathingUserData;
+        public IntPtr pathingVisCallback, pathingUserData;  // stays for the layout: pathing is unused here
     }
 
     // --- direct-effect output (the result we read) ---
@@ -172,6 +162,7 @@ internal static partial class Phonon
         public int tanSlot;
     }
 
+    // Kept because IPLSimulationOutputs carries one: its layout must match phonon.h 4.8.1.
     [StructLayout(LayoutKind.Sequential)]
     public struct IPLPathEffectParams
     {
@@ -184,41 +175,17 @@ internal static partial class Phonon
         public int normalizeEQ;         // IPLbool
     }
 
-    /// <summary>Output struct for iplSourceGetOutputs — full layout so direct/reflections/pathing can all be read.</summary>
+    /// <summary>Output struct for iplSourceGetOutputs — full layout so direct and reflections can be read.</summary>
     [StructLayout(LayoutKind.Sequential)]
     public struct IPLSimulationOutputs
     {
         public IPLDirectEffectParams direct;
         public IPLReflectionEffectParams reflections;
-        public IPLPathEffectParams pathing;
+        public IPLPathEffectParams pathing;  // stays for the layout: pathing is unused here
     }
 
-    // --- probe (pathing) types ---
     [StructLayout(LayoutKind.Sequential)]
     public unsafe struct IPLMatrix4x4 { public fixed float elements[16]; } // row-major
-
-    [StructLayout(LayoutKind.Sequential)]
-    public struct IPLProbeGenerationParams
-    {
-        public int type;                // IPLProbeGenerationType
-        public float spacing;
-        public float height;
-        public IPLMatrix4x4 transform;  // maps the unit cube [0,1]^3 to the volume to fill with probes
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    public struct IPLPathBakeParams
-    {
-        public IntPtr scene;
-        public IntPtr probeBatch;
-        public IPLBakedDataIdentifier identifier;
-        public int numSamples;
-        public float radius;
-        public float threshold;
-        public float visRange;
-        public float pathRange;
-        public int numThreads;
-    }
 
     // --- functions ---
     [DllImport(Lib, CallingConvention = CC)] public static extern int iplSceneCreate(IntPtr context, ref IPLSceneSettings settings, out IntPtr scene);
@@ -263,17 +230,4 @@ internal static partial class Phonon
     [DllImport(Lib, CallingConvention = CC)] public static extern void iplReflectionEffectRelease(ref IntPtr effect);
     [DllImport(Lib, CallingConvention = CC)] public static extern void iplReflectionEffectReset(IntPtr effect);
     [DllImport(Lib, CallingConvention = CC)] public static extern int iplReflectionEffectApply(IntPtr effect, ref IPLReflectionEffectParams effectParams, ref IPLAudioBuffer inBuf, ref IPLAudioBuffer outBuf, IntPtr mixer);
-
-    // probes / pathing
-    [DllImport(Lib, CallingConvention = CC)] public static extern int iplProbeArrayCreate(IntPtr context, out IntPtr probeArray);
-    [DllImport(Lib, CallingConvention = CC)] public static extern void iplProbeArrayRelease(ref IntPtr probeArray);
-    [DllImport(Lib, CallingConvention = CC)] public static extern void iplProbeArrayGenerateProbes(IntPtr probeArray, IntPtr scene, ref IPLProbeGenerationParams pms);
-    [DllImport(Lib, CallingConvention = CC)] public static extern int iplProbeArrayGetNumProbes(IntPtr probeArray);
-    [DllImport(Lib, CallingConvention = CC)] public static extern int iplProbeBatchCreate(IntPtr context, out IntPtr probeBatch);
-    [DllImport(Lib, CallingConvention = CC)] public static extern void iplProbeBatchRelease(ref IntPtr probeBatch);
-    [DllImport(Lib, CallingConvention = CC)] public static extern void iplProbeBatchAddProbeArray(IntPtr probeBatch, IntPtr probeArray);
-    [DllImport(Lib, CallingConvention = CC)] public static extern void iplProbeBatchCommit(IntPtr probeBatch);
-    [DllImport(Lib, CallingConvention = CC)] public static extern void iplSimulatorAddProbeBatch(IntPtr simulator, IntPtr probeBatch);
-    [DllImport(Lib, CallingConvention = CC)] public static extern void iplSimulatorRunPathing(IntPtr simulator);
-    [DllImport(Lib, CallingConvention = CC)] public static extern void iplPathBakerBake(IntPtr context, ref IPLPathBakeParams pms, IntPtr progressCallback, IntPtr userData);
 }

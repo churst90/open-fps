@@ -27,13 +27,13 @@ public static class NativeAudioLibraries
         [
             new("fmod.dll", true, "no sound at all"),
             new("fmodstudio.dll", true, "no sound at all"),
-            new("phonon.dll", true, "no HRTF binaural — spatial cues collapse to stereo panning, and geometry-driven occlusion, pathing and reverb are all off"),
+            new("phonon.dll", true, "no HRTF binaural — spatial cues collapse to stereo panning, and geometry-driven occlusion and reverb are all off"),
         ]
         :
         [
             new("libfmod.so", true, "no sound at all"),
             new("libfmodstudio.so", true, "no sound at all"),
-            new("libphonon.so", true, "no HRTF binaural — spatial cues collapse to stereo panning, and geometry-driven occlusion, pathing and reverb are all off"),
+            new("libphonon.so", true, "no HRTF binaural — spatial cues collapse to stereo panning, and geometry-driven occlusion and reverb are all off"),
         ];
 
     /// <summary>The directory the runtime resolves native libraries from (next to the executable).</summary>

@@ -114,7 +114,6 @@ public class AsyncAcousticWorkerTests
         Await(() => worker.TryGetResult(7, out _), "answered the source");
 
         Assert.False(worker.SteamAudioActive);
-        Assert.False(worker.PathingReady);
         Assert.False(worker.IsDegraded);
         Assert.False(worker.TryGetListenerReverbDecayMs(out float ms));
         Assert.Equal(0f, ms);

@@ -78,10 +78,6 @@ public class AsyncAcousticWorker : IDisposable
     /// reflection emitters.</summary>
     public bool SteamAudioActive => _saEnabled;
 
-    /// <summary>The probe graph is baked and pathing takes part in every tick. The lab waits on this: a
-    /// probe asked before the bake measures a different engine from the game's.</summary>
-    public bool PathingReady => _saSim?.PathingReady == true;
-
     /// <summary>The surveyed decay for the listener's room, ms, or false without one. Game thread.</summary>
     public bool TryGetListenerReverbDecayMs(out float ms)
     {
@@ -574,7 +570,6 @@ public class AsyncAcousticWorker : IDisposable
     /// (negative: nothing in the way); measured once, since it decides both the bearing and the level.</param>
     /// <param name="BarrierVerified">The route round the barrier box is clear of everything else; when not,
     /// the route does not exist and its level must not be used (BuildSimPath).</param>
-    /// <param name="Path">Steam Audio's own route through the scene, when it found one.</param>
     /// <param name="Route">What came by the openings (OpeningRoutes), when source and listener are in
     /// different places and a route joins them.</param>
     /// <param name="Round">What bends round the things in the way, per band, spreading included
@@ -583,14 +578,13 @@ public class AsyncAcousticWorker : IDisposable
     private readonly record struct SaResult(SteamAudioSimulator.DirectResult Direct, Vector3 ApparentPosition,
                                             bool HasApparent, float BarrierDelta,
                                             bool BarrierVerified = true,
-                                            SteamAudioSimulator.PathResult Path = default,
                                             OpeningRoutes.Answer? Route = null,
                                             Vector3 Round = default, bool RoundFound = false);
 
     // Below this visibility a source is heard from where it arrives (an edge, an opening), not through the wall.
     private const float PathRedirectVisibility = 0.5f;
 
-    /// <summary>The direct and pathing stages for every pending source, or null with no simulator.</summary>
+    /// <summary>The direct stage for every pending source, or null with no simulator.</summary>
     private Dictionary<int, SaResult>? RunSteamAudio(IAcousticWorld world)
     {
         if (!_saEnabled || _saSim == null) return null;
@@ -603,16 +597,10 @@ public class AsyncAcousticWorker : IDisposable
                 return null;
             }
 
-            // A finished bake joins here, before anything is staged, between runs, on the thread that owns
-            // the simulator (single-threaded by contract). Committed after staging, it crashed the client
-            // natively a second after the cars started (docs/AUDIO_GHOSTS_AND_STUTTERS.md, the probe batch).
-            if (_saSim.CommitPendingProbes())
-                Console.WriteLine("[AcousticWorker] Pathing probes are live; occluded sources can now be localized to the opening they arrive through.");
-
             long now = OpenFPS.Sound.AudioClockStamps.StampMs(_clock);
             Vector3 listener = default;
             bool haveListener = false;
-            int blocked = 0, viaEdge = 0, viaProbe = 0, reflections = 0;
+            int blocked = 0, viaEdge = 0, reflections = 0;
             // More asked about than the pool holds: the first SaMaxSources in line are served, the line
             // starting with last tick's turned-away, and a source held by someone further back is lent.
             // With every source keeping its own, the same sixteen of eighty were turned away for good and
@@ -676,9 +664,8 @@ public class AsyncAcousticWorker : IDisposable
                 }
 
                 // Over the thing or round it: the routes compete for the bearing on the same terms as for
-                // the level (BuildSimPath), whichever delivers more energy. Decided on visibility alone, a
-                // near car on the speedway was heard to stop: the bearing snapped to the 7.3 m probe grid.
-                // See docs/CLIENT_NOTES.md, "The bearing follows the level".
+                // the level (BuildSimPath), whichever delivers more energy. See docs/CLIENT_NOTES.md,
+                // "The bearing follows the level".
                 Vector3 edge = kv.Value.ListenerPos;
                 bool edgeVerified = false, roundFound = false;
                 float barrierDelta = -1f;
@@ -690,7 +677,6 @@ public class AsyncAcousticWorker : IDisposable
                     Console.WriteLine($"[ROUTE] {kv.Value.SourcePos} -> {kv.Value.ListenerPos}: {barrierDelta:F2} m round one box, edge {edge}");
                 Vector3 apparent = default;
                 bool hasApparent = false;
-                var route = default(SteamAudioSimulator.PathResult);
                 if (direct.Visibility < PathRedirectVisibility)
                 {
                     float dist = Vector3.Distance(kv.Value.ListenerPos, kv.Value.SourcePos);
@@ -711,8 +697,7 @@ public class AsyncAcousticWorker : IDisposable
                         }
                     }
                     // No verified route: the level is what comes through the wall, so the bearing is the
-                    // source's own. The probe graph's direction here put a siren behind a ground-floor
-                    // flat's wall straight below, where turning the head changes nothing.
+                    // source's own.
                 }
                 // And by the openings, a route with corners in it (the street to a corridor by way of the
                 // front door): without it an open front door changed nothing ("only when a loud source
@@ -720,7 +705,7 @@ public class AsyncAcousticWorker : IDisposable
                 OpeningRoutes.Answer? viaOpenings = routes != null
                     ? AskRoutes(routes, world, kv.Key, kv.Value.SourcePos, kv.Value.ListenerPos, listenerRegion)
                     : null;
-                results[kv.Key] = new SaResult(direct, apparent, hasApparent, barrierDelta, edgeVerified, route, viaOpenings, round, roundFound);
+                results[kv.Key] = new SaResult(direct, apparent, hasApparent, barrierDelta, edgeVerified, viaOpenings, round, roundFound);
                 if (direct.Visibility < PathRedirectVisibility) blocked++;
                 reflections += _lastReflectionCount;
             }
@@ -731,8 +716,8 @@ public class AsyncAcousticWorker : IDisposable
             if (_saDebug && now - _saSummaryLastPrint >= SaDebugIntervalMs)
             {
                 _saSummaryLastPrint = now;
-                Console.WriteLine($"[SASUMMARY] sources={results.Count}/{_pending.Count} blocked={blocked} viaEdge={viaEdge} viaProbe={viaProbe} " +
-                                  $"refl={reflections} sceneBoxes={_lastSceneBoxes} pathing={(_saSim.PathingReady ? "ready" : "off")} " +
+                Console.WriteLine($"[SASUMMARY] sources={results.Count}/{_pending.Count} blocked={blocked} viaEdge={viaEdge} " +
+                                  $"refl={reflections} sceneBoxes={_lastSceneBoxes} " +
                                   $"reverb={_listenerReverbMs:F0}ms lis=({listener.X:F1},{listener.Y:F1},{listener.Z:F1})");
             }
             return results;
@@ -752,7 +737,7 @@ public class AsyncAcousticWorker : IDisposable
         var ap = SteamAudioSimulator.ToAcousticParams(sr.Direct);
         string? trace = TraceProvenance
             ? $"sim vis {sr.Direct.Visibility:F2} through {Db(ap.EqLow):F0}/{Db(ap.EqMid):F0}/{Db(ap.EqHigh):F0}" : null;
-        if (_saDebug) Console.WriteLine($"[SAPATH] e{req.EntityId} vis {sr.Direct.Visibility:F3} trans {sr.Direct.TransLow:F3}/{sr.Direct.TransMid:F3}/{sr.Direct.TransHigh:F3} barrierDelta {sr.BarrierDelta:F3} verified {sr.BarrierVerified} route {(sr.Path.Found ? $"{sr.Path.EqLow:F3}/{sr.Path.EqMid:F3}/{sr.Path.EqHigh:F3}" : "none")}");
+        if (_saDebug) Console.WriteLine($"[SAPATH] e{req.EntityId} vis {sr.Direct.Visibility:F3} trans {sr.Direct.TransLow:F3}/{sr.Direct.TransMid:F3}/{sr.Direct.TransHigh:F3} barrierDelta {sr.BarrierDelta:F3} verified {sr.BarrierVerified}");
         float occ = Math.Clamp(ap.Occlusion, 0f, AcousticConstants.OcclusionCap);
         Vector3 apparent = sr.HasApparent ? sr.ApparentPosition : req.SourcePos;
         float dist = Vector3.Distance(req.ListenerPos, req.SourcePos);
@@ -766,8 +751,7 @@ public class AsyncAcousticWorker : IDisposable
             // could have the level "over the wall" and the bearing "through a door".
             // Only a route that exists: round a shut door's edge is eight centimetres and straight into the
             // wall it hangs in, and would pass -7/-11/-19 dB (--path-probe). A way round one thing that runs
-            // on through another pays that other's transmission (OpeningRoutes.BarrierGains). Not Steam
-            // Audio's pathing eq either: that is the bend's colour, about 1.0 for a route 150 m long, not its loss.
+            // on through another pays that other's transmission (OpeningRoutes.BarrierGains).
             if (sr.RoundFound)
             {
                 // The longer route's spreading is in it, which the barrier loss stops paying at its 24 dB
@@ -1050,10 +1034,7 @@ public class AsyncAcousticWorker : IDisposable
             Console.WriteLine(_embree
                 ? "[AcousticWorker] Steam Audio scenes use Embree: a sub-scene per tile and per door leaf."
                 : "[AcousticWorker] Embree did not start here; Steam Audio scenes use the default tracer and are rebuilt whole.");
-            // Pathing off: its probe grid is too coarse on a city (tens of metres) to say where a sound comes
-            // from, nothing reads its answer, and the bake cost a core for minutes at every map load. Routes
-            // round obstacles come from the barrier search (BarrierPathDifference).
-            _saSim = new SteamAudioSimulator(_saContext, SaMaxSources, enablePathing: false, samplingRate: Traced.MixerRate);
+            _saSim = new SteamAudioSimulator(_saContext, SaMaxSources, samplingRate: Traced.MixerRate);
             if (!_saSim.IsValid)
             {
                 _saSim.Dispose(); _saSim = null;
@@ -1063,9 +1044,8 @@ public class AsyncAcousticWorker : IDisposable
             }
             _saScene = new SteamAudioScene(_saContext);
 
-
             _saEnabled = true;
-            Console.WriteLine($"[AcousticWorker] Steam Audio simulation enabled (SIMD {simd}; per-source occlusion/transmission/pathing). " +
+            Console.WriteLine($"[AcousticWorker] Steam Audio simulation enabled (SIMD {simd}; per-source occlusion and transmission). " +
                               "Reflections and room response are measured from the scene's own surfaces.");
         }
         catch (DllNotFoundException)
@@ -1275,7 +1255,6 @@ public class AsyncAcousticWorker : IDisposable
     {
         // Not while the tracers are still being handed the new scenes: until then they trace the old.
         if (Traced.Reconfiguring) return;
-        if (_saSim is { Baking: true }) return;                 // nor while the bake reads the old one
         long cutoff = OpenFPS.Sound.RealTime.Ticks - 5 * TimeSpan.TicksPerSecond;
         for (int i = _retiredScenes.Count - 1; i >= 0; i--)
             if (_retiredScenes[i].At < cutoff) { _retiredScenes[i].Scene.Dispose(); _retiredScenes.RemoveAt(i); }
@@ -1345,8 +1324,8 @@ public class AsyncAcousticWorker : IDisposable
         var terrains = world.TerrainSolids();
         var mapLeaves = OpeningGraph.LeavesOf(world);
         _lastSceneBoxes = boxes.Count;
-        // A new map gets new scene objects; the old are retired, not rebuilt in place: the tracers and
-        // the bake may still run on them, and freeing a native scene under a running trace is a crash.
+        // A new map gets new scene objects; the old are retired, not rebuilt in place: the tracers may
+        // still run on them, and freeing a native scene under a running trace is a crash.
         if (_saScene.IsBuilt)
         {
             long now = OpenFPS.Sound.RealTime.Ticks;
@@ -1406,9 +1385,6 @@ public class AsyncAcousticWorker : IDisposable
             }
             Traced.Configure(_saContext, _saScene,
                 _saListenerScene is { IsBuilt: true } ? _saListenerScene : null);
-            // Off the worker thread: inside SetScene the bake took a hundred seconds of a core before any
-            // source had an occlusion value, the world unoccluded until then.
-            if (mapChanged) _saSim.BeginProbeBake(_saScene);
         }
         // The scene's own boxes, so diffraction and occlusion cannot disagree about what is there.
         _barrierBoxes = boxes;

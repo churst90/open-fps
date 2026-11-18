@@ -9,6 +9,12 @@
   fingerprint and every stored stream are as before, and no MEMPACK043 warning arose (no `DateTimeOffset`
   member is serialised).
 
+- Steam Audio pathing removed, on Cody's decision of 2026-11-17. It never ran (the simulator was made with
+  `enablePathing: false` and nothing read its answer), its probe bake was the 2026-09 stutter, and the barrier
+  search and `OpeningRoutes` find every route from the map's own geometry. The option, the bake thread, the probe
+  state and their bindings are gone; the native structs keep their pathing fields for phonon.h's layout, zeroed
+  as they always were. No sound, render or stored stream moved; the wire hash and door fingerprint are unchanged.
+
 ## 2026-11-17
 
 - The drop's resonance is its resonance, not a bell's chord (docs/PHYSICS_BOUNDARY.md 18.13; Cody heard round 1 on

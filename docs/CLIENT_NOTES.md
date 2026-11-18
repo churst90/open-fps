@@ -564,43 +564,16 @@ though most of what reaches the corridor is what came into it, which was right);
 beyond the next opening was measured on the wrong side of it. OpeningRoutesTests holds it with one doorway named
 both ways.
 
-## Steam Audio pathing is off (a decision for Cody)
+## Steam Audio pathing was removed (Cody's decision, 2026-11-17)
 
-The worker makes its simulator with `enablePathing: false`, so Steam Audio's pathing never runs: no probe
-grid, no bake, no route search. The code to bake and stage it is still in SteamAudioSimulator
-(BeginProbeBake, CommitPendingProbes, the pathing inputs in SetSourceInputs); the reader of its answer
-(GetPathing) went in the 2026-10-07 housekeeping, since nothing called it. What it would take and cost,
-for deciding whether to turn it on. Not turned on.
+Steam Audio's pathing never ran: the worker made its simulator with `enablePathing: false`, and nothing read
+its answer. Its bake was the 2026-09 stutter (about 100 s of a core over the speedway at 2 m probes, every
+source unoccluded until it finished). The option, the bake and the probe state went on 2026-11-18; no sound,
+render or stored stream moved, since none used it.
 
-What it does: a grid of probes on the floors, a baked visibility graph between them, and each tick, for
-each source, the shortest routes between the probes nearest the source and the listener, given as a
-per-band level (its eq) and an arrival direction (first-order SH).
-
-What already does that job here, without it:
-- The level and bearing of a blocked source: the barrier search over the edges in the way
-  (BarrierPathDifference) and the routes through openings (OpeningRoutes, the portal graph). The two
-  compete for both (see "The bearing follows the level" above).
-- Engines and physical models are placed at their emitter whatever a path says; only recordings and
-  one-offs take an apparent position from the path.
-
-What turning it on would take:
-1. A reader again: the eq and direction into AcousticPathData, and a rule for how it competes with
-   OpeningRoutes and the barrier search for the level and the bearing. Without that rule the three
-   disagree and a bearing flips between them (the speedway's "car stopping", above).
-2. Probes fine enough to mean something: the grid is sized to the map and capped at 8,192 probes, so the
-   speedway's was 7.3 m apart (thirty degrees of bearing quantisation at fifteen metres) and a city's
-   coarser. Two metres everywhere is 75,000 probes on a 720 x 420 m map. Streamed maps would need a probe
-   batch per tile, baked when the tile arrives and removed when it goes.
-3. Doors: the bake sees the scene it was given; a door leaf swinging changes the routes. Either rebake
-   round each door or turn on validation (`enableValidation`), which casts rays
-   along every route every tick.
-
-What it would cost, measured before it was turned off (docs/AUDIO_GHOSTS_AND_STUTTERS.md, issues 1 and
-2): the bake on one thread took about 100 s at 2 m over the speedway, during which every source played
-unoccluded until the bake was moved off the worker; at 6.8 m it was 0.5 s for 1,719 probes. The bake
-grows worse than linearly in the probe count. The per-tick route search was never measured on its own.
-Making it safe also took a fix of its own (a source staged without probes in the tick the batch arrived
-crashed the native library; Postscript 2 there).
+What does that job here, without it: the barrier search over the edges in the way (BarrierPathDifference) and
+the routes through openings (OpeningRoutes, the portal graph), for both the level and the bearing (see "The
+bearing follows the level" above).
 
 ## The worker's answers: the pool, and what each answer says
 

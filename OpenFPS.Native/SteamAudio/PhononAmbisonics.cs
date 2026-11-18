@@ -112,7 +112,7 @@ internal static partial class Phonon
     /// <summary>
     /// A point or direction of the game's world in Steam Audio's: z the other way (the game is +z
     /// forward, Steam Audio -z). Every world coordinate handed to Steam Audio goes through here, or a
-    /// traced response is decoded facing backwards while occlusion and pathing still look right
+    /// traced response is decoded facing backwards while occlusion still looks right
     /// (changes.md, 2026-09-29).
     /// </summary>
     /// <remarks>SA_MIRROR=0 hands the world over unflipped, for the lab's <c>--sa-frame</c> check

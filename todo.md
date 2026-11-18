@@ -750,8 +750,9 @@ The open questions for Cody, in one place. A few that belong to one item stay wi
   unchanged). A tap can then run with the plug out, and a basin can be filled and left standing. Retires
   `PlugWhileRunning` (docs/RUNNING_WATER.md); spoken: "plug in", "plug out".
 - Steam Audio pathing: answered 2026-11-17, remove it. It never ran (`enablePathing: false`), its bake was the
-  2026-09 stutter, and OpeningRoutes finds every route from the map's own openings. Remove the pathing option,
-  bake and redirect from `SteamAudioSimulator` and its callers; no render or stream may move, since none used it.
+  2026-09 stutter, and OpeningRoutes finds every route from the map's own openings. DONE 2026-11-18: the option,
+  bake and probe state are gone from `SteamAudioSimulator` and its callers; no render or stream moved, since
+  none used it.
 - Server `/move` for map owners: answered 2026-11-17. A map's owner may `/move` themselves by coordinates on a
   map they own (`MapService.IsOwner`, as `OwnsHere` asks); moving anybody else stays `move-player`, staff only,
   and everywhere else `/move` stays staff only.
