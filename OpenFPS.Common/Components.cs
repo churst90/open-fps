@@ -353,6 +353,14 @@ public partial struct SoundEmitterComponent
     /// piece from where it is (docs/RUNNING_WATER.md 15.6). One per source: a bend is a bend, not a seam.
     /// </summary>
     public Vector3[]? Line { get; set; }
+
+    /// <summary>
+    /// A basin's plug, in or out: the world's state, set by a person at the basin (the server's Shift+E) and
+    /// sent again in the definition, so every client hears the same water. The preset's FlowBasin.PlugIn is
+    /// only where it starts (docs/RUNNING_WATER.md 10.4). Changing it neither replaces the voice nor empties
+    /// the water the synth already holds.
+    /// </summary>
+    public bool PlugIn { get; set; }
 }
 
 [MemoryPackable]

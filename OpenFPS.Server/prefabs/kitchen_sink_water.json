@@ -1,7 +1,7 @@
 {
   "Id": "kitchen_sink_water",
   "Name": "Kitchen sink",
-  "Description": "A stainless kitchen sink and its mixer tap (RunningWaterSpec.KitchenSink, RunningWaterSynth). Off until somebody turns it on with the interact key standing at it: then the tap runs onto the steel and the bowl fills with the plug in; shut, the plug comes out and the bowl drains through its strainer, gurgling as it empties. Place it over the sink at rim height. Not a recording and not a loop.",
+  "Description": "A stainless kitchen sink and its mixer tap (RunningWaterSpec.KitchenSink, RunningWaterSynth). Off until somebody turns it on with the interact key standing at it; the plug starts in, so the tap runs onto the steel and the bowl fills and stands full when it is shut. Shift+E at the sink facing it works the plug: pulled, the bowl drains through its strainer, gurgling as it empties. Place it over the sink at rim height. Not a recording and not a loop.",
   "Material": "Water",
   "ColliderSize": {
     "X": 0.2,

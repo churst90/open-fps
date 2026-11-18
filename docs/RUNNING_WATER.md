@@ -442,8 +442,11 @@ water stands over the hole.
   stream lands; a quarter of it rings, as bubbles of 0.12-1 mm (fitted): the hiss of a running tap.
 - **Basin** (`FlowBasin`): a level that rises with the tap and falls through the inlet. The first water
   stands in the dish over the waste (0.012 m²) until it is deeper than the bottom falls (6 mm). With
-  the plug in only the overflow lets water go. `PlugWhileRunning`: the interact key that turns the tap
-  on puts the plug in, and turning it off pulls it: a person filling the basin and letting it go.
+  the plug in only the overflow lets water go. The plug is its own control: one key turns the tap
+  (`SoundEmitterComponent.SynthRunning`), another works the plug (`SoundEmitterComponent.PlugIn`), so a
+  tap can run with the plug out and a basin can be filled and left standing. The preset's `FlowBasin.PlugIn`
+  is only where a placed basin's plug starts. Changing it never restarts the voice or empties the water
+  the synth already holds: only what leaves the basin changes.
 - **The tap's jet** (`FlowTap`): onto the bare bottom while the water there is thinner than the jet
   (e^(-h/d), the circular jump of a tap into a sink still meets the steel), into the water once deeper.
   From the spout's height less the water's, already moving at the spout's speed. A plain spout's stream
@@ -463,9 +466,11 @@ water stands over the hole.
 ### 10.5 Presets
 
 `flow:kitchen_sink`, `flow:dripping_sink`, `flow:washbasin`, `flow:shower`, `flow:gutter_outlet`.
-Taps start off (`SynthRunning` false in the prefab); the interact key standing within 1.3 m of one
-turns it on or off (server `ToggleTapInReach`, before doors). A shut tap whose basin has drained is
-given no voice.
+Taps start off (`SynthRunning` false in the prefab); the interact key (E) standing within 1.3 m of one
+turns it on or off (server `ToggleTapInReach`, before doors). A sink and a washbasin are placed with
+their plugs in and a shower tray with its plug out (`FlowBasin.PlugIn`, where the plug starts); Shift+E
+at a basin you face works the plug, saying "plug in" or "plug out" (`CommandHandler.HandleKnock`, before
+the door). A shut tap whose basin has drained is given no voice.
 
 ### 10.6 On the city
 
@@ -478,7 +483,7 @@ its gutter outlet at the eaves (64 each). All appended at the end of `tools/gen_
 
 - Toilet flush and cistern refill: not built (they would need a timed sequence and a valve's hiss). The parts
   are written down in section 14.
-- The plug as its own control; a person standing in the shower; washing-up liquid.
+- A person standing in the shower; washing-up liquid.
 - A filling vessel's rising note (the basin is too wide for it to matter); a kettle or a bucket.
 - People in the flats using their taps (NPC use).
 

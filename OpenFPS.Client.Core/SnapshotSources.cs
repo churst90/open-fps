@@ -125,6 +125,7 @@ public sealed class SnapshotSources : IAudioSources
             Loudspeaker = em.Loudspeaker,
             Quench = em.Quench,
             Line = em.Line,
+            PlugIn = em.PlugIn,
             Shape = def.Collider.Shape,
             Size = def.Collider.Size,
         };

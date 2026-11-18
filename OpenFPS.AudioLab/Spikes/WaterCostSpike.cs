@@ -118,6 +118,8 @@ public static class WaterCostSpike
                 Measure("flow_" + key + (cut ? "_cut" : ""), $"{q:0.####} L/s", places, 2f, sec, reps, dir, () =>
                 {
                     var s = new RunningWaterSynth(spec, Rate, 7, places) { Flow = q, RainOnWater = rain, Spread = 1f };
+                    // The old rule, kept for this measurement: in while the tap ran, out when it was shut.
+                    if (spec.Tap is { } tap) s.PlugIn = q > tap.LeakLitresPerSecond + 1e-5f;
                     if (cut)
                         s.Cut = ExtendedSources.Cut(ExtendedSources.View(Vector3.Zero, Vector3.UnitX, spec.LengthMetres, new Vector3(0f, 1.7f, 1.5f)), places);
                     return (s.Control, s.NextPlaces);

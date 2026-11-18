@@ -161,7 +161,7 @@ degrees a second. You cannot turn while riding in a vehicle: you face the way it
 | Key | Action |
 |---|---|
 | E | Interact (see below) |
-| Shift+E | Knock on the nearest door. With no door in reach, knock on whatever is in front of you |
+| Shift+E | At a basin you face: put its plug in or pull it out. Otherwise knock on the nearest door, or with no door in reach on whatever is in front of you |
 | G | Pick up the nearest thing within reach |
 | Q | Drop what is in your hands |
 | R | With a gun in your hands: reload. In a vehicle: wind the windows. Otherwise: sling what you hold onto your back |
@@ -178,8 +178,9 @@ What E does, in order:
 1. A thing on the ground within 2 m: picks it up. It takes the one you chose with comma or period,
    else the one in front of you, else it opens a list to choose from. It then says if others are
    still within reach.
-2. A tap or a gas hob you are standing at (within about 1.3 m): turns the tap on or off. On a hob it
-   lights the next burner; with every burner lit it turns them all off.
+2. A tap or a gas hob you are standing at (within about 1.3 m): turns the tap on or off, or on a hob
+   lights the next burner (with every burner lit it turns them all off). The tap's plug is separate:
+   Shift+E at a basin you face puts it in or pulls it out.
 3. A shut door within reach: opens it. Between two doors (a corridor's doors facing each other), or a
    door and a vehicle, the one you face wins, else the nearer, measured to its doorway. A door on the
    floor above or below is never in reach.
@@ -194,6 +195,12 @@ within 5 m it knocks on the solid thing in front of you instead (a wall, a fence
 `/tap` taps it twice with a fingertip. Either sounds of what the thing is made of, its shape and its
 size, so it is a way to hear what something is. Everyone near hears it. Nothing is said when it works;
 with nothing in reach you are told so.
+
+**A tap's plug.** Standing at a running water basin and facing it, Shift+E is the plug instead: it says
+"plug in" or "plug out". A sink and a washbasin are placed with their plugs in, so E runs the tap and
+fills the bowl, and shutting the tap leaves the water standing; pulling the plug drains it, gurgling.
+A shower tray's plug starts out. A door you face still takes the knock, and a basin you are not facing
+does not.
 
 **Voice chat (V).** It uses the microphone chosen in Settings. While it is on, everyone on your map
 can hear you, from where you stand: closer is louder, and walls muffle you as they would anyone
@@ -376,8 +383,9 @@ Type these on the chat line. The `/` is optional and case does not matter.
 - `/scan`: named things within 20 m (the same as Shift+P).
 - `/doors`: doors within 20 m, whether each is open or shut, which way and how far.
 - `/open [name]`, `/close [name]` (or `/shut`): a door.
-- `/knock [name]`: knock on the nearest door, or the door named (the same as Shift+E). With no door in
-  reach and no name, it knocks on whatever is in front of you.
+- `/knock [name]`: knock on the nearest door, or the door named (the same as Shift+E). With no name and
+  a basin you face within reach, it works the plug instead; with no name, no such basin and no door in
+  reach, it knocks on whatever is in front of you.
 - `/tap`: tap whatever is in front of you with a fingertip, to hear what it is made of.
 - `/clap`: clap your hands (the same as T on foot).
 - `/room [radius]`: whether the walls around you form a room, and what is missing if not. The

@@ -74,8 +74,10 @@ public class WorldWireBytesTests
     {
         // 2026-10-17: SoundEmitterComponent.Line appended (a source laid along a line of its own, docs/RUNNING_WATER.md
         // 15.6): the emitter has one member more, null here. 2026-10-17: PortalComponent.GapMetres and UndercutMetres
-        // appended (a shut door's gaps, DoorGaps): the portal has two floats more, zero here.
-        public const string Definition = "4772c8d9af12df4d612161903f654387b8fe217f472c69b21be5fe04798e092b";
+        // appended (a shut door's gaps, DoorGaps): the portal has two floats more, zero here. 2026-11-18:
+        // SoundEmitterComponent.PlugIn appended (a basin's plug is the world's, docs/RUNNING_WATER.md): one bool
+        // more, false here.
+        public const string Definition = "fe6a6e8b41b0eaf9bcf2b3eb47350d4d3f21b21f15aa372d72f345401176d80d";
         public const string TileStream = "e40761c663bb9337d817ce3814e979f91896f28cf198bc06672be7f637419f69";
         public const string CityRoads = "1794c6f218491f38537875c63a3837ffb35756886a78541cc2ee98a730042a65";
     }

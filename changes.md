@@ -15,6 +15,17 @@
   state and their bindings are gone; the native structs keep their pathing fields for phonon.h's layout, zeroed
   as they always were. No sound, render or stored stream moved; the wire hash and door fingerprint are unchanged.
 
+- A tap and its plug are two controls (Cody's decision of 2026-11-17). E turns the tap and nothing else; Shift+E
+  at a basin you face, within the tap's 1.3 m, puts the plug in or pulls it out and says "plug in" or "plug
+  out". A door you face still takes the knock, and a basin you are not facing does not take the key. The plug is
+  the world's: `SoundEmitterComponent.PlugIn`, appended, sent with the definition and set on the live synth each
+  frame beside the tap's switch, so changing it never remakes the voice or empties the water. A sink and a
+  washbasin are placed with the plug in, so the first turn of the tap fills them as before; shut, the water now
+  stands until someone pulls the plug. `PlugWhileRunning` is retired; the lab's fixtures keep its timing, so
+  their renders are unchanged. The wire hash moves to 76462a50fa10 (the server and the Windows client deploy
+  together); the door fingerprint is unchanged. city.json is unchanged (only gen_city.py's comment moved). The
+  stored emitter streams gain `PlugIn=false` on each voice's first line and nothing else.
+
 ## 2026-11-17
 
 - The drop's resonance is its resonance, not a bell's chord (docs/PHYSICS_BOUNDARY.md 18.13; Cody heard round 1 on

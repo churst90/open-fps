@@ -258,6 +258,9 @@ public struct SpatialEmitter
     /// clock has it, heard after its flight. 0 for every other voice, which starts from its top.</summary>
     public double ProgramStart;
 
+    /// <summary>A basin's plug is in (SoundEmitterComponent.PlugIn); the live synth follows it, never remade.</summary>
+    public bool PlugIn;
+
     public SpatialEmitter()
     {
         EntityId = 0;

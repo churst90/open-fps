@@ -111,6 +111,9 @@ public static partial class RunningWaterSpike
     public static float[] Render(RunningWaterSpec spec, float flow, float sec, int seed, string[]? parts = null, float rainOnWater = 0f)
     {
         var s = new RunningWaterSynth(spec, Rate, seed) { Flow = flow, RainOnWater = rainOnWater };
+        // These renders predate the plug's own control: keep the plug where the old rule had it (in while the
+        // tap ran, out when it was shut), so an unchanged model renders byte for byte.
+        if (spec.Tap is { } tap) s.PlugIn = flow > tap.LeakLitresPerSecond + 1e-5f;
         if (parts != null)
         {
             s.SitePart = parts.Contains("sites") ? 1f : 0f;
@@ -145,6 +148,8 @@ public static partial class RunningWaterSpike
         float flowOn = Arg(args, "flow=", spec.Tap?.OpenLitresPerSecond ?? spec.ReferenceFlow);
         float flowOff = spec.Tap?.LeakLitresPerSecond ?? 0f;
         var s = new RunningWaterSynth(spec, Rate, 7) { Flow = 0f };
+        // The cycle's plug follows the old rule, so its renders stay as they were.
+        if (spec.Tap is { } cycleTap) s.PlugIn = flowOn > cycleTap.LeakLitresPerSecond + 1e-5f;
         if (args.FirstOrDefault(a => a.StartsWith("parts=", StringComparison.Ordinal))?[6..].Split(',') is { } parts)
         {
             s.SitePart = parts.Contains("sites") ? 1f : 0f;
@@ -163,6 +168,8 @@ public static partial class RunningWaterSpike
             if ((i & 255) == 0)
             {
                 s.Flow = t >= 0f && t < on ? flowOn : flowOff;
+                // The old rule, kept for this fixture: in while the tap ran, out when it was shut.
+                s.PlugIn = s.Flow > (spec.Tap?.LeakLitresPerSecond ?? 0f) + 1e-5f;
                 s.Control(256f / Rate);
                 if (i >= 0 && i % (Rate / 2) == 0)
                     Console.WriteLine($"  {t,5:F1} s  flow {s.Flow * 1000,6:F1} mL/s  level {s.Level * 1000,6:F1} mm  over the inlet {s.InletDepth * 1000,6:F1} mm"
@@ -320,6 +327,8 @@ public static partial class RunningWaterSpike
             var def = defs[id];
             var em = def.SoundEmitter;
             em.SynthRunning = on;
+            // The old rule, kept for this fixture: the tap's key put the plug in and pulled it.
+            em.PlugIn = on;
             def.SoundEmitter = em;
             world.RegisterDefinition(def);
         }

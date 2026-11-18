@@ -470,6 +470,7 @@ public sealed partial class ClientGameSession : IDisposable
         "Enter fires the gun in your hands; with no gun it interacts, like E. X moves the fire selector, Shift X back; held Enter on auto keeps firing.",
         "Admin gun: X changes its mode (kill, vaporize, freeze, inspect), Y and Shift Y its calibre.",
         "C coordinates, F facing, H health, Z area, P look ahead, Shift P scan, E interact or pick up, I inventory list, Shift I what you carry.",
+        "Shift E at a basin you face works its plug (plug in or plug out); elsewhere it knocks on the door or thing in front of you.",
         "Comma and period step through the nearest things of one kind, nearest first; Shift comma and Shift period change the kind:",
         "doors, entrances, stairs, items, people, vehicles, places.",
         "N turns the narration of what is ahead, as you turn and move and as things pass, on or off.",

@@ -177,6 +177,8 @@ public sealed partial class RunningWaterSynth
     public RunningWaterSynth(RunningWaterSpec spec, float sampleRate, int seed, int places = 0, bool banksApart = true)
     {
         Spec = spec;
+        // A basin's plug starts where its preset places it; the world moves it from there.
+        PlugIn = spec.Basin?.PlugIn ?? false;
         _rate = sampleRate;
         places = places > 0 ? places : Math.Max(1, spec.Places);
         _open = new EventSum[places];

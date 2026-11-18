@@ -310,6 +310,9 @@ public sealed class PlacedNatureVoice
     public volatile bool Running = true;
     /// <summary>A fire's share of its heat taken by water now (the server's, SoundEmitterComponent.Quench).</summary>
     public volatile float TargetQuench;
+    /// <summary>A basin's plug, in or out (the server's, SoundEmitterComponent.PlugIn). The synth keeps its
+    /// water; only what leaves the basin changes.</summary>
+    public volatile bool TargetPlugIn;
     /// <summary>For a wood heard as one (WoodChorus): the places its wind is read at, one a bough, and how
     /// many trees it stands for now (the client's, eased here so it never steps). Null for a tree.</summary>
     public Vector3[]? WindPlaces;
@@ -339,7 +342,11 @@ public sealed class PlacedNatureVoice
     public PlacedNatureVoice(string key, RunningWaterSpec spec, float sampleRate, int seed, Vector3 position, WorldWeather weather,
                              WideSources wide)
         : this(wide.FlowPlaces(key, spec, ModelLibrary.Presets), sampleRate, position, spec.SourceLevelDb, spec.PeakHeadroomDb, 1f, weather)
-        => Flow = new RunningWaterSynth(spec, sampleRate, seed, wide.FlowPlaces(key, spec, ModelLibrary.Presets));
+    {
+        Flow = new RunningWaterSynth(spec, sampleRate, seed, wide.FlowPlaces(key, spec, ModelLibrary.Presets));
+        // Until the world says otherwise, the plug is where the basin is placed.
+        TargetPlugIn = Flow.PlugIn;
+    }
 
     /// <summary>Waves at an edge (ShoreSynth); fetch, lie and length come from the map's key
     /// (ShoreSpec.KeyFor).</summary>
@@ -447,6 +454,7 @@ public sealed class PlacedNatureVoice
             var spec = Flow.Spec;
             Flow.Spread = spread;
             Flow.Cut = TargetCut;
+            Flow.PlugIn = TargetPlugIn;
             // A tap runs when somebody has turned it on (Running, from the server), and the basin under
             // it goes on draining after; anything else runs with its own flow and the rain.
             Flow.Flow = spec.Tap != null ? spec.FlowNow(Weather, tapOn: Running) : Running ? spec.FlowNow(Weather) : 0f;

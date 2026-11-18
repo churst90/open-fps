@@ -89,17 +89,22 @@ public class RunningWaterRound2Tests
     // ── The basin ──────────────────────────────────────────────────────────────────────────────
 
     [Fact]
-    public void A_sink_fills_while_its_tap_runs_and_drains_with_a_gurgle_when_it_is_shut()
+    public void A_sink_fills_while_its_tap_runs_and_drains_with_a_gurgle_when_the_plug_is_pulled()
     {
         var spec = RunningWaterSpec.KitchenSink;
         var s = new RunningWaterSynth(spec, Rate, 3) { Flow = 0f };
         var on = Run(s, spec.Tap!.OpenLitresPerSecond, 60f);
         float full = s.Level;
         _o.WriteLine($"  after a minute running: {full * 1000:F1} mm");
-        // The plug is in while it runs: 0.12 L/s over a 0.45 by 0.38 m bowl is 0.7 mm a second.
+        // The plug starts in: 0.12 L/s over a 0.45 by 0.38 m bowl is 0.7 mm a second.
         Assert.InRange(full * 1000f, 36f, 46f);
         Assert.Equal(0f, s.InletFlow);
-        // Shut: the plug comes out, it drains, and the gurgle comes only once it is shallow.
+        // Shut, the plug still in, it stands: nothing leaves and nothing is said. Pulled, it drains, and the
+        // gurgle comes only once it is shallow.
+        Run(s, 0f, 30f);
+        Assert.Equal(full, s.Level, 3);
+        Assert.Equal(0f, s.InletFlow);
+        s.PlugIn = false;
         var gurgle = new List<(float T, float Level, float G)>();
         for (int k = 0; k < 120; k++)
         {
@@ -120,7 +125,7 @@ public class RunningWaterRound2Tests
     [Fact]
     public void A_tap_on_a_steel_bottom_rings_it_and_water_on_it_damps_the_ringing()
     {
-        var spec = RunningWaterSpec.KitchenSink with { Basin = RunningWaterSpec.KitchenSink.Basin! with { PlugWhileRunning = false } };
+        var spec = RunningWaterSpec.KitchenSink with { Basin = RunningWaterSpec.KitchenSink.Basin! with { PlugIn = false } };
         double Rendered(float platePart)
         {
             var s = new RunningWaterSynth(spec, Rate, 5) { Flow = 0f, PlatePart = platePart };

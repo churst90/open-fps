@@ -748,7 +748,11 @@ The open questions for Cody, in one place. A few that belong to one item stay wi
 - A tap and its plug: answered 2026-11-17, two controls. E works the tap alone; the plug is its own action
   (Shift+E, the knock's key, on a basin rather than a door: what you face decides, and the knock at a door is
   unchanged). A tap can then run with the plug out, and a basin can be filled and left standing. Retires
-  `PlugWhileRunning` (docs/RUNNING_WATER.md); spoken: "plug in", "plug out".
+  `PlugWhileRunning` (docs/RUNNING_WATER.md); spoken: "plug in", "plug out". DONE 2026-11-18: the plug is
+  `SoundEmitterComponent.PlugIn`, appended to the component and carried like the tap's switch, so changing it
+  neither restarts the voice nor empties the basin; `FlowBasin.PlugIn` is only where a placed basin starts
+  (in for a sink and a washbasin, out for a shower). Shift+E at a faced basin in reach says "plug in" or
+  "plug out"; a faced door still knocks.
 - Steam Audio pathing: answered 2026-11-17, remove it. It never ran (`enablePathing: false`), its bake was the
   2026-09 stutter, and OpeningRoutes finds every route from the map's own openings. DONE 2026-11-18: the option,
   bake and probe state are gone from `SteamAudioSimulator` and its callers; no render or stream moved, since

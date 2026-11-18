@@ -158,11 +158,11 @@ public sealed record FlowBasin
     public float SumpSquareMetres { get; init; } = 0.012f;
     [Tunable("m", 0, 0.05, "How far the bottom falls to the waste. Below that depth the water stands in the dish, not over the whole bottom.", Label = "fall to the waste", Step = 0.001)]
     public float FallToWasteMetres { get; init; } = 0.006f;
-    [Tunable("", 0, 1, "The plug is in: nothing leaves but over the overflow.", Label = "plug in")]
+    /// <summary>Where the plug starts: in for a basin placed with its plug in, out for one placed ready to drain.
+    /// A person changes it afterwards (the server's SoundEmitterComponent.PlugIn), and every client hears the
+    /// change without the synth restarting.</summary>
+    [Tunable("", 0, 1, "Where the plug starts: in for a basin placed with its plug in, out for one placed ready to drain. A person changes it afterwards at the basin.", Label = "plug starts in")]
     public bool PlugIn { get; init; }
-    /// <summary>One key does both: the game's interact key on the tap.</summary>
-    [Tunable("", 0, 1, "The plug goes in while the tap runs and comes out when it is shut, as when someone fills the basin and lets it go after.", Label = "plug in while running")]
-    public bool PlugWhileRunning { get; init; }
     [Tunable("m", 0.01, 1, "How high the overflow slot is above the bottom.", Label = "overflow height", Step = 0.01)]
     public float OverflowMetres { get; init; } = 0.15f;
 }
@@ -505,8 +505,9 @@ public sealed record RunningWaterSpec
     /// A kitchen sink: a stainless bowl 0.45 by 0.38 m and 0.18 deep (0.9 mm steel with its anti-drum
     /// pads), an aerated mixer tap 0.28 m over its bottom giving 0.12 L/s fully open, and a 40 mm basket
     /// strainer (its bars leave about half of it open) over 0.35 m of waste down to the trap. The tap is
-    /// turned on and off by a person (SoundEmitterComponent.SynthRunning): on, the plug goes in and the bowl
-    /// fills; off, the plug comes out and it drains, gurgling as it empties.
+    /// turned on and off by a person (SoundEmitterComponent.SynthRunning) and its plug is its own control
+    /// (SoundEmitterComponent.PlugIn): placed with the plug in, the bowl fills while the tap runs and stands
+    /// full when it is shut; the plug pulled, it drains, gurgling as it empties.
     /// </summary>
     public static RunningWaterSpec KitchenSink => new()
     {
@@ -514,7 +515,7 @@ public sealed record RunningWaterSpec
         Channel = FlowChannel.None,
         Tap = new FlowTap { OpenLitresPerSecond = 0.12f, NozzleMm = 18f, Aerated = true, HeightMetres = 0.28f },
         Basin = new FlowBasin { Material = "Metal", SkinMetres = 0.0009f, LengthMetres = 0.45f, WidthMetres = 0.38f, DepthMetres = 0.18f, LossFactor = 0.04f,
-                                PlugWhileRunning = true },
+                                PlugIn = true },
         Inlet = new FlowInlet { DiameterMetres = 0.04f, OpenShare = 0.45f, RimMetres = 0.5f, Swirl = 0.25f, PipeMetres = 0.35f },
         Falls = new[]
         {
@@ -551,7 +552,7 @@ public sealed record RunningWaterSpec
     /// <summary>
     /// A bathroom washbasin: vitreous china (stiff and thick, so it does not ring like steel: a hard wet
     /// surface), 0.45 by 0.35 m and 0.15 deep, an aerated tap 0.2 m over the bottom at 0.08 L/s, a 32 mm
-    /// waste with a pop-up plug standing open (about half the hole), 0.3 m to its trap.
+    /// waste with a pop-up plug, in where it starts, 0.3 m to its trap.
     /// </summary>
     public static RunningWaterSpec Washbasin => new()
     {
@@ -559,7 +560,7 @@ public sealed record RunningWaterSpec
         Channel = FlowChannel.None,
         Tap = new FlowTap { OpenLitresPerSecond = 0.08f, NozzleMm = 16f, Aerated = true, HeightMetres = 0.2f },
         Basin = new FlowBasin { Material = "Tile", SkinMetres = 0.008f, LengthMetres = 0.45f, WidthMetres = 0.35f, DepthMetres = 0.15f, LossFactor = 0.02f,
-                                OverflowMetres = 0.12f, PlugWhileRunning = true },
+                                OverflowMetres = 0.12f, PlugIn = true },
         Inlet = new FlowInlet { DiameterMetres = 0.032f, OpenShare = 0.5f, Swirl = 0.25f, PipeMetres = 0.3f },
         Falls = new[]
         {

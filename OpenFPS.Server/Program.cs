@@ -2198,12 +2198,17 @@ public class GameServer
         return Flat(a - from).LengthSquared() <= Flat(b - from).LengthSquared();
 
         static Vector3 Flat(Vector3 v) => new(v.X, 0f, v.Z);
-        static bool InFront(Vector3 from, float yaw, Vector3 to)
-        {
-            var toward = Flat(to - from);
-            if (toward.LengthSquared() < 1e-4f) return true;   // standing on it
-            return Vector3.Dot(Vector3.Normalize(toward), Flat(ScopeMath.Forward(yaw, 0f))) >= MathF.Cos(FacingHalfAngle);
-        }
+    }
+
+    /// <summary>Whether <paramref name="to"/> is in front of someone at <paramref name="from"/> facing
+    /// <paramref name="yaw"/>: the same cone every "in front of you" question uses (doors, cars, taps).
+    /// Measured across the floor.</summary>
+    internal static bool InFront(Vector3 from, float yaw, Vector3 to)
+    {
+        var toward = new Vector3(to.X - from.X, 0f, to.Z - from.Z);
+        if (toward.LengthSquared() < 1e-4f) return true;   // standing on it
+        var forward = ScopeMath.Forward(yaw, 0f);
+        return Vector3.Dot(Vector3.Normalize(toward), Vector3.Normalize(new Vector3(forward.X, 0f, forward.Z))) >= MathF.Cos(FacingHalfAngle);
     }
 
     /// <summary>How close you must stand to a tap to turn it, m, measured along the floor: at the sink.</summary>
@@ -2213,8 +2218,9 @@ public class GameServer
     /// Turns the tap you are standing at on, or off (running water with a tap: RunningWaterSpec.Tap). The
     /// tap's flow is its emitter's SynthRunning, which every client reads from the definition, so the
     /// definition goes out again; the basin under it fills and drains on each client from that one flag.
+    /// The plug is its own control (Shift+E, CommandHandler.HandleKnock) and is not touched here.
     /// </summary>
-    private bool ToggleTapInReach(World world, Vector3 position, Action<string> say)
+    internal bool ToggleTapInReach(World world, Vector3 position, Action<string> say)
     {
         Entity? nearest = null;
         float best = TapReach;
@@ -2264,22 +2270,33 @@ public class GameServer
         return true;
     }
 
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> TapIds = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, RunningWaterSpec?> TapSpecs = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>Whether a sound id is running water with a tap a person turns.</summary>
-    internal static bool IsTap(string? soundId)
+    /// <summary>The running water a tap's sound id names, or null for anything else. One parse per id.</summary>
+    private static RunningWaterSpec? TapSpec(string? soundId)
     {
-        if (!ModelKindTable.Is(soundId, ModelSynth.Flow)) return false;
-        return TapIds.GetOrAdd(soundId!, static id =>
+        if (!ModelKindTable.Is(soundId, ModelSynth.Flow)) return null;
+        return TapSpecs.GetOrAdd(soundId!, static id =>
         {
-            try { return OpenFPS.Models.ModelLibrary.Presets.Flow(ModelKindTable.KindOf(id)!.Rest(id)).Tap != null; }
+            try
+            {
+                var spec = OpenFPS.Models.ModelLibrary.Presets.Flow(ModelKindTable.KindOf(id)!.Rest(id));
+                return spec.Tap != null ? spec : null;
+            }
             catch (Exception ex)
             {
                 ModelKindTable.Fail(id, ex.Message);
-                return false;
+                return null;
             }
         });
     }
+
+    /// <summary>Whether a sound id is running water with a tap a person turns.</summary>
+    internal static bool IsTap(string? soundId) => TapSpec(soundId) != null;
+
+    /// <summary>Whether a tap's basin has a plug a person can work (every basin here does: a sink, a washbasin,
+    /// a shower tray). A tap with no basin is not one.</summary>
+    internal static bool TapHasBasin(string? soundId) => TapSpec(soundId)?.Basin != null;
 
     /// <summary>Shuts the open door within arm's length that you mean (the one you face, else the nearer),
     /// if there is one, unless somebody is in the way of the leaf: then says so, and leaves it open.</summary>

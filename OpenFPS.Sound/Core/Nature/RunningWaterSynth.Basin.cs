@@ -75,6 +75,10 @@ public sealed partial class RunningWaterSynth
 
     // ── The basin ─────────────────────────────────────────────────────────────────────────────────
 
+    /// <summary>The plug's state now, set by the world (SoundEmitterComponent.PlugIn) from the moment the
+    /// basin is placed; the preset only says where it starts. Changing it changes the water, not the voice.</summary>
+    public bool PlugIn;
+
     private float _level;                    // m of water over the basin's bottom
     private float _inletFlow;                // L/s leaving through the inlet
     private float _inletDepth;               // m of water over the inlet
@@ -83,9 +87,6 @@ public sealed partial class RunningWaterSynth
     private Plate? _plate;
     private EventSum? _plateDrive;
     private float _plateLevel = -1f;
-
-    /// <summary>The tap is open (more than its leak is asked for).</summary>
-    private bool TapOn => Spec.Tap is { } tap && Flow > tap.LeakLitresPerSecond + 1e-5f;
 
     /// <summary>How deep the water stands in the basin now, m (for the lab and the tests).</summary>
     public float Level => _level;
@@ -178,7 +179,7 @@ public sealed partial class RunningWaterSynth
             // What the tap puts in is this source's flow; what leaves is the inlet's, at this depth.
             float inflow = _flow * 1e-3f;
             float level = _level;
-            bool plugIn = basin.PlugIn || (basin.PlugWhileRunning && TapOn);
+            bool plugIn = PlugIn;
             // Sub-steps: a shallow basin drains in seconds, a block is 5 ms.
             for (int k = 0; k < 4; k++)
             {

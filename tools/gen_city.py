@@ -2430,9 +2430,10 @@ prop("drain_grate_water", GUTTER_X1 + 0.3, 0.1, GUTTER_Z + 0.1, name="Foundry St
 #
 # Round 2 of running water (docs/RUNNING_WATER.md section 10). Every flat has a kitchen sink, a washbasin
 # and a shower, against its outer wall at the far end from its sofa: RunningWaterSpec.KitchenSink,
-# Washbasin and Shower. A person turns each on and off with the interact key standing at it; running,
-# the sink and the basin fill with the plug in, shut, they drain and gurgle. Silent until somebody does.
-# One kitchen tap, in the Union Building's first-floor flat 1F, has a worn washer and drips.
+# Washbasin and Shower. A person turns each on and off with the interact key standing at it, and works its
+# plug with Shift+E: the sink and the basin are placed with the plug in, so they fill and stand full; pulled,
+# they drain and gurgle. Silent until somebody does. One kitchen tap, in the Union Building's first-floor
+# flat 1F, has a worn washer and drips.
 #
 # Every house has a downpipe at the garden end of its back wall, and at the eaves over it the outlet
 # where the roof gutter empties into it (RunningWaterSpec.Downpipe and GutterOutlet): silent in dry

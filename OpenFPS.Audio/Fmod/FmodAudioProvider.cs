@@ -2811,6 +2811,7 @@ public partial class FmodAudioProvider : IAudioProvider
                                     emitter.Seed * 43 + 17, emitter.Position, Weather);
         voice.TargetSpread = emitter.Spread;
         voice.TargetQuench = emitter.Quench;
+        if (voice.Flow != null) voice.TargetPlugIn = emitter.PlugIn;
         if (cut) voice.TargetCut = PiecesOf(emitter.EntityId);
         if (voice.Fire != null) voice.Fire.Hearing = Hearing;
         if (voice.Flow != null) voice.Flow.Lab = Lab;
@@ -3913,6 +3914,7 @@ public partial class FmodAudioProvider : IAudioProvider
                         middle.Shared.TargetSpread = emitter.Spread;
                         middle.Shared.TargetQuench = emitter.Quench;
                         if (middle.Shared.Wood) middle.Shared.TargetTrees = emitter.Trees;
+                        if (middle.Shared.Flow != null) middle.Shared.TargetPlugIn = emitter.PlugIn;
                     }
                     else if (active.MachineState is WaterTapState { Place: 0 } tapMiddle)
                     {

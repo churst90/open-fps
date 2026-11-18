@@ -3377,6 +3377,8 @@ public partial class AudioWorld : IDisposable, IAudioShutdown
             // client sees; a crossing's bell rings for a train the listener may be a kilometre from, so
             // it comes down the wire (true for everything else).
             EngineRunning = spec.SynthRunning,
+            // A basin's plug, the world's like the tap's switch: the live synth follows it, never remade.
+            PlugIn = spec.PlugIn,
             Quench = spec.Quench,
             ServingStop = spec.ServingStop,
             WindowsOpen = _cabins.WindowsOpen(src.Id, spec.WindowsOpen, _now()),

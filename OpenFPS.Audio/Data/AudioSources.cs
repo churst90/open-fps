@@ -70,6 +70,8 @@ public readonly record struct SourceSpec
     /// <summary>A source laid along a line of its own, its points from end to end in its own frame; null for a point
     /// or a source whose places are its model's (SoundEmitterComponent.Line).</summary>
     public Vector3[]? Line { get; init; }
+    /// <summary>A basin's plug, in or out (SoundEmitterComponent.PlugIn): the world's state, not the preset's.</summary>
+    public bool PlugIn { get; init; }
 
     /// <summary>The body it sits on: its collider's shape and full size (a fire's bed, a shore's stretch, a
     /// vehicle the catalogue cannot name).</summary>

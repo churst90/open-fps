@@ -24,6 +24,13 @@ public partial class CommandHandler
         if (!TryGetBody(session, reply, out var world, out var grid, out var position)) return;
         var from = ReachingFrom(world, session.Entity, position);
         string wanted = args.Length > 0 ? string.Join(" ", args) : "";
+        // At a basin you face, the key is the plug's: in or out, said, and the water follows on every client.
+        // A door you face still gets the knock, and a basin you are not facing does not take the key.
+        if (wanted.Length == 0)
+        {
+            float yaw = world.Has<PlayerComponent>(session.Entity) ? world.Get<PlayerComponent>(session.Entity).Yaw : 0f;
+            if (ToggleBasinPlugInFront(world, from, yaw, reply)) return;
+        }
         var door = NearestDoor(world, from, wanted, out _, out string name);
         // No door in reach: whatever is in front of you, struck by its own material, shape and size
         // (docs/MATTER.md 7.3). A door keeps its own knock, fitted to a recording (DoorKnock).
@@ -52,6 +59,32 @@ public partial class CommandHandler
                 Noisiness = 1f,
             },
         });
+    }
+
+    /// <summary>
+    /// Works the plug of the nearest running-water tap with a basin within arm's length that you face, saying
+    /// "plug in" or "plug out". False when there is none, so the knock goes on to the door. The plug is a field
+    /// of the definition, sent again: changing it never replaces the voice or empties the basin's water.
+    /// </summary>
+    private bool ToggleBasinPlugInFront(World world, Vector3 from, float yaw, Action<IMessage> reply)
+    {
+        Entity? nearest = null;
+        float best = GameServer.TapReach;
+        world.Query(new QueryDescription().WithAll<Transform, SoundEmitterComponent>(), (Entity e, ref Transform t, ref SoundEmitterComponent em) =>
+        {
+            if (!GameServer.TapHasBasin(em.SoundId)) return;
+            float dx = t.Position.X - from.X, dz = t.Position.Z - from.Z;
+            float distance = MathF.Sqrt(dx * dx + dz * dz);
+            if (distance > best || MathF.Abs(t.Position.Y - from.Y) > 2.5f) return;
+            if (!GameServer.InFront(from, yaw, t.Position)) return;
+            best = distance; nearest = e;
+        });
+        if (nearest == null) return false;
+        ref var tap = ref world.Get<SoundEmitterComponent>(nearest.Value);
+        tap.PlugIn = !tap.PlugIn;
+        _server.SyncAudioComponent(nearest.Value.Id);
+        Say(reply, tap.PlugIn ? "plug in" : "plug out");
+        return true;
     }
 
     /// <summary>/tap: two taps of a fingertip on whatever is in front of you, heard from its own material, shape and

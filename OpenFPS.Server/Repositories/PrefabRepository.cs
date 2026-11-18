@@ -22,6 +22,19 @@ public class PrefabRepository : PrefabLibrary
     internal static bool AnnouncesByDefault(PrefabTemplate t) =>
         t.Announce ?? t.Type is EntityType.Item or EntityType.NPC or EntityType.Beacon;
 
+    /// <summary>Where a placed basin's plug starts, from its running-water preset: a sink or a washbasin is
+    /// placed with its plug in, a shower tray with it out. Anything that is not a tap with a basin: out.</summary>
+    private static bool PlugStartsIn(string? soundId)
+    {
+        if (!OpenFPS.Models.ModelKindTable.Is(soundId, OpenFPS.Models.ModelSynth.Flow)) return false;
+        try
+        {
+            var kind = OpenFPS.Models.ModelKindTable.KindOf(soundId)!;
+            return OpenFPS.Models.ModelLibrary.Presets.Flow(kind.Rest(soundId!)).Basin?.PlugIn ?? false;
+        }
+        catch (Exception) { return false; }
+    }
+
     /// <summary>A thing's beacon category by what it is: a door, an item, or a Beacon's own category
     /// (a waypoint if it names none). Empty for anything else.</summary>
     public static string BeaconCategoryOf(PrefabTemplate t)
@@ -163,6 +176,7 @@ public class PrefabRepository : PrefabLibrary
                 SynthPulseWidth = t.SynthPulseWidth ?? 0.5f,
                 SynthRunning = t.SynthRunning ?? true,
                 Loudspeaker = t.Loudspeaker ?? "",
+                PlugIn = PlugStartsIn(t.SoundId),
             });
         }
 

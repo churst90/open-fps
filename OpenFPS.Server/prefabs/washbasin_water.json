@@ -1,7 +1,7 @@
 {
   "Id": "washbasin_water",
   "Name": "Washbasin",
-  "Description": "A ceramic bathroom washbasin and its tap (RunningWaterSpec.Washbasin): off until somebody turns it on with the interact key; fills with the plug in while it runs, drains and gurgles when it is shut. Place it over the basin. Not a recording and not a loop.",
+  "Description": "A ceramic bathroom washbasin and its tap (RunningWaterSpec.Washbasin): off until somebody turns it on with the interact key; its plug starts in, so it fills while the tap runs and stands full when it is shut. Shift+E at the basin facing it works the plug: pulled, it drains and gurgles. Place it over the basin. Not a recording and not a loop.",
   "Material": "Water",
   "ColliderSize": {
     "X": 0.2,
