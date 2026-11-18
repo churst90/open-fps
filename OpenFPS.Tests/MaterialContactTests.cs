@@ -15,14 +15,14 @@ public class MaterialContactTests
     /// <summary>Every filled cell, as docs/MATTER.md lists it: a figure added, changed or left out changes the doc too.</summary>
     private static readonly Dictionary<string, (float? Static, float? Kinetic, float? Restitution)> Filled = new()
     {
-        ["Metal"] = (0.74f, 0.57f, null), ["Fence"] = (0.74f, 0.57f, null), ["Aluminium"] = (1.2f, 1.4f, null),
+        ["Metal"] = (0.74f, 0.57f, 0.72f), ["Fence"] = (0.74f, 0.57f, 0.72f), ["Aluminium"] = (1.2f, 1.4f, null),
         ["CastIron"] = (1.1f, 0.15f, null), ["Copper"] = (1.0f, null, null), ["Lead"] = (0.90f, null, null),
         ["Titanium"] = (0.36f, 0.30f, null), ["Glass"] = (0.95f, 0.4f, 0.93f), ["LaminatedGlass"] = (0.95f, 0.4f, null),
-        ["Concrete"] = (null, 0.65f, null), ["Brick"] = (null, 0.68f, null), ["Granite"] = (null, 0.6f, null),
+        ["Concrete"] = (null, 0.65f, 0.60f), ["Brick"] = (null, 0.68f, null), ["Granite"] = (null, 0.6f, null),
         ["Wood"] = (0.38f, null, null), ["Oak"] = (0.62f, 0.48f, null), ["Acrylic"] = (0.8f, null, null),
         ["Nylon"] = (0.2f, null, null), ["Rubber"] = (1.16f, null, null), ["Dirt"] = (0.58f, null, null),
         ["Sand"] = (0.57f, null, null), ["Clay"] = (0.42f, null, null), ["Gravel"] = (0.70f, null, null),
-        ["Ice"] = (0.3f, 0.035f, null),
+        ["Ice"] = (0.3f, 0.035f, null), ["Tile"] = (null, null, 0.82f),
     };
 
     [Fact]
