@@ -327,13 +327,15 @@ questions; `TryRailSource` and `TryWaterTap` are the two keys' parsers, which th
   shipped map (city, speedway, the test map, Albany and Magnolia, with traffic, trains and crossings
   spawned) and every prefab: every synthesised id resolves, no recording wears a model's prefix, and on
   every body placed the footsteps and the scope's answer equal the replaced lists'.
-- Disagreements and what was chosen, none changing behaviour:
+- Disagreements and what was chosen:
   - Scope and OtherBodies on mowers. OtherBodies walked the push mower by its id; Scope's comment said
     "somebody pushing a push mower is a person" but its code made every NPC with a `machine:` sound not a
     person. The table says a small machine's body is Fixed (its spec's doc: "stands still and runs") and the
-    push mower's Walks. OtherBodies keeps its footsteps; Scope picks out a person only when the sound names
-    no model, so the push mower stays unpicked as before. Open for Cody: whether the scope should call it a
-    person (one line in `Scope.Classify`).
+    push mower's Walks. OtherBodies keeps its footsteps. Answered by Cody on 2026-11-17, built 2026-11-18:
+    whatever declares a walking operator has a person with it. `SightKinds.Classify` makes an NPC whose
+    model body Walks a Person, read from `ModelKindTable.BodyOf` as OtherBodies reads it; the scope aims at
+    its chest as for any person and calls it "person", and the people tracker lists it under People. A
+    machine nobody walks, the riding mower included, is still not picked out.
   - The riding mower moves on the city but its body is Fixed, as every small machine's is: the scope did not
     call it a vehicle and still does not. A `Rolls` body for it would make it a vehicle to the scope.
   - IsSynth. OtherBodies asked it for aircraft, rail and machine but not engine; the table reads the id

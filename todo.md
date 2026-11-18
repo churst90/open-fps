@@ -709,9 +709,10 @@ here are checked to stand on (docs/LISTENING_SPOTS.md).
 The open questions for Cody, in one place. A few that belong to one item stay with it, marked (Cody).
 - Real weather (docs/REAL_WEATHER.md section 12): all seven answered 2026-11-17, with the units, a made-up map's
   static or changing weather and the generic climate ("Decided (Cody, 2026-11-17)").
-- The scope and the push mower (audit P2): answered 2026-11-17, a person. Whatever declares a walking operator
-  (`SmallMachineSpec.WalkedBehind`, the rule `OtherBodies` already uses for the footsteps) has a person with it,
-  and the scope says so; a machine with no operator is still not picked out.
+- The scope and the push mower (audit P2): DONE 2026-11-18. Whatever declares a walking operator
+  (`SmallMachineSpec.WalkedBehind`, the rule `OtherBodies` already uses for the footsteps) has a person with it:
+  `SightKinds.Classify` reads `ModelBody.Walks`, so the scope and the people tracker say person; a machine with
+  no operator is still not picked out.
 - The editor and sound ids (audit P2): answered 2026-11-17, yes. `ModelKinds.TryModelOfSound` answers for every
   kind through the model kind table (each row its `LibraryKind`), so no model is out of the editor's reach by
   being missed off a list; trains and woods first, then horns, aircraft, gates, sirens and rain as each gets

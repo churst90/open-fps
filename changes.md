@@ -26,6 +26,15 @@
   together); the door fingerprint is unchanged. city.json is unchanged (only gen_city.py's comment moved). The
   stored emitter streams gain `PlugIn=false` on each voice's first line and nothing else.
 
+- The scope picks out a machine somebody walks behind as a person (Cody's decision of 2026-11-17;
+  docs/SPECIAL_CASES_AUDIT.md, P2). `SightKinds.Classify` reads `ModelKindTable.BodyOf` for an NPC: a model
+  whose body `Walks` is a person, as a body with no model is, and a fixed machine (a riding mower, an air
+  conditioner) is still not picked out. The scope aims at the entity's chest as for any person (nothing
+  declares an operator offset, and the footsteps already come from the machine's own body) and calls it
+  "person"; the people tracker lists it under People, not Vehicles. The city's mowers have `Named` false, so
+  their machine name is not spoken. No sound, render or stored stream moved; the wire hash stays
+  76462a50fa10 and the door fingerprint d163818bf3ff.
+
 ## 2026-11-17
 
 - The drop's resonance is its resonance, not a bell's chord (docs/PHYSICS_BOUNDARY.md 18.13; Cody heard round 1 on

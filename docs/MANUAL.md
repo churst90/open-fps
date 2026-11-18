@@ -144,6 +144,8 @@ degrees a second. You cannot turn while riding in a vehicle: you face the way it
 
 - Comma and period look up to 100 m away. A thing one floor up or down counts as further than one
   on your floor. The kind you chose is saved.
+- A push mower somebody walks behind is under People, not Vehicles; a machine nobody walks is in
+  neither.
 - A door with a wall between you and it is still named, but its beacon would not be heard through the
   wall, so you hear "behind a wall" instead. Find the way round to it: a barn's doorway, for example,
   may face the street, away from the house's doors.
@@ -255,6 +257,9 @@ the keypad. Raising the scope says so if Num Lock is off.
 | Numpad / or Enter | Fire |
 
 With the scope down, Numpad / opens the command line, like `/`.
+
+A machine somebody walks behind, such as a push mower, is a person to the scope; a machine with
+nobody at it is not picked out.
 
 The guidance tone pulses faster and higher as you near someone and holds a note when you are on
 them; `/scope tone off` silences it. Bullets fall and drift with the wind and take about a second
