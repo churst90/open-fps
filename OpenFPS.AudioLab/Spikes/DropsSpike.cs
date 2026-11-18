@@ -23,9 +23,11 @@ namespace OpenFPS.AudioLab.Spikes;
 /// (wood, concrete, carpet, metal), and two of them thrown, all stepped in a <see cref="BodyWorld"/> and every
 /// impact heard through the same contact and the same <see cref="ImpactAcoustics.Dropped"/> the server uses. Each
 /// drop is rendered to a WAV beside the old scripted drop of the same item, floor and height, at game level (the
-/// shipped hearing's placement), and every file's peak and RMS is printed. The shapes section (18.12) adds a steel
-/// bar, a steel pipe, a glass bottle, a wooden plank and a plastic box, each dropped from one metre onto concrete
-/// and wood, and prints each new render's strongest tail peaks beside the notes its shape's law predicts.
+/// shipped hearing's placement), and every file's peak and RMS is printed. The shapes section (18.12-18.13) adds a
+/// steel bar, a steel pipe, a glass bottle, a wooden plank and a plastic box, each dropped from one metre onto
+/// concrete and wood, and prints each new render's peak, RMS, clipped samples, fall to 30 dB, octave levels over
+/// the first 300 ms, and strongest tail peaks beside the notes its shape's law predicts. `measure=DIR` measures
+/// WAVs already on disk the same way, so a round sits beside the one before it.
 /// <c>cost</c> (or always, after) also prices the server's warm-up and a tick with 1, 10 and 50 moving items on the
 /// city's own tiles.
 /// </summary>
@@ -72,6 +74,8 @@ public static class DropsSpike
         string outDir = Arg(args, "out=") ?? Path.Combine(
             System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile),
             ".cache", "openfps-build", "drops", "renders");
+        if (Arg(args, "measure=") is { } measureDir) return Measure(measureDir);
+
         Directory.CreateDirectory(outDir);
         var hearing = HearingSettings.FromEnvironment();
         Console.WriteLine($"Drops: game level, compression {hearing.Compression:F2}; writing to {outDir}\n");
@@ -162,21 +166,37 @@ public static class DropsSpike
                 var flight = Fly(item, start, Vector3.Zero, material);
                 string stem = $"{n:00}-new-{Slug(item.Name)}-from-1m-on-{Slug(material)}";
                 var pcm = Mix(flight.Impacts, hearing, out var times);
-                bad += Write(outDir, stem + ".wav", pcm, times);
+                bad += Write(outDir, stem + ".wav", pcm, times, detailed: true);
 
                 var old = OldScript(item, material, start);
                 string oldStem = $"{n:00}-old-{Slug(item.Name)}-from-1m-on-{Slug(material)}";
                 var oldPcm = Mix(old, hearing, out var oldTimes);
                 bad += Write(outDir, oldStem + ".wav", oldPcm, oldTimes);
 
-                var modes = ItemModes.Free(AcousticRegistry.GetProperties(item.Material), item.Shape, item.MassKg);
+                var itemMaterial = AcousticRegistry.GetProperties(item.Material);
+                var floorMaterial = AcousticRegistry.GetProperties(material);
+                var first = flight.Impacts.Count > 0 ? flight.Impacts[0] : null;
+                float speed = first?.Speed ?? MathF.Sqrt(2f * Earth.StandardGravity);
+                var contactAt = first?.Point ?? Vector3.Zero;
+                float contact = ItemModes.ContactSeconds(itemMaterial, floorMaterial, item.MassKg, DroppedThings.FixedMassKg,
+                                                         item.Shape.ContactRadiusMetres, speed);
+                float reducedMass = item.MassKg * DroppedThings.FixedMassKg / (item.MassKg + DroppedThings.FixedMassKg);
+                var modes = ItemModes.Free(itemMaterial, item.Shape, item.MassKg, floorMaterial, contact, reducedMass,
+                                           ImpactAcoustics.SeedFor(contactAt, speed));
+                static string Db(float gain)
+                {
+                    float db = 20f * MathF.Log10(MathF.Max(1e-3f, gain));
+                    return (MathF.Abs(db) < 0.5f ? 0f : db).ToString("F0", CultureInfo.InvariantCulture);
+                }
                 string predicted = modes.Count == 0 ? "none"
-                    : string.Join(", ", modes.Select(m => $"{m.Hz:F0} Hz"));
-                float blow = flight.Impacts.Count > 0 ? flight.Impacts[0].Time : 0f;
+                    : string.Join(", ", modes.Select(m => $"{m.Hz:F0} Hz ({Db(m.Gain)} dB, {m.Seconds:F2} s)"));
+                float blow = first?.Time ?? 0f;
                 float longest = modes.Count > 0 ? modes.Max(m => m.Seconds) : 0.05f;
-                float from = blow + Math.Clamp(longest * 0.1f, 0.005f, 0.05f);
-                float window = Math.Clamp(longest * 1.5f, 0.1f, 0.5f);
-                var peaks = TailPeaks(pcm, from, window, 6);
+                // The bright modes live for tens of milliseconds: the tail must start at the blow, not after
+                // the long low mode's first tenth, or the render is judged only by its slowest partial.
+                float from = blow + 0.005f;
+                float window = Math.Clamp(MathF.Min(longest, 0.25f), 0.05f, 0.25f);
+                var peaks = TailPeaks(pcm, from, window, 8);
                 string measured = peaks.Count == 0 ? "none"
                     : string.Join(", ", peaks.Select(f => $"{f:F0} Hz"));
                 Console.WriteLine($"      {stem}: predicted {predicted}; tail peaks {measured}");
@@ -239,7 +259,7 @@ public static class DropsSpike
         return peaks;
     }
 
-    private sealed record ImpactAt(float Time, List<TransientSound> Sounds);
+    private sealed record ImpactAt(float Time, List<TransientSound> Sounds, Vector3 Point, float Speed);
     private sealed record Flight(List<ImpactAt> Impacts, int Ticks, float Seconds);
 
     /// <summary>
@@ -275,7 +295,7 @@ public static class DropsSpike
                 if (contact.Phase != ContactPhase.Began || contact.Body != BodyWorld.ContactId(body)) continue;
                 var sounds = DroppedThings.Impact(contact, item.MassKg, DroppedThings.FixedMassKg,
                                                   item.Shape, new ItemShape(ItemShapeKind.Block, FloorPanel), struckFixed: true);
-                if (sounds.Count > 0) impacts.Add(new ImpactAt(time, sounds));
+                if (sounds.Count > 0) impacts.Add(new ImpactAt(time, sounds, contact.Point, contact.ClosingSpeed));
             }
             if (world.State(body).Sleeping) break;
         }
@@ -293,7 +313,7 @@ public static class DropsSpike
         var sounds = ImpactAcoustics.Between(AcousticRegistry.GetProperties(item.Material),
                                              AcousticRegistry.GetProperties(floorMaterial), at, speed,
                                              item.MassKg, item.MassKg * 500f, 2f, 2f, 0.2f);
-        return sounds.Count == 0 ? new List<ImpactAt>() : new List<ImpactAt> { new(0f, sounds) };
+        return sounds.Count == 0 ? new List<ImpactAt>() : new List<ImpactAt> { new(0f, sounds, at, speed) };
     }
 
     /// <summary>Every impact's transients at their contact times, each at the level the shipped hearing places it.
@@ -327,8 +347,11 @@ public static class DropsSpike
         return mix;
     }
 
-    /// <summary>Writes one file, measures it, and prints its line. True when it clips or holds a non-finite sample.</summary>
-    private static int Write(string outDir, string name, float[] pcm, List<(float Time, float KnockDb, float PeakDb)> times)
+    /// <summary>Writes one file, measures it, and prints its line. True when it clips or holds a non-finite sample.
+    /// A detailed line adds the tail's fall to 30 dB under its first impact and the octave levels over the first
+    /// 300 ms after it, which a round compares with the one before.</summary>
+    private static int Write(string outDir, string name, float[] pcm, List<(float Time, float KnockDb, float PeakDb)> times,
+                             bool detailed = false)
     {
         float peak = 0f;
         double sum = 0;
@@ -346,7 +369,106 @@ public static class DropsSpike
         File.WriteAllBytes(Path.Combine(outDir, name), WeaponSynth.ToWav16(pcm, Rate));
         string at = string.Join(", ", times.Select(t => $"{t.Time.ToString("0.000", CultureInfo.InvariantCulture)}:{t.KnockDb.ToString("0.0", CultureInfo.InvariantCulture)}/{t.PeakDb.ToString("0.0", CultureInfo.InvariantCulture)}"));
         Console.WriteLine($"  {name,-42} {pcm.Length / (float)Rate,4:F2} {peakDb,6:F1} {rmsDb,6:F1} {clip,4} {nan,3}  {at}");
+        if (detailed) Console.WriteLine($"      T30 {Tail30(pcm):F2} s; {OctaveLine(pcm)}");
         return clip > 0 || nan > 0 ? 1 : 0;
+    }
+
+    /// <summary>
+    /// Measures WAVs already on disk with the same numbers (a round's files beside the next round's): the loudest
+    /// 5 ms is the impact, and the fall and octave levels follow it. A file that cannot be read says so.
+    /// </summary>
+    private static int Measure(string dir)
+    {
+        Console.WriteLine($"Measure: {dir}");
+        Console.WriteLine("  file                                       secs   peak   rms  clip  T30  octave dBFS 125..8000 Hz");
+        foreach (string file in Directory.GetFiles(dir, "*.wav").OrderBy(f => f, StringComparer.Ordinal))
+        {
+            float[] pcm;
+            try { pcm = WeaponSynth.ReadWav16Mono(File.ReadAllBytes(file)); }
+            catch { Console.WriteLine($"  {Path.GetFileName(file),-42} unreadable"); continue; }
+            float peak = 0f;
+            double sum = 0;
+            int clip = 0, nan = 0;
+            foreach (float v in pcm)
+            {
+                if (!float.IsFinite(v)) { nan++; continue; }
+                float a = MathF.Abs(v);
+                if (a > peak) peak = a;
+                if (a >= 0.999f) clip++;
+                sum += (double)v * v;
+            }
+            float peakDb = 20f * MathF.Log10(MathF.Max(1e-9f, peak));
+            float rmsDb = 10f * MathF.Log10(MathF.Max(1e-12f, (float)(sum / Math.Max(1, pcm.Length))));
+            Console.WriteLine($"  {Path.GetFileName(file),-42} {pcm.Length / (float)Rate,4:F2} {peakDb,6:F1} {rmsDb,6:F1} {clip,4} {Tail30(pcm),4:F2}  {OctaveLine(pcm)}");
+            if (clip > 0 || nan > 0) return 1;
+        }
+        return 0;
+    }
+
+    /// <summary>
+    /// Time for the sound to fall 30 dB under its loudest 5 ms, after that loudest block: the first impact's
+    /// own fall, so a later bounce is not mistaken for the tail.
+    /// </summary>
+    private static float Tail30(float[] pcm)
+    {
+        int window = Math.Max(1, Rate / 200), hop = Math.Max(1, Rate / 1000);
+        var rms = new List<double>();
+        for (int start = 0; start + window <= pcm.Length; start += hop)
+        {
+            double sum = 0;
+            for (int i = 0; i < window; i++) sum += (double)pcm[start + i] * pcm[start + i];
+            rms.Add(Math.Sqrt(sum / window));
+        }
+        if (rms.Count == 0) return 0f;
+        int loudest = 0;
+        for (int i = 1; i < rms.Count; i++) if (rms[i] > rms[loudest]) loudest = i;
+        double floor = rms[loudest] * Math.Pow(10, -30.0 / 20.0);
+        for (int i = loudest + 1; i < rms.Count; i++)
+        {
+            if (rms[i] > floor) continue;
+            double above = rms[i - 1], below = rms[i];
+            double between = (above - floor) / Math.Max(1e-30, above - below);
+            return (float)((i - loudest - 1 + between) * hop / (double)Rate);
+        }
+        return pcm.Length / (float)Rate - loudest * hop / (float)Rate;
+    }
+
+    /// <summary>Octave band levels, dBFS, over the first 300 ms after the loudest 5 ms: 125 to 8000 Hz, six bands.</summary>
+    private static string OctaveLine(float[] pcm)
+    {
+        int window = Math.Max(1, Rate / 200);
+        int loudest = 0;
+        double loudestRms = 0;
+        for (int start = 0; start + window <= pcm.Length; start += Math.Max(1, Rate / 1000))
+        {
+            double sum = 0;
+            for (int i = 0; i < window; i++) sum += (double)pcm[start + i] * pcm[start + i];
+            if (sum > loudestRms) { loudestRms = sum; loudest = start; }
+        }
+        int from = Math.Max(0, loudest - window / 2);
+        int n = 1;
+        while (n < 0.3f * Rate) n <<= 1;
+        var buffer = new System.Numerics.Complex[n];
+        int take = Math.Min(n, Math.Max(0, pcm.Length - from));
+        for (int i = 0; i < take; i++)
+        {
+            float w = 0.5f - 0.5f * MathF.Cos(MathF.Tau * i / (n - 1));
+            buffer[i] = new System.Numerics.Complex(pcm[from + i] * w, 0);
+        }
+        Spectrum.Fft(buffer);
+        float[] edges = { 125f, 250f, 500f, 1000f, 2000f, 4000f, 8000f };
+        var parts = new List<string>(edges.Length);
+        double norm = 16.0 / (3.0 * n * n);
+        for (int b = 0; b < edges.Length - 1; b++)
+        {
+            int low = Math.Max(1, (int)(edges[b] * n / Rate));
+            int high = Math.Min(n / 2 - 1, (int)(edges[b + 1] * n / Rate));
+            double power = 0;
+            for (int k = low; k <= high; k++)
+                power += buffer[k].Real * buffer[k].Real + buffer[k].Imaginary * buffer[k].Imaginary;
+            parts.Add($"{10.0 * Math.Log10(Math.Max(1e-15, power * norm)):F0}");
+        }
+        return string.Join(" ", parts);
     }
 
     private static string Slug(string s) => s.ToLowerInvariant().Replace(' ', '-');

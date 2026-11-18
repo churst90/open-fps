@@ -102,9 +102,14 @@ public static class PanelAcoustics
     /// <summary>How long the ring takes to fall 60 dB: T60 = 2.2 / (loss factor × frequency). A mounting
     /// loss of zero for something flying free.</summary>
     public static float RingSeconds(MaterialProperties material, float hz, float mountingLoss = MountedLoss)
+        => RingSeconds(material.LossFactor + MathF.Max(0f, mountingLoss), hz);
+
+    /// <summary>How long a mode takes to fall 60 dB from its total loss factor, the material's own and what
+    /// the surface it rests on adds (ItemModes.SupportLoss).</summary>
+    public static float RingSeconds(float lossFactor, float hz)
     {
         if (hz <= 0f) return 0f;
-        float loss = MathF.Max(1e-5f, material.LossFactor + MathF.Max(0f, mountingLoss));
+        float loss = MathF.Max(1e-5f, lossFactor);
         // Nothing in a building but a bell rings longer than 2.5 s.
         return Math.Clamp(2.2f / (loss * hz), 0.01f, 2.5f);
     }

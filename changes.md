@@ -2,6 +2,29 @@
 
 ## 2026-11-17
 
+- The drop's resonance is its resonance, not a bell's chord (docs/PHYSICS_BOUNDARY.md 18.13; Cody heard round 1 on
+  2026-11-17, this built 2026-11-18). Each mode's level now comes from the shape's radiation efficiency (a slender
+  bar or tube in bending is a line dipole, (ka)^2/(1+(ka)^2); a free plate Maidanik's edge radiation below
+  coincidence; a shell a multipole of order n), from the Hertz blow's half-sine spectrum and from the mode shape
+  where it landed (near an end, seeded jitter); each mode gains the landing surface's loss by its share of the
+  contact's strain energy (carpet most, concrete less, metal least). Up to twelve modes with a little roughness,
+  each mode's T60 from the total loss through `PanelAcoustics.RingSeconds`, and no fixed -5 dB: the blow and the
+  resonance take the impact's energy. Re-rendered the 20 shape files over round 1's (kept in
+  `~/.cache/openfps-build/rings/renders/round1/`): steel bar on concrete falls 30 dB in 0.13 s against 1.96, its
+  130 Hz mode 37 dB below its kHz modes; steel pipe 1.80 to 0.12 s; glass bottle 1.36 to 0.13 s with its 1-10 kHz
+  modes in the tail; wooden plank 0.21 to 0.12 s and duller; plastic box 0.14 to 0.13 s; none clips and all hold
+  finite samples. Every non-drop `Between` caller and every non-drop Ring and Knock render stay byte for byte, and
+  the old scripted files are byte-identical to round 1's. Wire hash `dc55222e4e23` to `91d439b602bb`, so the server
+  and the Windows client deploy together; the door fingerprint stays `d163818bf3ff`. Tests: ItemShapeTests 16,
+  ImpactAndGlassSoundTests 17, WorldAudioEventTests 11, DroppedThingsTests 6, HeldItemTests 24, BodyWorldTests 19,
+  BodyWorldAnalyticTests 31, BodyContactsTests 9, WallBumpAndNarrationTests 24, DoorSoundTests 15,
+  DoorSoundPlacementTests 9, GlassKindTests 10, ReflectionAndGlassTests 14, CarWindowTests 11,
+  SteelDoorSoundTests 1, FootstepTests 12 (1 skipped), FireTests 16, ScopedFireTests 6, DrivingSoundsTests 4,
+  VehicleBodyTests 21, PrefabSpecTests 33, BodiesTests 19, OtherBodiesTests 15, PieceBodiesTests 13,
+  StreetBodiesTests 2, BreathTests 4, MixerRateTests 9, EnvironmentWireBytesTests 4 (375, 1 skipped); the guards
+  192; the replays DrivingReplay, RailReplay, MovementReplay, PhysicsCrossMachine and PeopleReplay 37 with
+  `DOTNET_PROCESSOR_COUNT=4`, the stored streams, spoken lines and render fingerprint 102 with the same setting.
+
 - Items declare a shape and a dropped thing rings as what it is (docs/PHYSICS_BOUNDARY.md 18.12). A prefab now
   gives `ItemShape` (Block, Bar, Tube, Plate, Shell), `ItemSize` and an optional `ItemWallMetres`; the item carries
   them in appended `ItemComponent` fields, and `DroppedThings.TryBody` makes its body from them (an item that

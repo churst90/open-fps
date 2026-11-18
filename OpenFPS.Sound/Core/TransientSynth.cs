@@ -32,7 +32,7 @@ public static class TransientSynth
         {
             case SoundCharacter.Ring when sound.ModeRatios is { Length: > 0 } ratios
                                       && sound.ModeDecaySeconds is { } decays && decays.Length == ratios.Length:
-                RenderModedRing(buffer, hz, sound.Noisiness, ratios, decays, rng);
+                RenderModedRing(buffer, hz, sound.Noisiness, ratios, decays, sound.ModeGains, rng);
                 break;
             case SoundCharacter.Ring: RenderRing(buffer, hz, seconds, sound.Noisiness, rng); break;
             case SoundCharacter.Hiss: RenderHiss(buffer, hz, rng); break;
@@ -116,14 +116,15 @@ public static class TransientSynth
     }
 
     /// <summary>
-    /// A ring of a shape's own modes: each partial at its own ratio and its own T60. An impulse gives every
-    /// normalised mode the same initial velocity, so they start together and only their losses part them; the
-    /// old three-partial ring above is untouched for every sound that carries no modes.
+    /// A resonance of a shape's own modes: each partial at its own ratio, its own T60 and, when the shape gives
+    /// them, its own level. Without levels every mode starts at the same velocity; the old three-partial ring
+    /// above is untouched for every sound that carries no modes, byte for byte.
     /// </summary>
     private static void RenderModedRing(float[] buffer, float hz, float noisiness,
-                                        float[] ratios, float[] decays, Random rng)
+                                        float[] ratios, float[] decays, float[]? gains, Random rng)
     {
         int count = Math.Min(ratios.Length, 24);
+        bool levelled = gains is { Length: > 0 } && gains.Length == ratios.Length;
         var phases = new float[count];
         var ks = new float[count];
         for (int p = 0; p < count; p++)
@@ -141,7 +142,8 @@ public static class TransientSynth
             {
                 float f = hz * ratios[p];
                 if (f <= 0f || f > SampleRate * 0.45f) continue;
-                v += MathF.Sin(phases[p]) * MathF.Exp(-ks[p] * i);
+                float amp = levelled ? MathF.Max(0f, gains![p]) : 1f;
+                v += MathF.Sin(phases[p]) * amp * MathF.Exp(-ks[p] * i);
                 phases[p] += twoPiOverSr * f;
             }
             if (noisiness > 0f) v += (float)(rng.NextDouble() * 2.0 - 1.0) * noisiness * MathF.Exp(-noiseK * i * 8f);

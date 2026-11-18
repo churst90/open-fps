@@ -194,8 +194,10 @@ again once.
      measured costs, renders, tests and what it leaves for step 8 in 18.11. A key for `/throw` is Cody's to choose;
      two limits Cody named on 2026-11-17: an item declared no size, so it fell as a cube of its mass at its
      material's density and a crowbar could not clatter end over end — DONE for shapes 2026-11-17 (`ItemShape`,
-     `ItemSize`, `ItemWallMetres`, docs/PHYSICS_BOUNDARY.md 18.12; wire hash `dc55222e4e23`), with glass breakage
-     still later; and a glass bottle bounces where it would break (breakage from the material and the impact),
+     `ItemSize`, `ItemWallMetres`, docs/PHYSICS_BOUNDARY.md 18.12; wire hash `dc55222e4e23`), and its resonance
+     then got its radiation, the blow's spectrum and the landing surface's support loss (18.13; wire hash
+     `91d439b602bb`), with glass breakage still later; and a glass bottle bounces where it would break (breakage
+     from the material and the impact),
      still later;
    - stage 5, moving air and loose layers;
    - stage 6, vehicles in full.

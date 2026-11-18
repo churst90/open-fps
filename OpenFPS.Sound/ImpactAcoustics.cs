@@ -73,10 +73,10 @@ public static class ImpactAcoustics
     }
 
     /// <summary>
-    /// The sound of one dropped or thrown thing meeting another (docs/PHYSICS_BOUNDARY.md 18.12): the blow's length
-    /// and brightness from the Hertz contact of the pair, the dropped thing's own ring by its declared shape, and
-    /// the struck thing's ring as <see cref="Between"/> has always made it. The two rings are separate sounds
-    /// because they are two things, each free to ring as what it is; <paramref name="struckWidth"/>,
+    /// The sound of one dropped or thrown thing meeting another (docs/PHYSICS_BOUNDARY.md 18.12-18.13): the blow's
+    /// length and brightness from the Hertz contact of the pair, the dropped thing's own resonance by its declared
+    /// shape, and the struck thing's ring as <see cref="Between"/> has always made it. The two are separate sounds
+    /// because they are two things, each free to resonate as what it is; <paramref name="struckWidth"/>,
     /// <paramref name="struckHeight"/> and <paramref name="struckThickness"/> are the struck face, as before.
     /// </summary>
     public static List<TransientSound> Dropped(MaterialProperties hitter, MaterialProperties struck, ItemShape hitterShape,
@@ -94,6 +94,14 @@ public static class ImpactAcoustics
         // Hertz: how long the two are in contact, and so what the blow has above 1/tau (ItemModes.ContactSeconds).
         float contact = ItemModes.ContactSeconds(hitter, struck, hitterMassKg, struckMassKg,
                                                  hitterShape.ContactRadiusMetres, closingSpeed);
+        float reducedMass = hitterMassKg * struckMassKg / (hitterMassKg + struckMassKg);
+
+        // The dropped thing itself, free: its shape's modes, their radiation, and the blow's spectrum and
+        // landing point on them (docs/PHYSICS_BOUNDARY.md 18.13). The blow and the resonance take the same
+        // impact energy: each mode's amplitude comes from that impulse, not a fixed level per ring.
+        var modes = ItemModes.Free(hitter, hitterShape, hitterMassKg, struck, contact, reducedMass,
+                                   SeedFor(where, closingSpeed));
+
         var softer = hitter.YoungsModulusGPa <= struck.YoungsModulusGPa ? hitter : struck;
         float softness = 1f / (1f + MathF.Max(0f, softer.YoungsModulusGPa));
         float reduced = PanelAcoustics.ImpactJoules(hitterMassKg, struckMassKg, 1f) * 2f;
@@ -109,17 +117,17 @@ public static class ImpactAcoustics
             Noisiness = 0.85f,
         });
 
-        // The dropped thing itself, free: its shape's own modes, each with the material's T60 at that note.
-        var modes = ItemModes.Free(hitter, hitterShape, hitterMassKg);
         if (modes.Count > 0)
         {
             var ratios = new float[modes.Count];
             var decays = new float[modes.Count];
+            var gains = new float[modes.Count];
             float longest = modes[0].Seconds;
             for (int i = 0; i < modes.Count; i++)
             {
                 ratios[i] = modes[i].Hz / modes[0].Hz;
                 decays[i] = modes[i].Seconds;
+                gains[i] = modes[i].Gain;
                 longest = MathF.Max(longest, modes[i].Seconds);
             }
             sounds.Add(new TransientSound
@@ -127,12 +135,13 @@ public static class ImpactAcoustics
                 Character = SoundCharacter.Ring,
                 DelaySeconds = 0.003f,
                 Position = where,
-                LevelDb = db - 5f,
+                LevelDb = db,
                 Hz = modes[0].Hz,
                 DecaySeconds = longest,
                 Noisiness = 0.12f,
                 ModeRatios = ratios,
                 ModeDecaySeconds = decays,
+                ModeGains = gains,
             });
         }
 
@@ -155,6 +164,23 @@ public static class ImpactAcoustics
                 });
         }
         return sounds;
+    }
+
+    /// <summary>
+    /// The seed a drop's landing point and speed give its modes: where on the shape the floor met it and how
+    /// its section's irregularity detunes it. Built from the floats' bits, not HashCode, so a server and a
+    /// replay on another machine land the same way.
+    /// </summary>
+    public static int SeedFor(Vector3 where, float closingSpeed)
+    {
+        unchecked
+        {
+            int x = BitConverter.SingleToInt32Bits(where.X);
+            int y = BitConverter.SingleToInt32Bits(where.Y);
+            int z = BitConverter.SingleToInt32Bits(where.Z);
+            int v = BitConverter.SingleToInt32Bits(closingSpeed);
+            return (x * 73856093) ^ (y * 19349663) ^ (z * 83492791) ^ (v * (int)2654435761u);
+        }
     }
 }
 

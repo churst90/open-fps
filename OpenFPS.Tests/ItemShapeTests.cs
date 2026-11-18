@@ -13,10 +13,12 @@ using Xunit;
 namespace OpenFPS.Tests;
 
 /// <summary>
-/// Items that declare a shape and ring as what they are (docs/PHYSICS_BOUNDARY.md 18.12): the beam's mode ratios,
-/// a tube's note above a bar of its own length and mass, steel ringing longer than wood, a free ring longer than a
-/// mounted one, the Hertz contact being shorter for steel than for wood, the shape crossing the wire, and the old
-/// `Between` and the old Ring and Knock renders staying byte for byte as they were.
+/// Items that declare a shape and resonate as what they are (docs/PHYSICS_BOUNDARY.md 18.12-18.13): the beam's
+/// mode ratios, a tube's note above a bar of its own length and mass, steel resonating longer than wood, a free
+/// resonance longer than a mounted one, the Hertz contact shorter for steel than for wood, a slender bar's low
+/// bending mode far below its kHz modes in radiation, the surface's support loss in the struck material's order,
+/// the half-sine blow's spectrum, the shape and its modes crossing the wire, and the old `Between` and the old
+/// Ring and Knock renders staying byte for byte as they were.
 /// </summary>
 public class ItemShapeTests
 {
@@ -28,34 +30,48 @@ public class ItemShapeTests
     private static readonly ItemShape WoodBar = new(ItemShapeKind.Bar, new Vector3(1f, 0.1f, 0.025f));
     private static readonly ItemShape SteelTube = new(ItemShapeKind.Tube, new Vector3(1f, 0.04f, 0.04f));
 
+    /// <summary>The modes of a steel bar dropped on concrete: what a render's predictions and the level tests use.</summary>
+    private static List<ItemModes.Mode> SteelBarOnConcrete(float speed = 4.4f, int seed = 1)
+    {
+        var bar = Of("Metal");
+        var floor = Of("Concrete");
+        float contact = ItemModes.ContactSeconds(bar, floor, 4.9f, 1e6f, SteelBar.ContactRadiusMetres, speed);
+        float reduced = 4.9f * 1e6f / (4.9f + 1e6f);
+        return ItemModes.Free(bar, SteelBar, 4.9f, floor, contact, reduced, seed);
+    }
+
     // ── The laws ───────────────────────────────────────────────────────────────────────────────────
 
-    /// <summary>A free-free beam's first four roots give ratios 1, 2.756, 5.404, 8.933 (Rayleigh I section 170).</summary>
+    /// <summary>A free-free beam's first four roots give ratios 1, 2.756, 5.404, 8.933 (Rayleigh I section 170);
+    /// the section's small irregularity moves them by only a few parts in a thousand.</summary>
     [Fact]
     public void AFreeBeamRingsAtTheFreeFreeRatios()
     {
-        var modes = ItemModes.Free(Of("Metal"), SteelBar, 4.9f);
-        Assert.Equal(4, modes.Count);
+        var modes = ItemModes.Free(Of("Metal"), SteelBar, 4.9f, seed: 1);
+        Assert.True(modes.Count >= 4, $"{modes.Count} modes");
         float[] expected = { 1f, 2.7559f, 5.4039f, 8.9329f };
         for (int i = 0; i < expected.Length; i++)
-            Assert.Equal(expected[i], modes[i].Hz / modes[0].Hz, 0.002f);
+            Assert.True(MathF.Abs(expected[i] - modes[i].Hz / modes[0].Hz) < expected[i] * 0.02f,
+                        $"mode {i}: {modes[i].Hz / modes[0].Hz:F4} against {expected[i]:F4}");
     }
 
-    /// <summary>Steel's loss is 0.0002 against wood's 0.03: the same shape rings longer.</summary>
+    /// <summary>Steel's loss is 0.0002 against wood's 0.03: the same shape resonates longer on the same floor.</summary>
     [Fact]
-    public void SteelRingsLongerThanWoodOfTheSameShape()
+    public void SteelResonatesLongerThanWoodOfTheSameShape()
     {
-        var steel = ItemModes.Free(Of("Metal"), SteelBar, 4.9f);
-        var wood = ItemModes.Free(Of("Wood"), SteelBar, 4.9f);
+        var steel = ItemModes.Free(Of("Metal"), SteelBar, 4.9f, seed: 1);
+        var wood = ItemModes.Free(Of("Wood"), WoodBar, 1.63f, seed: 1);
         Assert.NotEmpty(steel);
         Assert.NotEmpty(wood);
-        Assert.True(steel[0].Seconds > wood[0].Seconds * 2f,
-            $"steel {steel[0].Seconds:F3} s at {steel[0].Hz:F0} Hz against wood {wood[0].Seconds:F3} s at {wood[0].Hz:F0} Hz");
+        Assert.True(steel[0].Loss < wood[0].Loss,
+            $"steel loss {steel[0].Loss:F4} against wood {wood[0].Loss:F4}");
+        Assert.True(steel[^1].Seconds > wood[^1].Seconds * 2f,
+            $"steel {steel[^1].Seconds:F3} s at {steel[^1].Hz:F0} Hz against wood {wood[^1].Seconds:F3} s at {wood[^1].Hz:F0} Hz");
     }
 
-    /// <summary>Nothing holds a dropped thing: its ring is the material's loss alone, not a mounting's.</summary>
+    /// <summary>Nothing holds a dropped thing: its resonance is the material's loss alone, not a mounting's.</summary>
     [Fact]
-    public void AFreeRingIsLongerThanAMountedOne()
+    public void AFreeResonanceIsLongerThanAMountedOne()
     {
         float free = PanelAcoustics.RingSeconds(Of("Metal"), 500f, mountingLoss: 0f);
         float mounted = PanelAcoustics.RingSeconds(Of("Metal"), 500f, PanelAcoustics.MountedLoss);
@@ -65,10 +81,10 @@ public class ItemShapeTests
     /// <summary>A tube of the same length and mass has its material farther from the axis than a solid bar, so its
     /// radius of gyration is larger and its bending note higher: I/A is what a tube spends its mass on.</summary>
     [Fact]
-    public void ATubeRingsHigherThanABarOfTheSameLengthAndMass()
+    public void ATubeResonatesHigherThanABarOfTheSameLengthAndMass()
     {
-        var bar = ItemModes.Free(Of("Metal"), SteelBar, 4.9f);
-        var tube = ItemModes.Free(Of("Metal"), SteelTube, 4.9f);
+        var bar = ItemModes.Free(Of("Metal"), SteelBar, 4.9f, seed: 1);
+        var tube = ItemModes.Free(Of("Metal"), SteelTube, 4.9f, seed: 1);
         Assert.NotEmpty(bar);
         Assert.NotEmpty(tube);
         Assert.True(tube[0].Hz > bar[0].Hz, $"tube {tube[0].Hz:F0} Hz against bar {bar[0].Hz:F0} Hz");
@@ -84,10 +100,10 @@ public class ItemShapeTests
         Assert.True(ItemModes.ContactHz(steel) > ItemModes.ContactHz(wood));
     }
 
-    /// <summary>The drop's blow is brighter for steel on concrete than wood on concrete, and the dropped thing
-    /// carries its own modes beside the struck floor's ring.</summary>
+    /// <summary>The blow is the pair's, not the softer material's: steel on concrete is brighter than wood on
+    /// concrete, and the same drop carries its own modes beside the floor's ring.</summary>
     [Fact]
-    public void ADropTakesItsBrightnessFromBothMaterialsAndRingsItsOwnShape()
+    public void ADropTakesItsBrightnessFromBothMaterialsAndCarriesItsModes()
     {
         var steel = ImpactAcoustics.Dropped(Of("Metal"), Of("Concrete"), SteelBar, Vector3.Zero, 4.4f, 4.9f, 1e6f,
                                             2f, 2f, 0.2f, struckIsFixed: true);
@@ -96,14 +112,98 @@ public class ItemShapeTests
         var steelKnock = steel.First(s => s.Character == SoundCharacter.Knock);
         var woodKnock = wood.First(s => s.Character == SoundCharacter.Knock);
         Assert.True(steelKnock.Hz > woodKnock.Hz, $"steel {steelKnock.Hz:F0} Hz against wood {woodKnock.Hz:F0} Hz");
+        Assert.Contains(steel, s => s.Character == SoundCharacter.Ring && s.ModeRatios is { Length: > 0 });
+        Assert.Contains(steel, s => s.Character == SoundCharacter.Ring && s.ModeRatios is null);
+    }
 
-        var own = steel.First(s => s.Character == SoundCharacter.Ring && s.ModeRatios is { Length: > 0 });
-        Assert.Equal(4, own.ModeRatios!.Length);
-        Assert.Equal(own.ModeDecaySeconds!.Length, own.ModeRatios.Length);
-        Assert.Equal(ItemModes.Free(Of("Metal"), SteelBar, 4.9f)[0].Hz, own.Hz, own.Hz * 0.01f);
+    /// <summary>A slender bar in bending is a line dipole, nearly silent at 130 Hz and loud at kHz: the low mode
+    /// is at least 12 dB below the strongest (Fahy section 4.5; measured near 19 dB).</summary>
+    [Fact]
+    public void TheBarsLowBendingModeRadiatesFarBelowItsKilohertzModes()
+    {
+        var modes = SteelBarOnConcrete();
+        var low = modes.MinBy(m => m.Hz);
+        var strong = modes.MaxBy(m => m.Gain);
+        Assert.True(low.Hz < 200f, $"lowest mode {low.Hz:F0} Hz");
+        Assert.True(strong.Hz > 1000f, $"strongest mode {strong.Hz:F0} Hz");
+        float db = 20f * MathF.Log10(MathF.Max(1e-6f, low.Gain) / MathF.Max(1e-6f, strong.Gain));
+        Assert.True(db < -12f, $"{db:F1} dB");
+    }
+
+    /// <summary>The surface a thing lands on takes its vibration in the struck material's own order: carpet's
+    /// loss is 0.4, concrete's 0.015, metal's 0.0002 (Ungar and Kerwin's modal strain energy share).</summary>
+    [Fact]
+    public void CarpetTakesMoreThanConcreteThanMetal()
+    {
+        float carpet = ItemModes.SupportLoss(Of("Metal"), Of("Carpet"), 500f);
+        float concrete = ItemModes.SupportLoss(Of("Metal"), Of("Concrete"), 500f);
+        float metal = ItemModes.SupportLoss(Of("Metal"), Of("Metal"), 500f);
+        Assert.True(carpet > concrete * 10f, $"carpet {carpet:F3} against concrete {concrete:F3}");
+        Assert.True(concrete > metal, $"concrete {concrete:F4} against metal {metal:F5}");
+
+        var onCarpet = ItemModes.Free(Of("Metal"), SteelBar, 4.9f, Of("Carpet"), 0.0006f, 4.9f, seed: 1);
+        var onConcrete = SteelBarOnConcrete();
+        Assert.True(onCarpet[0].Seconds < onConcrete[0].Seconds * 0.2f,
+            $"carpet {onCarpet[0].Seconds:F3} s against concrete {onConcrete[0].Seconds:F3} s");
+    }
+
+    /// <summary>A half-sine contact's spectrum is one at zero and falls above 1/tau (Harris and Crede ch. 8).</summary>
+    [Fact]
+    public void TheBlowsSpectrumFallsAboveTheContact()
+    {
+        const float contact = 0.0006f;
+        Assert.Equal(1f, ItemModes.ForceSpectrum(0f, contact));
+        Assert.Equal(1f, ItemModes.ForceSpectrum(100f, 0f));
+        Assert.True(ItemModes.ForceSpectrum(200f, contact) > ItemModes.ForceSpectrum(5000f, contact));
+        Assert.True(ItemModes.ForceSpectrum(5000f, contact) < 0.2f);
+    }
+
+    /// <summary>The blow and the resonance take the same impact energy: neither is a fixed -5 dB, and each
+    /// mode's own amplitude comes from its radiation and the blow's spectrum at it.</summary>
+    [Fact]
+    public void TheBlowAndTheResonanceTakeTheImpactsEnergy()
+    {
+        var sounds = ImpactAcoustics.Dropped(Of("Metal"), Of("Concrete"), SteelBar, Vector3.Zero, 4.4f, 4.9f, 1e6f,
+                                             2f, 2f, 0.2f, struckIsFixed: true);
+        var knock = sounds.First(s => s.Character == SoundCharacter.Knock);
+        var own = sounds.First(s => s.Character == SoundCharacter.Ring && s.ModeRatios is { Length: > 0 });
+        float db = PanelAcoustics.ImpactDb(PanelAcoustics.ImpactJoules(4.9f, 1e6f, 4.4f));
+        Assert.Equal(db, knock.LevelDb, 0.01f);
+        Assert.Equal(db, own.LevelDb, 0.01f);
+        Assert.NotEqual(db - 5f, own.LevelDb);
+
+        Assert.NotNull(own.ModeGains);
+        Assert.Equal(own.ModeRatios!.Length, own.ModeGains!.Length);
+        Assert.All(own.ModeGains, g => Assert.InRange(g, 0f, 1f));
+        Assert.Equal(1f, own.ModeGains.Max(), 1e-4f);
+        Assert.True(own.ModeGains.Min() < 0.1f, $"quietest mode {own.ModeGains.Min():F3}");
+
+        // Glass radiates a far larger share of its impact than steel: the share is the physics behind the
+        // mode levels, and the reason a bottle is heard and a bar on concrete is a clank.
+        var bottle = new ItemShape(ItemShapeKind.Shell, new Vector3(0.28f, 0.08f, 0.08f));
+        float glassContact = ItemModes.ContactSeconds(Of("Glass"), Of("Concrete"), 0.5f, 1e6f,
+                                                      bottle.ContactRadiusMetres, 4.4f);
+        var glass = ItemModes.Free(Of("Glass"), bottle, 0.5f, Of("Concrete"), glassContact, 0.5f, seed: 1);
+        Assert.True(glass.Sum(m => m.RadiatedShare) > SteelBarOnConcrete().Sum(m => m.RadiatedShare) * 3f,
+            $"glass {glass.Sum(m => m.RadiatedShare):F3} against steel {SteelBarOnConcrete().Sum(m => m.RadiatedShare):F3}");
     }
 
     // ── The data ──────────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>A shaped ring's gains cross the wire with its ratios and lengths.</summary>
+    [Fact]
+    public void ModeGainsRoundTrip()
+    {
+        var sound = new TransientSound
+        {
+            Character = SoundCharacter.Ring, Hz = 130f, DecaySeconds = 1f, Noisiness = 0.12f,
+            ModeRatios = new[] { 1f, 2.76f, 5.4f }, ModeDecaySeconds = new[] { 1f, 0.4f, 0.2f },
+            ModeGains = new[] { 0.01f, 0.7f, 1f },
+        };
+        var back = MemoryPackSerializer.Deserialize<TransientSound>(MemoryPackSerializer.Serialize(sound));
+        Assert.Equal(sound.ModeGains, back.ModeGains);
+        Assert.Equal(sound.ModeRatios, back.ModeRatios);
+    }
 
     /// <summary>A declared shape survives the wire exactly, extents and wall included.</summary>
     [Fact]
@@ -224,6 +324,23 @@ public class ItemShapeTests
         }
     }
 
+    /// <summary>A shaped ring with no gains is the equal-amplitude ring of round 1, byte for byte: a copy of that
+    /// synthesiser alongside the shipped one.</summary>
+    [Fact]
+    public void AModedRingWithoutGainsRendersAsBefore()
+    {
+        var sound = new TransientSound
+        {
+            Character = SoundCharacter.Ring, Hz = 130f, DecaySeconds = 2.5f, Noisiness = 0.12f,
+            ModeRatios = new[] { 1f, 2.7559f, 5.4039f, 8.9329f },
+            ModeDecaySeconds = new[] { 2.5f, 1.2f, 0.6f, 0.3f },
+        };
+        var now = TransientSynth.Render(sound, 7);
+        var before = RenderModedBefore(sound, 7);
+        Assert.Equal(before.Length, now.Length);
+        for (int i = 0; i < before.Length; i++) Assert.Equal(before[i], now[i]);
+    }
+
     private static List<TransientSound> BetweenBeforeShapes(MaterialProperties hitter, MaterialProperties struck, Vector3 where,
                                                             float closingSpeed, float hitterMassKg, float struckMassKg,
                                                             float struckWidth, float struckHeight, float struckThickness,
@@ -310,6 +427,49 @@ public class ItemShapeTests
                 v += modes[m].Process(raw) * gains[m] * MathF.Exp(-k * i * (1f + m * 0.55f));
             buffer[i] = v + lp * noise * 0.6f * MathF.Exp(-k * i * 3f);
         }
+    }
+
+    private static float[] RenderModedBefore(TransientSound sound, int seed)
+    {
+        float seconds = Math.Clamp(sound.DecaySeconds, 0.005f, 3f);
+        int samples = Math.Max(16, (int)(seconds * TransientSynth.SampleRate));
+        var buffer = new float[samples];
+        var rng = new Random(seed);
+        float hz = MathF.Max(20f, sound.Hz * (0.97f + 0.06f * (float)rng.NextDouble()));
+        var ratios = sound.ModeRatios!;
+        var decays = sound.ModeDecaySeconds!;
+        int count = Math.Min(ratios.Length, 24);
+        var phases = new float[count];
+        var ks = new float[count];
+        for (int p = 0; p < count; p++)
+        {
+            phases[p] = (float)(rng.NextDouble() * Math.Tau);
+            ks[p] = 6.9f / (Math.Clamp(decays[p], 0.005f, 3f) * TransientSynth.SampleRate);
+        }
+        float noiseK = ks[0];
+        float twoPiOverSr = MathF.Tau / TransientSynth.SampleRate;
+        for (int i = 0; i < buffer.Length; i++)
+        {
+            float v = 0f;
+            for (int p = 0; p < count; p++)
+            {
+                float f = hz * ratios[p];
+                if (f <= 0f || f > TransientSynth.SampleRate * 0.45f) continue;
+                v += MathF.Sin(phases[p]) * MathF.Exp(-ks[p] * i);
+                phases[p] += twoPiOverSr * f;
+            }
+            if (sound.Noisiness > 0f)
+                v += (float)(rng.NextDouble() * 2.0 - 1.0) * sound.Noisiness * MathF.Exp(-noiseK * i * 8f);
+            buffer[i] = v;
+        }
+        float peak = 0f;
+        foreach (float v in buffer) peak = MathF.Max(peak, MathF.Abs(v));
+        if (peak >= 1e-6f)
+        {
+            float gain = 0.98f / peak;
+            for (int i = 0; i < buffer.Length; i++) buffer[i] *= gain;
+        }
+        return buffer;
     }
 
     private static void RingBefore(float[] buffer, float hz, float seconds, float noisiness, Random rng)

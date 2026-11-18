@@ -2853,6 +2853,114 @@ new file, and Sound's `TransientSound` and `ImpactAcoustics`), so the server and
 together. The door fingerprint is still `d163818bf3ff`: `AcousticRegistry.cs` and the door model files did not
 move, and the door render fingerprints pass unchanged.
 
+### 18.13 The drop's resonance: radiation, excitation, support and colour (2026-11-18)
+
+Cody heard round 1's shaped drops and said the glass sounded like a bell and the metal like church bells: "ring"
+was the wrong word; a dropped thing's sound is an impact coloured by its resonance, short and dense, with the low
+bending modes barely heard. Round 1 had given every mode the same amplitude and only the material's loss, so a bar
+was a clean four-tone chord in the air. Round 2 works each mode's level and length from the shape, the contact and
+the surface it landed on.
+
+**Radiation.** Each mode's level is scaled by the shape's radiation efficiency at that mode's note and size. A
+slender bar or tube in bending is a line dipole, sigma = (ka)^2 / (1 + (ka)^2) with a half the thickness or the
+outer radius, nearly silent where ka is much below one (Fahy, *Sound and Structural Vibration*, 2nd ed., section
+4.5; Morse and Ingard, *Theoretical Acoustics*, 1968, chapter 7). A free plate uses Maidanik's edge and corner
+radiation below coincidence, about one above it (Maidanik, J. Acoust. Soc. Am. 34 (1962) 809; Leppington,
+Broadbent and Heron, J. Sound Vib. 61 (1978) 1), with the two faces' dipole cancellation. A shell's breathing mode
+is a compact source, (ka)^2 / (1 + (ka)^2); its n-th circumferential mode is a multipole, 1 / (1 + (n/kR)^(2n))
+(Junger and Feit, *Sound, Structures and Their Interaction*, 2nd ed., chapter 7). A compact block uses the compact
+source law at its own size.
+
+**Excitation.** The amplitude of each mode comes from the Hertz blow's half-sine force pulse, whose normalised
+spectrum is |cos(pi f tau) / (1 - (2 f tau)^2)|, one at zero and falling as 1/f^2 above 1/tau, with nulls at
+f = 3/(2 tau), 5/(2 tau), ... (Harris and Crede, *Shock and Vibration Handbook*, 3rd ed., chapter 8; Thomson,
+*Theory of Vibration with Applications*). The mode's own shape at the contact point multiplies it: a bar lands near
+an end, a plate near a corner, with a seeded jitter, so two landings excite the modes differently (Rayleigh, *The
+Theory of Sound*, Vol. I, 2nd ed., section 170; Blevins, *Formulas for Natural Frequency and Mode Shape*, 1979,
+Table 8-1). A small per-mode roughness (a few parts in a thousand, the section's tolerance) keeps the ideal ratios
+from sounding like a chord (Rayleigh I, section 68). Up to twelve modes are carried, so the impact is coloured and
+a render stays cheap.
+
+**The surface.** A landed thing is in contact with the floor, and the contact adds the struck material's loss,
+weighted by the share of the joint's strain energy its compliance holds (the modal strain energy method, Ungar and
+Kerwin, J. Acoust. Soc. Am. 34 (1962) 954; support loss, Hao, Erbil and Ayazi, J. Microelectromech. Syst. 12 (2003)
+328). In the game's own materials that is 0.4 on carpet, 0.015 on concrete and 0.0002 on metal, so a bar on a
+carpet stops dead and a bar on steel keeps its note. Each mode's T60 is 2.2 / (total loss factor x frequency)
+through `PanelAcoustics.RingSeconds`, with no mounting loss: the dropped thing is free. The low mode's length can
+be a second, but its radiation is tens of decibels below the kHz modes, so the heard tail is short.
+
+**One energy, not a fixed -5 dB.** The blow and the resonance take the impact's level; each mode's amplitude in the
+`TransientSound` is its own, from `TransientSound.ModeGains`, and the synth renders the modes with those levels.
+The floor's own ring stays `ImpactAcoustics.Between`'s, at the level it always had. A `Ring` with no mode gains
+still renders through round 1's equal-amplitude path, byte for byte.
+
+**Renders.** AudioLab `--drops` re-rendered the 20 shape files over round 1's copies (kept in
+`~/.cache/openfps-build/rings/renders/round1/`): a steel bar, steel pipe, glass bottle, wooden plank and plastic
+box, each from one metre onto concrete and onto wood. `measure=DIR` measures a directory with the same numbers. All
+20 are below full scale, hold only finite samples and clip 0 samples.
+
+| item, floor | peak / RMS round 1 | peak / RMS round 2 | T30 round 1 | T30 round 2 |
+|---|---|---|---|---|
+| steel bar, concrete | -9.4 / -30.3 | -7.2 / -35.4 | 1.96 s | 0.13 s |
+| steel bar, wood | -10.3 / -33.0 | -8.8 / -40.7 | 1.02 s | 0.10 s |
+| steel pipe, concrete | -7.7 / -31.3 | -9.1 / -37.1 | 1.80 s | 0.12 s |
+| steel pipe, wood | -9.2 / -34.2 | -8.8 / -41.3 | 0.99 s | 0.08 s |
+| glass bottle, concrete | -11.4 / -37.7 | -11.6 / -40.3 | 1.36 s | 0.13 s |
+| glass bottle, wood | -12.6 / -41.1 | -12.4 / -45.4 | 0.61 s | 0.09 s |
+| wooden plank, concrete | -12.4 / -39.8 | -10.9 / -41.4 | 0.21 s | 0.12 s |
+| wooden plank, wood | -10.8 / -40.7 | -12.5 / -42.6 | 0.22 s | 0.09 s |
+| plastic box, concrete | -10.5 / -42.5 | -9.2 / -42.4 | 0.14 s | 0.13 s |
+| plastic box, wood | -10.3 / -43.9 | -9.0 / -43.7 | 0.09 s | 0.09 s |
+
+Octave levels over the first 300 ms, dBFS at 125, 250, 500, 1000, 2000, 4000 and 8000 Hz. The steel's clank is
+in the first tens of milliseconds and then the floor's low ring is most of the 300 ms average; the glass's high
+modes are just as short; wood's bands stay low and its tail is the dullest.
+
+| item, floor | round 1 | round 2 |
+|---|---|---|
+| steel bar, concrete | -31 -31 -31 -31 -84 -81 | -43 -62 -59 -58 -82 -84 |
+| steel bar, wood | -31 -31 -31 -31 -83 -80 | -48 -56 -76 -77 -77 -74 |
+| steel pipe, concrete | -32 -63 -32 -32 -32 -80 | -43 -62 -57 -76 -75 -83 |
+| steel pipe, wood | -32 -70 -32 -32 -32 -80 | -46 -70 -66 -86 -89 -87 |
+| glass bottle, concrete | -48 -66 -81 -36 -44 -54 | -47 -65 -80 -71 -77 -106 |
+| glass bottle, wood | -55 -75 -88 -36 -44 -53 | -55 -73 -88 -92 -105 -107 |
+| wooden plank, concrete | -47 -56 -71 -108 -108 -105 | -45 -53 -66 -81 -79 -76 |
+| wooden plank, wood | -54 -55 -68 -106 -106 -104 | -53 -53 -68 -84 -81 -78 |
+| plastic box, concrete | -46 -64 -78 -108 -108 -99 | -46 -64 -78 -113 -112 -98 |
+| plastic box, wood | -53 -72 -86 -110 -110 -100 | -53 -72 -86 -114 -113 -98 |
+
+Predicted modes and measured tail peaks (the floor's own ring near 160-400 Hz is beside the item's, as both things
+ring; the measured peaks are within the synth's and the section's few per cent):
+
+| item, floor | predicted (strongest) | measured tail |
+|---|---|---|
+| steel bar, concrete | 700, 1161, 1727, 3214 Hz | 713, 1182, 1753 (floor 168, 394) |
+| steel bar, wood | 699, 1154, 1727, 3217 Hz | 708, 1182 (floor 133, 195) |
+| steel pipe, concrete | 648, 1270, 2108, 4387 Hz | 661, 1288, 2140, 4458 (floor 168, 394) |
+| steel pipe, wood | 650, 1274, 2114, 3152 Hz | 658, 1293 (floor 195) |
+| glass bottle, concrete | 1190, 3350, 6456, 10416 Hz | 1204, 3401, 6565, 10567 (floor 161, 401) |
+| glass bottle, wood | 1189, 3358, 6459, 10425 Hz | 1201, 3416, 10576 (floor 182, 451) |
+| wooden plank, concrete | 106, 291, 571, 948 Hz | 110, 297, 579 (floor 168, 394) |
+| wooden plank, wood | 106, 291, 570, 942 Hz | 110, 297, 582 (floor 195) |
+| plastic box, concrete | 7719 Hz | 7834 (floor 158, 404) |
+| plastic box, wood | 7737 Hz | 7834 (floor 182, 451) |
+
+The steel bar's 130 Hz mode is 37 dB below its strongest (a line dipole at ka = 0.03), and its tail falls 30 dB in
+0.13 s rather than 1.96; the floor's ring near 170 Hz is what is left over the 300 ms. The bottle's 3.4 kHz mode is
+the strongest and its 6.5 and 10.4 kHz modes are in the tail; on wood the support loss takes them in under 0.01 s,
+so it is short and high. The plank's low modes stay weak and its tail is the dullest of the ten; the plastic box
+is one compact mode at 7.7 kHz.
+
+**Tests.** `ItemShapeTests` (16) now also hold a slender bar's low bending mode at least 12 dB below its kHz modes
+(measured 37), the support loss carpet > concrete > metal and a carpet tail under a fifth of concrete's, the
+half-sine spectrum's fall, the drop's blow and resonance both at the impact's level with per-mode gains, the gains
+crossing the wire, and a moded `Ring` without gains rendering byte for byte as round 1 did. Every non-drop
+`Between` caller and every non-drop Ring and Knock render still match their old copies.
+
+**Wire.** The wire hash moved from `dc55222e4e23` to `91d439b602bb` (the appended `TransientSound.ModeGains` and
+the Acoustics and Sound laws), so the server and the Windows client deploy together. The door fingerprint is still
+`d163818bf3ff`; no door model file moved and the door render fingerprints pass unchanged.
+
 ## Decisions (Cody, 2026-10-11)
 
 - Approved as recommended, all ten (section 8), with two changes:
