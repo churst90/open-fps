@@ -2,6 +2,14 @@
 
 ## 2026-11-18
 
+- The sound library's third version, tag `library/v0.3.0` (docs/LIBRARY_CHANGES.md): everything the library gained
+  since `library/v0.2.0`, for Resonance to take. Rigid bodies on Jolt (`BodyWorld`, `PieceBodies`, contacts into
+  `ContactStream`), swept queries against the geometry, restitution set by the lossier body with measured floors, a
+  dropped thing's own resonance by its shape, a vehicle's full brake from its tyres, the tap and the plug as two
+  controls, narrow and sloped ground left out of the listener's trace, `WindModel` gone for `WindField`, Steam Audio
+  pathing gone, MemoryPack 1.22.0 and JoltPhysicsSharp 2.23.0. Nothing in this entry changes a sound by itself; each
+  change was noted on its own day. Wire hash 76462a50fa10, door fingerprint d163818bf3ff.
+
 - MemoryPack 1.21.4 to 1.22.0 in all five projects that use it. 1.22.0 fixes the string-length overflow that
   let one five-byte packet read two gigabytes past its buffer and kill the server (Cysharp's PR #477): the
   library now throws instead, and `MemoryPackItselfRefusesTheOverflowingLength` holds it to that. `WireCheck`

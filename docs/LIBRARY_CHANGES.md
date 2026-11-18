@@ -6,9 +6,34 @@ tag (docs/SOUND_LIBRARY_BOUNDARY.md, stage 8 and decision 8) and references the 
 
 ## Unreleased
 
-- `OpenFPS.Physics` takes a new package dependency, JoltPhysicsSharp 2.22.0 (with its native `libjoltc.so` and
-  `joltc.dll`), so Resonance gets it with the package; the new `BodyWorld` type is the only one that uses it.
+Nothing yet.
 
+## library/v0.3.0 (2026-11-18)
+
+Rigid bodies on Jolt, swept queries, a dropped thing's own resonance, the tap and the plug as two controls, and
+Steam Audio pathing gone. The wire hash is 76462a50fa10 and the door fingerprint d163818bf3ff.
+
+What a host must change, if it used any of these:
+- Steam Audio pathing is gone (Cody, 2026-11-17). It never ran: the simulator was made with pathing off and nothing
+  read its answer, and its probe bake was the 2026-09 stutter. Gone are the option, the bake thread and probe state,
+  the pathing run, `PathingReady`, `PathingWorldDirection`, the scene bounds that only sized the probe volume, and the
+  probe and path-bake bindings in OpenFPS.Native. The native structs keep their pathing fields, zeroed, because their
+  layout must match phonon.h 4.8.1. Routes round walls still come from the map's own geometry (the barrier search and
+  `OpeningRoutes`); a host does nothing unless it called one of the removed members.
+- `WindModel` and `VehicleStep.Capacity` are gone (below, with what replaces each).
+- `RunningWater`'s `PlugWhileRunning` is gone: a tap and its plug are two controls. `FlowBasin.PlugIn` is now only
+  where a placed basin's plug starts (in for a sink and a washbasin, out for a shower tray), and the live plug is the
+  source's: `SourceSpec.PlugIn` and `SpatialEmitter.PlugIn` (appended) reach the running-water synth each frame
+  beside `Running`, so changing it never remakes the voice. Shut, a basin's water stands until the plug is pulled. A
+  host that relied on the old rule (the plug in while the tap runs, out when it shuts) sets `PlugIn` itself.
+- Two package versions: MemoryPack 1.21.4 to 1.22.0 in OpenFPS.Geometry and OpenFPS.Sound (1.21.4 read a string whose
+  length header was near `int.MinValue` two gigabytes past its buffer; 1.22.0 throws), and JoltPhysicsSharp 2.23.0
+  (its native JoltPhysics.Native 1.1.0). Valid MemoryPack data is unchanged.
+
+What is new or behaves differently:
+
+- `OpenFPS.Physics` takes a new package dependency, JoltPhysicsSharp 2.23.0 (with its native `libjoltc.so` and
+  `joltc.dll`), so Resonance gets it with the package; the new `BodyWorld` type is the only one that uses it.
 - The listener's trace (`SteamAudioScene.WithoutOpenGround`, `AcousticGeometry`) now leaves out narrow and sloped ground
   that is stood on, as it did broad level slabs: a slab at most 0.5 m thick whose top a body can walk (no steeper than
   45 degrees), that rests on the ground (judged at its four top corners and middle against the ground at those points:
@@ -25,6 +50,30 @@ tag (docs/SOUND_LIBRARY_BOUNDARY.md, stage 8 and decision 8) and references the 
   a vehicle's drag and rolling resistance in newtons, and `Brakes.Capacity`, the most a car's tyres can slow it at under a
   gravity, with an optional factor for the road's water. `VehicleStep.Capacity` is gone: a host that called it reads
   `Brakes.Capacity(mechanics.Tyres, gravity)`. Nothing moves; the wire hash moves only because the source did.
+- Rigid bodies (docs/PHYSICS_BOUNDARY.md stage 4): `BodyWorld` holds sphere, box, capsule and mesh shapes by the host's
+  handle, with pose, velocities, mass, and friction and restitution from materials, stepped at 120 Hz, four steps to a
+  tick, single-threaded so runs repeat. `PieceBodies` puts a tile's triangles in as static meshes, one body a
+  material, and door leaves as kinematic bodies; OpenFPS.Models' `AddVehicleBody` adds a vehicle's one closed shell as
+  a kinematic body. `ReportContacts` and `Tick(stream)` hand Jolt's contacts to `ContactStream`, sorted by pair, with closing and
+  slip speed and an impulse; body ids are 2^30 plus the handle, so they never meet entity ids. Nothing outside
+  OpenFPS.Physics names Jolt (the PhysicsBoundary guard).
+- Restitution between two bodies is the smaller of the two (set in `BodyWorld`'s contact listener; Jolt's own combine
+  takes the larger): a pair cannot rebound better than its lossier member against itself. Friction stays Jolt's
+  geometric mean. Floors have measured figures where one exists: Concrete 0.60, Tile 0.82, Metal and Fence 0.72;
+  materials with no measurement keep the 0.1 fallback (`AcousticRegistry`, docs/MATTER.md 2.4).
+- Swept queries in OpenFPS.Geometry: sphere, upright capsule and oriented box sweeps against the triangle BVH
+  (`SweptShape` and `SweepHit`, with the sweeps on `TriangleWorld` and `GeometryPiece`), conservative so nothing
+  tunnels, giving the fraction, point, normal, triangle and material.
+- A dropped or thrown thing sounds as what it is (docs/PHYSICS_BOUNDARY.md 18.13). An item declares a shape (Block,
+  Bar, Tube, Plate, Shell) with its outer size and an optional wall; `ImpactAcoustics.Dropped` and `ItemModes` give it
+  up to twelve modes by its shape's law, each weighted by how well the shape radiates it, by the blow's spectrum (the
+  Hertz contact of both materials) and by where it landed, and each damped by the surface it lands on (carpet most,
+  metal least). `TransientSound` gains `ModeRatios`, `ModeDecaySeconds` and `ModeGains`, appended; a ring or knock
+  without them renders byte for byte as before, and every other caller of `ImpactAcoustics.Between` is untouched.
+- A vehicle's full brake in the sound comes from its tyres: `Driveline.MaxBrake` is `Brakes.Capacity` of the profile's
+  tyres under standard gravity, set once in the constructor. Every brake request below the old 7.5 m/s² is the same
+  deceleration as before; a full stop is now the tyres' own (9.32 m/s² for a car, 10.79 for the sports bike, 7.35 for
+  the truck).
 
 ## library/v0.2.0 (2026-10-24)
 

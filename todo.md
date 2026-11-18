@@ -19,7 +19,8 @@ Where the plans stand (2026-10-17):
 - Sound library (docs/SOUND_LIBRARY_BOUNDARY.md): stages 0 to 7 done, and the namespace rename (decision 6,
   section 21), the engine packages under the library included (21.1), and stage 8: the first version tagged,
   `library/v0.1.0`, with docs/LIBRARY_CHANGES.md (2026-10-17). Resonance takes it as a submodule pinned to the tag.
-  Then `library/v0.2.0` (2026-10-24): todo 6a, the host's needs.
+  Then `library/v0.2.0` (2026-10-24): todo 6a, the host's needs; and `library/v0.3.0` (2026-11-18): Jolt bodies,
+  swept queries, a drop's own resonance, the tap and plug, Steam Audio pathing gone.
 - Engine packages (docs/ENGINE_PACKAGES.md): stages 0 to 5, 7 and 8 done. Left: 6, 9 and 10.
 - Physics (docs/PHYSICS_BOUNDARY.md): stages 0 to 3 done, with stage 2's leftovers (16.6). Left: 4 to 6.
 - Geometry (docs/GEOMETRY.md): stages 1 to 4 done, and stage 6's first half (each vehicle's body as one closed
@@ -29,8 +30,8 @@ Where the plans stand (2026-10-17):
   left is under "Left from the special-cases audit", below.
 
 Shipping is outside the order. Push, the VPS and the Windows zip go out together, and only when Cody says so,
-each time. Main was pushed 2026-10-24 (8f3c038d, tag `library/v0.2.0`; CI green on all 8 shards). The last deploy
-was 3fc38430512b on 2026-10-08. The wire hash has changed many times since (053dd7700918 now), so a client and a
+each time. Main was pushed 2026-11-18 and tagged `library/v0.3.0` once CI was green on all 8 shards. The last
+deploy was 3fc38430512b on 2026-10-08. The wire hash has changed many times since (76462a50fa10 now), so a client and a
 server from either side refuse each other at login: restart the server and update the clients first. The door
 fingerprint changed too (d163818bf3ff since the drops' floor restitutions, 2026-11-17), so the door renders are made
 again once.
