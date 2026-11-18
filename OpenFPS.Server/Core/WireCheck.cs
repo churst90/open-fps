@@ -9,11 +9,12 @@ namespace OpenFPS.Server.Core;
 /// Walks a client message's bytes, field by field, before MemoryPack reads it, and refuses any string
 /// whose length does not fit in what arrived.
 /// </summary>
-// MemoryPack 1.21.4 (and its main branch, 2026-10) reads a UTF-8 string by asking for ~header + 4 bytes; a
-// header of int.MinValue..int.MinValue+3 overflows that to a negative size, the bounds check passes, and it
-// reads two gigabytes past the buffer: an AccessViolationException, which no catch can stop. Five bytes in
-// a LoginRequest took the whole server down before login. The layout here is MemoryPack's for these types:
-// a union tag byte, a member count byte (255 null), then each field in declaration order.
+// MemoryPack 1.21.4 read a UTF-8 string by asking for ~header + 4 bytes; a header of int.MinValue..int.MinValue+3
+// overflowed that to a negative size, the bounds check passed, and it read two gigabytes past the buffer: an
+// AccessViolationException, which no catch can stop. Five bytes in a LoginRequest took the whole server down
+// before login. 1.22.0 fixed it (Cysharp/MemoryPack PR #477) and throws instead; this stays as our own guard.
+// The layout here is MemoryPack's for these types: a union tag byte, a member count byte (255 null), then each
+// field in declaration order.
 public static class WireCheck
 {
     private static readonly ConcurrentDictionary<Type, Type[]> Layouts = new();

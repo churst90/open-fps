@@ -763,9 +763,8 @@ The open questions for Cody, in one place. A few that belong to one item stay wi
   Answered 2026-11-17: keep them as they are.
 - MemoryPack's string-length overflow (one packet crashed the server): Cody said report it privately
   (2026-11-17), but Cysharp had already fixed it in 1.22.0 (2026-11-11, PR #477: `GetSpanReference` compares
-  as unsigned and `GetNextSpan` throws on a negative size), so no report. Next: update MemoryPack to 1.22.0 and
-  keep `WireCheck` as our own guard; its new MEMPACK043 warning for `DateTimeOffset` members must not break
-  the 0-warning builds, and the wire hash and stored streams must not move (valid data's format is unchanged).
+  as unsigned and `GetNextSpan` throws on a negative size), so no report. DONE 2026-11-18: MemoryPack is 1.22.0,
+  `WireCheck` stays as our own guard, no MEMPACK043 warning, the wire hash and stored streams unchanged.
 - Sound library: CI compares renders by tolerance; 430 KB per stream regeneration. Settled by use: both have run
   since 2026-10-11 (docs/SOUND_LIBRARY_BOUNDARY.md 13.3 and 13.4, the maths probe's tolerant fallback).
   (`ColliderShape` went to `OpenFPS.Geometry` with the namespace rename, 2026-10-17; decision 4, MemoryPack,

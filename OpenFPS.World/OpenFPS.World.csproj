@@ -34,7 +34,7 @@
 
   <ItemGroup>
     <!-- A tile's state is on the wire (TileStreamUpdate). -->
-    <PackageReference Include="MemoryPack" Version="1.21.4" />
+    <PackageReference Include="MemoryPack" Version="1.22.0" />
     <!-- Overture's buildings are GeoParquet, read by byte range (OneWorld/Overture.cs). MIT, fully managed. -->
     <PackageReference Include="Parquet.Net" Version="6.1.0" />
     <PackageReference Include="Serilog" Version="4.2.0" />

@@ -488,6 +488,32 @@ public class ServerHardeningTests : IDisposable
     }
 
     [Theory]
+    [InlineData(int.MinValue)]
+    [InlineData(int.MinValue + 1)]
+    [InlineData(int.MinValue + 2)]
+    [InlineData(int.MinValue + 3)]
+    public void MemoryPackItselfRefusesTheOverflowingLength(int header)
+    {
+        // Fixed upstream in 1.22.0 (Cysharp/MemoryPack PR #477): the bytes the wire check refuses, read with no
+        // check in front, now throw where 1.21.4 read 2 GB past the buffer; on 1.21.4 this kills the test host.
+        int thrown = 0;
+        foreach (var sample in new IMessage[] { new LoginRequest { Username = "aaaa", Password = "bbbb" }, new ChatMessage { Text = "cccc" },
+                                                 new TextCommand { Command = "dddd", Args = new[] { "eeee" } } })
+        {
+            byte[] good = MemoryPackSerializer.Serialize<IMessage>(sample);
+            for (int at = 2; at + 4 <= good.Length; at++)
+            {
+                var bytes = (byte[])good.Clone();
+                BitConverter.TryWriteBytes(bytes.AsSpan(at), header);
+                if (WireCheck.IsSafe(bytes)) continue;
+                try { MemoryPackSerializer.Deserialize<IMessage>(bytes); }
+                catch (Exception) { thrown++; }
+            }
+        }
+        Assert.True(thrown > 0, "MemoryPack read every refused message without complaint");
+    }
+
+    [Theory]
     [MemberData(nameof(ClientSamples))]
     public void TheWireCheckWalksEveryClientMessageExactly(string name, byte[] good)
     {

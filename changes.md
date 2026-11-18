@@ -1,5 +1,14 @@
 # Changes
 
+## 2026-11-18
+
+- MemoryPack 1.21.4 to 1.22.0 in all five projects that use it. 1.22.0 fixes the string-length overflow that
+  let one five-byte packet read two gigabytes past its buffer and kill the server (Cysharp's PR #477): the
+  library now throws instead, and `MemoryPackItselfRefusesTheOverflowingLength` holds it to that. `WireCheck`
+  stays in front as our own guard. Valid data's format is unchanged: the wire hash (91d439b602bb), the door
+  fingerprint and every stored stream are as before, and no MEMPACK043 warning arose (no `DateTimeOffset`
+  member is serialised).
+
 ## 2026-11-17
 
 - The drop's resonance is its resonance, not a bell's chord (docs/PHYSICS_BOUNDARY.md 18.13; Cody heard round 1 on

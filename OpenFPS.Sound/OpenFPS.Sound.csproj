@@ -32,7 +32,7 @@
   <ItemGroup>
     <!-- TransientSound travels in WorldAudioEvent, positionally (decision 4: the attribute stays, the
          bytes stay). Its sources are in OpenFPS.Common's wire hash. -->
-    <PackageReference Include="MemoryPack" Version="1.21.4" />
+    <PackageReference Include="MemoryPack" Version="1.22.0" />
     <!-- The models log what they could not load (decision 5: Serilog's static Log stays). -->
     <PackageReference Include="Serilog" Version="4.2.0" />
   </ItemGroup>
